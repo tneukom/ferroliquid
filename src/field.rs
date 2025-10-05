@@ -1,6 +1,4 @@
-use crate::{
-    math::{point::Point, rect::Rect, rgba8::Rgba8},
-};
+use crate::math::{point::Point, rect::Rect, rgba8::Rgba8};
 use data_encoding::BASE64;
 use image::ImageEncoder;
 use std::{
@@ -246,6 +244,15 @@ impl<T: Clone> Field<T> {
         Self::from_map(self.bounds * scale, |pixel| {
             self[pixel.div_euclid(scale)].clone()
         })
+    }
+}
+
+impl<T: Default> Field<T> {
+    pub fn defaults(bounds: Rect<i64>) -> Self {
+        let size = bounds.width() as usize * bounds.height() as usize;
+        let mut elems = Vec::new();
+        elems.resize_with(size, T::default);
+        Self { bounds, elems }
     }
 }
 
