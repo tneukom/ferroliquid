@@ -1,0 +1,64 @@
+#![allow(dead_code)]
+#![allow(unsafe_op_in_unsafe_fn)]
+
+extern crate core;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
+
+pub mod app;
+pub(crate) mod camera;
+pub(crate) mod coordinate_frame;
+pub(crate) mod field;
+pub(crate) mod math;
+pub(crate) mod painting;
+pub(crate) mod palettes;
+pub(crate) mod utils;
+pub(crate) mod view;
+pub(crate) mod widgets;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn main() {
+    use crate::app::EguiApp;
+    use eframe::WebGlContextOption;
+    use log::info;
+
+    // Redirect `log` message to `console.log` and friends:
+    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
+
+    let mut web_options = eframe::WebOptions::default();
+    web_options.webgl_context_option = WebGlContextOption::WebGl2;
+
+    unsafe {
+        wasm_bindgen_futures::spawn_local(async {
+            let document = web_sys::window()
+                .expect("No window")
+                .document()
+                .expect("No document");
+
+            let canvas = document
+                .get_element_by_id("the_canvas_id")
+                .expect("Failed to find the_canvas_id")
+                .dyn_into::<web_sys::HtmlCanvasElement>()
+                .expect("the_canvas_id was not a HtmlCanvasElement");
+
+            eframe::WebRunner::new()
+                .start(
+                    canvas, // hardcode it
+                    web_options,
+                    Box::new(|cc| {
+                        egui_extras::install_image_loaders(&cc.egui_ctx);
+                        use crate::app::EguiApp;
+                        let app = EguiApp::new(cc);
+                        Ok(Box::new(app))
+                    }),
+                )
+                .await
+                .expect("failed to start eframe");
+        });
+    }
+}
