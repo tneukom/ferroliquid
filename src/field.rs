@@ -1,6 +1,4 @@
-use crate::{
-    math::{point::Point, rect::Rect, rgba8::Rgba8},
-};
+use crate::math::{point::Point, rect::Rect, rgba8::Rgba8};
 use data_encoding::BASE64;
 use image::ImageEncoder;
 use std::{
@@ -32,6 +30,13 @@ impl<T> Field<T> {
         assert!(bounds.height() >= 0);
         assert_eq!(bounds.width() * bounds.height(), elems.len() as i64);
         Self { bounds, elems }
+    }
+
+    pub fn filled_with(bounds: Rect<i64>, f: impl FnMut() -> T) -> Self {
+        let mut elems = Vec::new();
+        let len = bounds.width() as usize * bounds.height() as usize;
+        elems.resize_with(len, f);
+        Self::from_linear(bounds, elems)
     }
 
     pub fn from_map(bounds: Rect<i64>, f: impl FnMut(Point<i64>) -> T) -> Self {
@@ -246,6 +251,19 @@ impl<T: Clone> Field<T> {
         Self::from_map(self.bounds * scale, |pixel| {
             self[pixel.div_euclid(scale)].clone()
         })
+    }
+
+    pub fn fill(&mut self, value: T) {
+        self.elems.fill(value)
+    }
+}
+
+impl<T: Default> Field<T> {
+    pub fn defaults(bounds: Rect<i64>) -> Self {
+        let size = bounds.width() as usize * bounds.height() as usize;
+        let mut elems = Vec::new();
+        elems.resize_with(size, T::default);
+        Self { bounds, elems }
     }
 }
 

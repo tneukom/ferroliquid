@@ -36,6 +36,9 @@ pub fn main_editor() {
 pub fn main() {
     #[cfg(not(target_arch = "wasm32"))]
     {
+        // use ferroliquid::basic_simulation;
+        // basic_simulation::basic_simulation();
+
         env_logger::init();
         warn!("Logging!");
 

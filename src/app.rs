@@ -1,15 +1,14 @@
+use crate::simulation::Simulation;
+use crate::simulation_painter::{
+    SimulationDrawSettings, draw_simulation, simulation_draw_settings_widget,
+};
 use crate::{
-    coordinate_frame::CoordinateFrames,
     math::{point::Point, rect::Rect},
-    painting::{
-        gl_garbage::gl_gc,
-        view_painter::{DrawView, ViewPainter},
-    },
-    utils::monotonic_time,
+    painting::view_painter::ViewPainter,
     view::{View, ViewInput, ViewSettings},
 };
-use glow::HasContext;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 pub struct EguiApp {
     view_painter: Arc<Mutex<ViewPainter>>,
@@ -18,7 +17,13 @@ pub struct EguiApp {
     gl: Arc<glow::Context>,
     view: View,
 
+    simulation: Simulation,
+
+    simulation_draw_settings: SimulationDrawSettings,
+
     view_input: ViewInput,
+
+    run: bool,
 }
 
 impl EguiApp {
@@ -32,12 +37,28 @@ impl EguiApp {
 
         let gl = cc.gl.clone().unwrap();
 
+        let bounds = Rect::low_size(Point::ZERO, Point(80, 80));
+        let mut simulation = Simulation::new(bounds, 1.0 / 60.0);
+
+        // Solid walls
+        for x in bounds.left()..bounds.right() {
+            simulation.grid.make_solid(Point(x, bounds.bottom() - 1));
+        }
+        for y in bounds.top()..bounds.bottom() {
+            simulation.grid.make_solid(Point(bounds.left(), y));
+            simulation.grid.make_solid(Point(bounds.right() - 1, y));
+        }
+        // simulation.create_particle(Point(5.5, 5.5), Point(0.0, 5.0));
+
         Self {
             view_painter: Arc::new(Mutex::new(view_painter)),
             view: View::new(),
             view_settings: ViewSettings::default(),
+            simulation,
             gl,
             view_input: ViewInput::EMPTY,
+            simulation_draw_settings: SimulationDrawSettings::default(),
+            run: false,
         }
     }
 
@@ -56,77 +77,38 @@ impl EguiApp {
     // }
 
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
-        // Nothing atm
+        ui.checkbox(&mut self.run, "Run");
+        let step_clicked = ui.button("Step").clicked();
+
+        if self.run || step_clicked {
+            // Run simulation step
+            let fill_rect = Rect::low_size(Point(4.0, 4.0), Point(8.0, 8.0));
+            let velocity = Point(20.0, 0.0);
+            self.simulation.fill_rectangle(fill_rect, velocity);
+            // for coord in fill_rect.iter_indices() {
+            //     self.simulation.fill(coord, velocity);
+            // }
+
+            self.simulation.apply_force(Point(0.0, 60.0));
+            let instant = Instant::now();
+            self.simulation.step();
+            println!("time to simulate: {}", instant.elapsed().as_secs_f64());
+        }
+
+        simulation_draw_settings_widget(ui, &mut self.simulation_draw_settings);
     }
 
-    fn central_panel(&mut self, ui: &mut egui::Ui) {
-        let input = ui.ctx().input(|input| input.clone());
-        let window_size: Point<f64> = input.screen_rect.size().into();
-
-        let size = ui.available_size_before_wrap();
-        let (egui_rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
-
-        let mut viewport: Rect<f64> = egui_rect.into();
-        if viewport.width() < 1.0 || viewport.height() < 1.0 {
-            // Hack so app doesn't crash when window is too small and viewport has size zero.
-            viewport = Rect::low_size(Point::ZERO, Point::ONE);
-        }
-        let frames = CoordinateFrames::new(window_size, viewport);
-
-        // `ctx.pointer_interact_pos()` is None if mouse is outside the window
-        if let Some(egui_mouse) = ui.ctx().pointer_interact_pos() {
-            let window_mouse = Point::new(egui_mouse.x as f64, egui_mouse.y as f64);
-            let view_mouse = frames.view_from_window() * window_mouse;
-
-            let hovered = response.hovered();
-
-            let mouse = &input.pointer;
-
-            let world_mouse = self.view.camera.world_from_view() * view_mouse;
-            let left_mouse_down = hovered && mouse.button_down(egui::PointerButton::Primary);
-
-            // TODO: wants_keyboard is false when cursor is in textbox and escape is pressed, so a
-            //   selection is cancelled. It should not be cancelled!
-            self.view_input = ViewInput {
-                frames,
-                view_mouse,
-                world_mouse,
-                left_mouse_down,
-            };
-        }
-
-        let draw_view =
-            DrawView::from_view(&mut self.view, &self.view_input, frames, monotonic_time());
-
-        let view_painter = self.view_painter.clone();
-
-        let cb = egui_glow::CallbackFn::new(move |_info, painter| {
-            let gl = painter.gl().as_ref();
-
-            let mut view_painter = view_painter.lock().unwrap();
-
-            unsafe {
-                gl.clear_depth(1.0);
-                gl.clear(glow::DEPTH_BUFFER_BIT);
-
-                gl.disable(glow::BLEND);
-                gl.disable(glow::SCISSOR_TEST);
-                gl.disable(glow::CULL_FACE);
-                gl.disable(glow::DEPTH_TEST);
-                // self.gl.enable(glow::FRAMEBUFFER_SRGB);
-
-                view_painter.draw_view(gl, &draw_view);
-
-                // Actually delete Opengl resources that were release in Drop impls
-                gl_gc(gl);
-            }
-        });
-
-        let callback = egui::PaintCallback {
-            rect: egui_rect,
-            callback: Arc::new(cb),
-        };
-        ui.painter().add(callback);
+    pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
+        let desired_size = egui::vec2(100.0, 100.0);
+        let (response, painter) = ui.allocate_painter(desired_size, egui::Sense::click());
+        let rect = response.rect;
+        let painter = ui.painter();
+        draw_simulation(
+            &self.simulation,
+            painter,
+            rect,
+            &self.simulation_draw_settings,
+        );
     }
 
     fn screen_is_narrow(ctx: &egui::Context) -> bool {
@@ -140,10 +122,6 @@ impl eframe::App for EguiApp {
 
         tracy_client::frame_mark();
 
-        // let mut style = ctx.style().deref().clone();
-        // style.visuals.dark_mode = false;
-        // ctx.set_style(style);
-
         ctx.style_mut(|style| {
             style.spacing.button_padding = egui::Vec2::splat(6.0);
             style
@@ -153,28 +131,19 @@ impl eframe::App for EguiApp {
                 .size = 15.0;
         });
 
-        // ctx.set_pixels_per_point(1.7);
-
         let visual = egui::Visuals::light();
-        // visual.window_shadow = epaint::Shadow::NONE;
         ctx.set_visuals(visual);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.central_panel(ui);
+        egui::SidePanel::left("left_panel").show(ctx, |ui| {
+            self.side_panel_ui(ui);
         });
 
-        self.view
-            .handle_input(&mut self.view_input, &mut self.view_settings);
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.central_panel_ui(ui);
+        });
 
-        // let cursor_icon = if self.view_settings.edit_mode == EditMode::Brush {
-        //     egui::CursorIcon::Default
-        // } else if self.view.ui_state.is_idle() && self.view.is_hovering_selection(&self.view_input)
-        // {
-        //     egui::CursorIcon::Move
-        // } else {
-        //     egui::CursorIcon::Default
-        // };
-        // ctx.set_cursor_icon(cursor_icon);
+        // self.view
+        //     .handle_input(&mut self.view_input, &mut self.view_settings);
 
         ctx.request_repaint();
     }

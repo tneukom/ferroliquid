@@ -4,7 +4,6 @@ pub(crate) mod generic;
 pub(crate) mod interval;
 pub(crate) mod matrix2;
 pub(crate) mod matrix3;
-pub(crate) mod pixel;
 pub(crate) mod point;
 pub(crate) mod rect;
 pub(crate) mod rgba8;
