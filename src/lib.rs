@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 pub mod app;
 pub(crate) mod camera;
+pub(crate) mod constants;
 pub(crate) mod coordinate_frame;
 pub(crate) mod field;
 pub(crate) mod grid;
@@ -18,6 +19,7 @@ pub(crate) mod math;
 pub(crate) mod painting;
 pub(crate) mod palettes;
 pub(crate) mod sides;
+pub(crate) mod solver;
 pub(crate) mod utils;
 pub(crate) mod view;
 pub(crate) mod widgets;

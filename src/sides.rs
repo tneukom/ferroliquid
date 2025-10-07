@@ -4,43 +4,113 @@ use crate::math::rect::Rect;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Index, IndexMut};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SideName {
-    Left,
-    Bottom,
-    Right,
-    Top,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    UP = 0,
+    DOWN = 1,
+    LEFT = 2,
+    RIGHT = 3,
 }
 
-impl SideName {
+impl Direction {
+    pub const ALL: [Self; 4] = [Self::UP, Self::LEFT, Self::RIGHT, Self::DOWN];
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SideOrientation {
+    Vertical,
+    Horizontal,
+}
+
+impl SideOrientation {
     pub fn unicode_symbol(self) -> char {
         match self {
-            Self::Top => '←',
-            Self::Left => '↓',
-            Self::Bottom => '→',
-            Self::Right => '↑',
+            Self::Vertical => '|',
+            Self::Horizontal => '—',
         }
     }
-
-    pub const ALL: [SideName; 4] = [Self::Left, Self::Bottom, Self::Right, Self::Top];
 }
 
 /// Side(pixel, side) is the counterclockwise side around pixel
 /// Each pixel has therefore 6 sides, see docs/sides_and_corners.jpg
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Side {
-    /// cell to the left of the side
-    pub left: Point<i64>,
-    pub name: SideName,
+    pub orientation: SideOrientation,
+    pub index: Point<i64>,
 }
 
 impl Side {
-    pub const fn new(left: Point<i64>, name: SideName) -> Self {
-        Self { left, name }
+    pub const fn new(orientation: SideOrientation, index: Point<i64>) -> Self {
+        Self { orientation, index }
     }
 
-    pub fn sides(left: Point<i64>) -> [Self; 4] {
-        SideName::ALL.map(|name| Self::new(left, name))
+    pub const fn vertical(index: Point<i64>) -> Self {
+        Self::new(SideOrientation::Vertical, index)
+    }
+
+    pub const fn horizontal(index: Point<i64>) -> Self {
+        Self::new(SideOrientation::Horizontal, index)
+    }
+
+    pub fn up(self) -> Self {
+        Self::new(self.orientation, self.index.up())
+    }
+
+    pub fn down(self) -> Self {
+        Self::new(self.orientation, self.index.down())
+    }
+
+    pub fn left(self) -> Self {
+        Self::new(self.orientation, self.index.left())
+    }
+
+    pub fn right(self) -> Self {
+        Self::new(self.orientation, self.index.right())
+    }
+
+    pub fn left_side(coord: Point<i64>) -> Self {
+        Self::vertical(coord)
+    }
+
+    pub fn right_side(coord: Point<i64>) -> Self {
+        Self::left_side(coord).right()
+    }
+
+    pub fn top_side(coord: Point<i64>) -> Self {
+        Self::horizontal(coord)
+    }
+
+    pub fn bottom_side(coord: Point<i64>) -> Self {
+        Self::top_side(coord).down()
+    }
+
+    pub fn sides(coord: Point<i64>) -> [Self; 4] {
+        [
+            Self::left_side(coord),
+            Self::bottom_side(coord),
+            Self::right_side(coord),
+            Self::top_side(coord),
+        ]
+    }
+
+    pub fn side(coord: Point<i64>, direction: Direction) -> Self {
+        match direction {
+            Direction::UP => Self::top_side(coord),
+            Direction::DOWN => Self::bottom_side(coord),
+            Direction::LEFT => Self::left_side(coord),
+            Direction::RIGHT => Self::right_side(coord),
+        }
+    }
+
+    pub fn upper_cell(self) -> Point<i64> {
+        self.index
+    }
+
+    pub fn lower_cell(self) -> Point<i64> {
+        match self.orientation {
+            SideOrientation::Vertical => self.upper_cell().up(),
+            SideOrientation::Horizontal => self.upper_cell().left(),
+        }
     }
 }
 
@@ -48,7 +118,7 @@ impl Add<Point<i64>> for Side {
     type Output = Side;
 
     fn add(self, rhs: Point<i64>) -> Self::Output {
-        Self::new(self.left + rhs, self.name)
+        Self::new(self.orientation, self.index + rhs)
     }
 }
 
@@ -56,10 +126,10 @@ impl Display for Side {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Side([{}, {}], {})",
-            self.left.x,
-            self.left.y,
-            self.name.unicode_symbol()
+            "Side({}, [{}, {}])",
+            self.orientation.unicode_symbol(),
+            self.index.x,
+            self.index.y,
         )
     }
 }
@@ -70,116 +140,89 @@ impl Debug for Side {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct CellSides<T> {
-    pub left: T,
-    pub bottom: T,
-    pub right: T,
-    pub top: T,
-}
-
-impl<T: Copy> CellSides<T> {
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = &T> {
-        [&self.left, &self.bottom, &self.right, &self.top].into_iter()
-    }
-
-    pub fn enumerate(&self) -> impl ExactSizeIterator<Item = (SideName, &T)> {
-        [
-            (SideName::Left, &self.left),
-            (SideName::Bottom, &self.bottom),
-            (SideName::Right, &self.right),
-            (SideName::Top, &self.top),
-        ]
-        .into_iter()
-    }
-
-    pub fn filled(value: T) -> Self {
-        Self {
-            left: value,
-            bottom: value,
-            right: value,
-            top: value,
-        }
-    }
-}
-
-impl<T> Index<SideName> for CellSides<T> {
-    type Output = T;
-
-    fn index(&self, side_name: SideName) -> &Self::Output {
-        match side_name {
-            SideName::Left => &self.left,
-            SideName::Bottom => &self.bottom,
-            SideName::Right => &self.right,
-            SideName::Top => &self.top,
-        }
-    }
-}
-
-impl<T> IndexMut<SideName> for CellSides<T> {
-    fn index_mut(&mut self, side_name: SideName) -> &mut Self::Output {
-        match side_name {
-            SideName::Left => &mut self.left,
-            SideName::Bottom => &mut self.bottom,
-            SideName::Right => &mut self.right,
-            SideName::Top => &mut self.top,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct SideField<T> {
-    cells: Field<CellSides<T>>,
+    vertical: Field<T>,
+    horizontal: Field<T>,
 }
 
 impl<T: Copy> SideField<T> {
     pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.cells.iter().flat_map(|cell| cell.iter())
+        self.vertical.iter().chain(self.horizontal.iter())
     }
 
-    pub fn enumerate(&self) -> impl Iterator<Item = (Side, &T)> {
-        self.cells.enumerate().flat_map(|(cell, cell_sides)| {
-            cell_sides
-                .enumerate()
-                .map(move |(side_name, value)| (Side::new(cell, side_name), value))
-        })
+    pub fn vertical_indices(&self) -> impl Iterator<Item = Side> + use<T> {
+        self.vertical.indices().map(Side::vertical)
     }
-}
 
-impl<T: Copy> SideField<T> {
+    pub fn horizontal_indices(&self) -> impl Iterator<Item = Side> + use<T> {
+        self.horizontal.indices().map(Side::horizontal)
+    }
+
+    pub fn indices(&self) -> impl Iterator<Item = Side> + use<T> {
+        self.vertical_indices().chain(self.horizontal_indices())
+    }
+
+    // pub fn enumerate(&self) -> impl Iterator<Item = (Side, &T)> {
+    //     self.cells.enumerate().flat_map(|(cell, cell_sides)| {
+    //         cell_sides
+    //             .enumerate()
+    //             .map(move |(side_name, value)| (Side::new(cell, side_name), value))
+    //     })
+    // }
+
+    pub fn filled_with(bounds: Rect<i64>, mut f: impl FnMut() -> T) -> Self {
+        // width + 1
+        let mut vertical_bounds = bounds;
+        vertical_bounds.x.high += 1;
+        let vertical = Field::filled_with(vertical_bounds, &mut f);
+
+        // height + 1
+        let mut horizontal_bounds = bounds;
+        horizontal_bounds.y.high += 1;
+        let horizontal = Field::filled_with(horizontal_bounds, &mut f);
+
+        Self {
+            vertical,
+            horizontal,
+        }
+    }
+
     pub fn filled(bounds: Rect<i64>, value: T) -> Self {
-        Self {
-            cells: Field::filled(bounds, CellSides::filled(value)),
-        }
+        Self::filled_with(bounds, || value)
     }
 }
 
-impl<T: Default> SideField<T> {
+impl<T: Copy + Default> SideField<T> {
     pub fn defaults(bounds: Rect<i64>) -> Self {
-        Self {
-            cells: Field::defaults(bounds),
-        }
+        Self::filled(bounds, T::default())
     }
 }
 
 impl<T> Index<Side> for SideField<T> {
     type Output = T;
 
-    fn index(&self, index: Side) -> &Self::Output {
-        &self.cells[index.left][index.name]
+    fn index(&self, side: Side) -> &Self::Output {
+        match side.orientation {
+            SideOrientation::Vertical => &self.vertical[side.index],
+            SideOrientation::Horizontal => &self.horizontal[side.index],
+        }
     }
 }
 
 impl<T> IndexMut<Side> for SideField<T> {
-    fn index_mut(&mut self, index: Side) -> &mut Self::Output {
-        &mut self.cells[index.left][index.name]
+    fn index_mut(&mut self, side: Side) -> &mut Self::Output {
+        match side.orientation {
+            SideOrientation::Vertical => &mut self.vertical[side.index],
+            SideOrientation::Horizontal => &mut self.horizontal[side.index],
+        }
     }
 }
 
 pub struct Sides {
-    pub velocityInterpolated: SideField<f64>,
-    pub velocityDivFree: SideField<f64>,
-    pub velocityCorrection: SideField<f64>,
+    pub velocity_interpolated: SideField<f64>,
+    pub velocity_div_free: SideField<f64>,
+    pub velocity_correction: SideField<f64>,
     pub density: SideField<f64>,
     // TODO: Why not bool?
     pub defined: SideField<f64>,
@@ -189,28 +232,36 @@ pub struct Sides {
     /// fluid(v) = v
     /// pump(v) = 0.1*v + v0
     /// moving_solid(v) = v0
-    /// f(v) = boundaryLinear * v + boundaryConstant
-    boundaryConstant: SideField<f64>,
-    boundaryLinear: SideField<f64>,
+    /// f(v) = boundary_linear * v + boundary_constant
+    pub boundary_constant: SideField<f64>,
+    pub boundary_linear: SideField<f64>,
 }
 
 impl Sides {
     pub fn new(bounds: Rect<i64>) -> Self {
         Self {
-            velocityInterpolated: SideField::defaults(bounds),
-            velocityDivFree: SideField::defaults(bounds),
-            velocityCorrection: SideField::defaults(bounds),
+            velocity_interpolated: SideField::defaults(bounds),
+            velocity_div_free: SideField::defaults(bounds),
+            velocity_correction: SideField::defaults(bounds),
             density: SideField::defaults(bounds),
             defined: SideField::defaults(bounds),
 
-            boundaryConstant: SideField::defaults(bounds),
-            boundaryLinear: SideField::filled(bounds, 1.0),
+            boundary_constant: SideField::defaults(bounds),
+            boundary_linear: SideField::filled(bounds, 1.0),
         }
     }
 
     pub fn make_solid(&mut self, side: Side) {
         //this->defined[coord] = 1.0;
-        self.boundaryConstant[side] = 0.0;
-        self.boundaryLinear[side] = 0.0;
+        self.boundary_constant[side] = 0.0;
+        self.boundary_linear[side] = 0.0;
+    }
+
+    pub fn make_fluid(&mut self, side: Side) {
+        self.defined[side] = 1.0;
+    }
+
+    pub fn indices(&self) -> impl Iterator<Item = Side> + use<> {
+        self.velocity_interpolated.indices()
     }
 }

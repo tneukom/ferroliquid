@@ -1,4 +1,5 @@
 use crate::math::generic::{Dot, Num, SignedNum};
+use crate::sides::Direction;
 use num_traits::{AsPrimitive, real::Real};
 use std::{
     cmp::Ordering,
@@ -105,6 +106,35 @@ impl<T: SignedNum> Point<T> {
 
     pub fn mirror_y(self) -> Self {
         Self::new(self.x, -self.y)
+    }
+
+    pub fn left(self) -> Self {
+        Self::new(self.x - T::ONE, self.y)
+    }
+
+    pub fn right(self) -> Self {
+        Self::new(self.x + T::ONE, self.y)
+    }
+
+    pub fn down(self) -> Self {
+        Self::new(self.x, self.y + T::ONE)
+    }
+
+    pub fn up(self) -> Self {
+        Self::new(self.x, self.y - T::ONE)
+    }
+
+    pub fn neighbors(self) -> [Self; 4] {
+        [self.left(), self.down(), self.right(), self.up()]
+    }
+
+    pub fn neighbor(self, direction: Direction) -> Self {
+        match direction {
+            Direction::UP => self.up(),
+            Direction::DOWN => self.down(),
+            Direction::LEFT => self.left(),
+            Direction::RIGHT => self.right(),
+        }
     }
 }
 

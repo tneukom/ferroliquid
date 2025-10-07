@@ -32,6 +32,13 @@ impl<T> Field<T> {
         Self { bounds, elems }
     }
 
+    pub fn filled_with(bounds: Rect<i64>, f: impl FnMut() -> T) -> Self {
+        let mut elems = Vec::new();
+        let len = bounds.width() as usize * bounds.height() as usize;
+        elems.resize_with(len, f);
+        Self::from_linear(bounds, elems)
+    }
+
     pub fn from_map(bounds: Rect<i64>, f: impl FnMut(Point<i64>) -> T) -> Self {
         // Meaning bounds.width() > 0 and bounds.height() > 0
         // assert!(!bounds.is_empty());
@@ -244,6 +251,10 @@ impl<T: Clone> Field<T> {
         Self::from_map(self.bounds * scale, |pixel| {
             self[pixel.div_euclid(scale)].clone()
         })
+    }
+
+    pub fn fill(&mut self, value: T) {
+        self.elems.fill(value)
     }
 }
 
