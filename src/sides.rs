@@ -163,6 +163,27 @@ impl<T: Copy> SideField<T> {
         self.vertical_indices().chain(self.horizontal_indices())
     }
 
+    pub fn vertical_inner_indices(&self) -> impl Iterator<Item = Side> + use<T> {
+        self.vertical
+            .bounds()
+            .padded(-1)
+            .iter_indices()
+            .map(Side::vertical)
+    }
+
+    pub fn horizontal_inner_indices(&self) -> impl Iterator<Item = Side> + use<T> {
+        self.horizontal
+            .bounds()
+            .padded(-1)
+            .iter_indices()
+            .map(Side::vertical)
+    }
+
+    pub fn inner_indices(&self) -> impl Iterator<Item = Side> + use<T> {
+        self.vertical_inner_indices()
+            .chain(self.horizontal_inner_indices())
+    }
+
     // pub fn enumerate(&self) -> impl Iterator<Item = (Side, &T)> {
     //     self.cells.enumerate().flat_map(|(cell, cell_sides)| {
     //         cell_sides
@@ -190,6 +211,11 @@ impl<T: Copy> SideField<T> {
 
     pub fn filled(bounds: Rect<i64>, value: T) -> Self {
         Self::filled_with(bounds, || value)
+    }
+
+    pub fn fill(&mut self, value: T) {
+        self.vertical.fill(value);
+        self.horizontal.fill(value);
     }
 }
 
@@ -251,6 +277,14 @@ impl Sides {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.velocity_interpolated.fill(0.0);
+        self.velocity_div_free.fill(0.0);
+        self.velocity_correction.fill(0.0);
+        self.density.fill(0.0);
+        self.defined.fill(0.0);
+    }
+
     pub fn make_solid(&mut self, side: Side) {
         //this->defined[coord] = 1.0;
         self.boundary_constant[side] = 0.0;
@@ -264,4 +298,18 @@ impl Sides {
     pub fn indices(&self) -> impl Iterator<Item = Side> + use<> {
         self.velocity_interpolated.indices()
     }
+
+    pub fn inner_indices(&self) -> impl Iterator<Item = Side> + use<> {
+        self.velocity_interpolated.inner_indices()
+    }
+
+    pub fn get_div_free_velocity(&self, side: Side, default_velocity: f64) -> f64 {
+        self.defined[side] * self.velocity_div_free[side]
+            + (1.0 - self.defined[side]) * default_velocity
+    }
+
+    // template<CoordType COORD_TYPE>
+    // inline REAL get_div_free_velocity(Coord<COORD_TYPE> coord, REAL defaultVelocity) const {
+    // return defined[coord] * velocityDivFree[coord] + ((REAL)1.0 - defined[coord]) * defaultVelocity;
+    // }
 }

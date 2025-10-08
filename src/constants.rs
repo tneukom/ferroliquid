@@ -7,5 +7,5 @@ pub const TARGET_DENSITY: f64 = TARGET_DENSITY_I as f64;
 pub const FILLED_PARTICLE_COUNT: usize = 2;
 
 //Working value for ALPHA: 3.0
-// const REAL ALPHA = (REAL)3.0;
-// const REAL SMOOTHING_COEFF = (REAL)1.0;
+pub const ALPHA: f64 = 3.0;
+pub const SMOOTHING_COEFF: f64 = 1.0;

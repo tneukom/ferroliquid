@@ -48,10 +48,8 @@ cached = "0.55.1"
 tracy-client = { version = "0.18.1", default-features = false, features = ["system-tracing",
     "context-switch-tracing", "code-transfer", "callstack-inlines", "only-localhost"] }
 weak-table = { version = "0.3.2", features = ["ahash"] }
-
-[dev-dependencies]
-fastrand = { version = "2.3.0", default-features = false }
-#rstest = "0.21.0"
+fastrand = { version = "2.3.0" }
+simple = "0.3.0"
 
 [profile.release]
 debug = 1

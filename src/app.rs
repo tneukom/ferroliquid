@@ -1,3 +1,4 @@
+use crate::simulation::Simulation;
 use crate::{
     coordinate_frame::CoordinateFrames,
     math::{point::Point, rect::Rect},
@@ -18,6 +19,8 @@ pub struct EguiApp {
     gl: Arc<glow::Context>,
     view: View,
 
+    simulation: Simulation,
+
     view_input: ViewInput,
 }
 
@@ -32,10 +35,14 @@ impl EguiApp {
 
         let gl = cc.gl.clone().unwrap();
 
+        let bounds = Rect::low_size(Point::ZERO, Point(50, 50));
+        let simulation = Simulation::new(bounds, 1.0 / 60.0);
+
         Self {
             view_painter: Arc::new(Mutex::new(view_painter)),
             view: View::new(),
             view_settings: ViewSettings::default(),
+            simulation,
             gl,
             view_input: ViewInput::EMPTY,
         }
@@ -138,11 +145,16 @@ impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // let dt = ctx.input(|input| input.unstable_dt) as f64;
 
-        tracy_client::frame_mark();
+        // Run simulation step
+        println!("step!");
+        let fill_rect = Rect::low_size(Point(20i64, 20), Point(5, 5));
+        for coord in fill_rect.iter_indices() {
+            self.simulation.fill(coord);
+        }
+        self.simulation.apply_force(Point(0.0, 60.0));
+        self.simulation.step();
 
-        // let mut style = ctx.style().deref().clone();
-        // style.visuals.dark_mode = false;
-        // ctx.set_style(style);
+        tracy_client::frame_mark();
 
         ctx.style_mut(|style| {
             style.spacing.button_padding = egui::Vec2::splat(6.0);
@@ -153,10 +165,7 @@ impl eframe::App for EguiApp {
                 .size = 15.0;
         });
 
-        // ctx.set_pixels_per_point(1.7);
-
         let visual = egui::Visuals::light();
-        // visual.window_shadow = epaint::Shadow::NONE;
         ctx.set_visuals(visual);
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -165,16 +174,6 @@ impl eframe::App for EguiApp {
 
         self.view
             .handle_input(&mut self.view_input, &mut self.view_settings);
-
-        // let cursor_icon = if self.view_settings.edit_mode == EditMode::Brush {
-        //     egui::CursorIcon::Default
-        // } else if self.view.ui_state.is_idle() && self.view.is_hovering_selection(&self.view_input)
-        // {
-        //     egui::CursorIcon::Move
-        // } else {
-        //     egui::CursorIcon::Default
-        // };
-        // ctx.set_cursor_icon(cursor_icon);
 
         ctx.request_repaint();
     }

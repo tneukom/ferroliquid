@@ -12,21 +12,22 @@ pub enum CellType {
     Fluid = 2,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParticleState {
     Dead = 0,
     Alive = 1,
 }
 
 pub struct Grid {
-    bounds: Rect<i64>,
-    cells_density: Field<f64>,
-    cells_particle_count: Field<usize>,
-    cells_type: Field<CellType>,
-    cells_fluid_index: Field<usize>,
-    cells_is_boundary: Field<bool>,
-    cells_pressure: Field<f64>,
-    sides: Sides,
-    fluid_cells: Vec<Point<i64>>,
+    pub bounds: Rect<i64>,
+    pub cells_density: Field<f64>,
+    pub cells_particle_count: Field<usize>,
+    pub cells_type: Field<CellType>,
+    pub cells_fluid_index: Field<usize>,
+    pub cells_is_boundary: Field<bool>,
+    pub cells_pressure: Field<f64>,
+    pub sides: Sides,
+    pub fluid_cells: Vec<Point<i64>>,
 }
 
 impl Grid {
@@ -300,7 +301,7 @@ impl Grid {
             }
         }
 
-        for side in self.sides.indices() {
+        for side in self.sides.inner_indices() {
             let upper_pressure = self.cells_pressure[side.upper_cell()];
             let lower_pressure = self.cells_pressure[side.lower_cell()];
 
@@ -310,6 +311,22 @@ impl Grid {
             self.sides.velocity_correction[side] =
                 self.sides.velocity_div_free[side] - self.sides.velocity_interpolated[side];
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.cells_density.fill(0.0);
+        self.cells_particle_count.fill(0);
+        self.cells_fluid_index.fill(0);
+        self.cells_is_boundary.fill(false);
+
+        for cell_type in self.cells_type.iter_mut() {
+            if *cell_type != CellType::Solid {
+                *cell_type = CellType::Air;
+            }
+        }
+
+        self.sides.clear();
+        self.fluid_cells.clear();
     }
 
     /// Returns whether pos was successfully projected out of solid
@@ -439,50 +456,3 @@ impl Grid {
         None
     }
 }
-
-// struct Grid {
-//
-//
-//     public:
-//         Grid(int width, int height, Simulation const& simulation);
-//
-//     void clear();
-//
-//     //NO_INLINE_PROFILE void applyBoundaryConditions();
-//     void insertParticle(Vec2& pos, Vec2& velocity, ParticleState& state, bool tryCorrection);
-//     //void insertParticle(Particle& particle, bool tryCorrection);
-//     NO_INLINE_PROFILE void insertParticles(
-//     std::vector<Vec2>& particlePosition,
-//     std::vector<Vec2>& particleVelocity,
-//     std::vector<ParticleState>& particleState);
-//
-//     NO_INLINE_PROFILE void solvePressure();
-//     NO_INLINE_PROFILE VectorX solve();
-//
-//     bool project_outside_solid(Vec2& particle);
-//
-//     void makeSolid(CellCoord coord);
-//
-//     inline bool isInsideFluidAt(Vec2 pos) {
-//     //TODO: Optimize
-//     if (pos.x < 0.0 || pos.x >= width || pos.y < 0.0 || pos.y >= height)
-//     return false;
-//     return cells_type.at((int)pos.x, (int)pos.y) == CellType::FLUID;
-//     }
-//
-//     /*
-//      * Interpolation
-//      */
-//
-//     //Vec2 velocityCorrectionAt(const Vec2 pos) {
-//     //    return Interpolator::interpolate(sides.velocity_correction, pos);
-//     //}
-//
-//     //Vec2 interpolatedVelocityAt(const Vec2 pos) {
-//     //    return Interpolator::interpolate(sides.velocity_interpolated, pos);
-//     //}
-//
-//     //Vec2 divFreeVelocityAt(const Vec2 pos, const Vec2 defaultVelocity) {
-//     //    return Interpolator::interpolateDivFreeVelocity(sides, pos, defaultVelocity);
-//     //}
-// };

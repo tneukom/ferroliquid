@@ -36,11 +36,14 @@ pub fn main_editor() {
 pub fn main() {
     #[cfg(not(target_arch = "wasm32"))]
     {
-        env_logger::init();
-        warn!("Logging!");
+        use ferroliquid::basic_simulation;
+        basic_simulation::basic_simulation();
 
-        tracy_client::Client::start();
-
-        main_editor();
+        // env_logger::init();
+        // warn!("Logging!");
+        //
+        // tracy_client::Client::start();
+        //
+        // main_editor();
     }
 }
