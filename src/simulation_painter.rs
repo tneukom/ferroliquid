@@ -10,6 +10,7 @@ use std::borrow::Borrow;
 #[derive(Debug, Clone, Copy)]
 pub struct SimulationDrawSettings {
     particles: bool,
+    particle_velocity_labels: bool,
     velocity_interpolated: bool,
     divergence: bool,
     velocity_div_free: bool,
@@ -26,6 +27,7 @@ impl Default for SimulationDrawSettings {
     fn default() -> Self {
         Self {
             particles: true,
+            particle_velocity_labels: false,
             velocity_interpolated: false,
             divergence: false,
             velocity_div_free: false,
@@ -42,6 +44,10 @@ impl Default for SimulationDrawSettings {
 
 pub fn simulation_draw_settings_widget(ui: &mut egui::Ui, settings: &mut SimulationDrawSettings) {
     ui.checkbox(&mut settings.particles, "Particles");
+    ui.checkbox(
+        &mut settings.particle_velocity_labels,
+        "Particle Velocity Labels",
+    );
     ui.checkbox(&mut settings.velocity_interpolated, "Velocity Interpolated");
     ui.checkbox(&mut settings.divergence, "Divergence");
     ui.checkbox(&mut settings.velocity_div_free, "Velocity Div Free");
@@ -154,9 +160,11 @@ pub fn divergence(u: &SideField<f64>, coord: Point<i64>) -> f64 {
 pub fn draw_simulation(
     simulation: &Simulation,
     painter: &egui::Painter,
-    ui_rect: egui::Rect,
+    mut ui_rect: egui::Rect,
     settings: &SimulationDrawSettings,
 ) {
+    ui_rect = ui_rect.translate(egui::Vec2::splat(10.0));
+
     let draw_scale = 10.0;
     let font = egui::FontId::new(9.0, egui::FontFamily::Monospace);
 
@@ -165,11 +173,10 @@ pub fn draw_simulation(
     }
 
     if settings.cell_types {
-        let font1 = font.clone();
         let field = &simulation.grid.cells_type;
         draw_cell_texts(
             painter,
-            font1,
+            font.clone(),
             draw_scale,
             ui_rect,
             field.bounds(),
@@ -186,13 +193,10 @@ pub fn draw_simulation(
 
     // Draw particles
     if settings.particles {
-        let particle_positions = &simulation.particle_position;
-        let particle_velocities = &simulation.particle_velocity;
-
         let particle_radius = 2.0;
 
-        for (i, &world_pos) in particle_positions.iter().enumerate() {
-            let center: egui::Vec2 = (draw_scale * world_pos).into();
+        for particle in &simulation.particles {
+            let center: egui::Vec2 = (draw_scale * particle.position).into();
 
             painter.circle_filled(
                 ui_rect.left_top() + center,
@@ -200,16 +204,17 @@ pub fn draw_simulation(
                 egui::Color32::from_rgb(255, 0, 0),
             );
 
-            // Draw velocity text next to the particle
-            let velocity = particle_velocities[i];
-            let text = format!("{:.1},{:.1}", velocity.x, velocity.y);
-            painter.text(
-                ui_rect.left_top() + center + egui::vec2(-20.0, 0.0),
-                egui::Align2::LEFT_CENTER,
-                text,
-                font.clone(),
-                egui::Color32::from_rgb(0, 0, 0),
-            );
+            if settings.particle_velocity_labels {
+                // Draw velocity text next to the particle
+                let text = format!("{:.1},{:.1}", particle.velocity.x, particle.velocity.y);
+                painter.text(
+                    ui_rect.left_top() + center + egui::vec2(-20.0, 0.0),
+                    egui::Align2::LEFT_CENTER,
+                    text,
+                    font.clone(),
+                    egui::Color32::from_rgb(0, 0, 0),
+                );
+            }
         }
     }
 

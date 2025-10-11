@@ -3,7 +3,9 @@ use crate::field::Field;
 use crate::math::point::Point;
 use crate::math::rect::Rect;
 use crate::sides::{Direction, Side, Sides};
+use crate::simulation::Particle;
 use crate::solver::Solver;
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellType {
@@ -59,43 +61,40 @@ impl Grid {
 
     pub fn insert_particle(
         &mut self,
-        pos: Point<f64>,
-        velocity: Point<f64>,
-        state: &mut ParticleState,
+        mut particle: Particle,
         try_correction: bool,
-    ) {
-        if !self.inner_bounds.as_f64().contains(pos) {
-            return;
+    ) -> Option<Particle> {
+        if !self.inner_bounds.as_f64().contains(particle.position) {
+            return None;
         }
 
-        let coord = pos.floor().as_i64();
+        let coord = particle.position.floor().as_i64();
         let cell_type = self.cells_type[coord];
 
         // Particles that are inside a solid cell are projected out or die
         if cell_type == CellType::Solid {
             if !try_correction {
-                *state = ParticleState::Dead;
-                return;
+                return None;
             }
 
-            let Some(pos) = self.project_outside_solid(pos) else {
+            let Some(corrected_pos) = self.project_outside_solid(particle.position) else {
                 // Failed, let particle die
-                *state = ParticleState::Dead;
-                return;
+                return None;
             };
 
+            particle.position = corrected_pos;
+
             // Insert particle with corrected position, with try_correction off
-            self.insert_particle(pos, velocity, state, false);
-            return;
+            return self.insert_particle(particle, false);
         }
 
         // Interpolate vertical sides velocities
         {
             // Vertical side centers are at (0.0, 0.5) offsets
-            let rounded_x = pos.x.floor();
-            let rounded_y = (pos.y - 0.5).floor();
-            let delta_x = pos.x - rounded_x;
-            let delta_y = (pos.y - 0.5) - rounded_y;
+            let rounded_x = particle.position.x.floor();
+            let rounded_y = (particle.position.y - 0.5).floor();
+            let delta_x = particle.position.x - rounded_x;
+            let delta_y = (particle.position.y - 0.5) - rounded_y;
 
             let left_top_side = Side::vertical(Point(rounded_x as i64, rounded_y as i64));
             let left_bottom_side = left_top_side.down();
@@ -103,18 +102,19 @@ impl Grid {
             let right_bottom_side = left_bottom_side.right();
 
             self.sides.velocity_interpolated[left_top_side] +=
-                (1.0 - delta_x) * (1.0 - delta_y) * velocity.x;
+                (1.0 - delta_x) * (1.0 - delta_y) * particle.velocity.x;
             self.sides.density[left_top_side] += (1.0 - delta_x) * (1.0 - delta_y);
 
             self.sides.velocity_interpolated[left_bottom_side] +=
-                (1.0 - delta_x) * delta_y * velocity.x;
+                (1.0 - delta_x) * delta_y * particle.velocity.x;
             self.sides.density[left_bottom_side] += (1.0 - delta_x) * delta_y;
 
             self.sides.velocity_interpolated[right_top_side] +=
-                delta_x * (1.0 - delta_y) * velocity.x;
+                delta_x * (1.0 - delta_y) * particle.velocity.x;
             self.sides.density[right_top_side] += delta_x * (1.0 - delta_y);
 
-            self.sides.velocity_interpolated[right_bottom_side] += delta_x * delta_y * velocity.x;
+            self.sides.velocity_interpolated[right_bottom_side] +=
+                delta_x * delta_y * particle.velocity.x;
             self.sides.density[right_bottom_side] += delta_x * delta_y;
         }
 
@@ -122,10 +122,10 @@ impl Grid {
         // TODO: Make interpolation generic
         {
             // Horizontal sides are at (0.5, 0.0) offsets
-            let rounded_x = (pos.x - 0.5).floor();
-            let rounded_y = pos.y.floor();
-            let delta_x = (pos.x - 0.5) - rounded_x;
-            let delta_y = pos.y - rounded_y;
+            let rounded_x = (particle.position.x - 0.5).floor();
+            let rounded_y = particle.position.y.floor();
+            let delta_x = (particle.position.x - 0.5) - rounded_x;
+            let delta_y = particle.position.y - rounded_y;
 
             let left_top_side = Side::horizontal(Point(rounded_x as i64, rounded_y as i64));
             let left_bottom_side = left_top_side.down();
@@ -133,28 +133,29 @@ impl Grid {
             let right_bottom_side = left_bottom_side.right();
 
             self.sides.velocity_interpolated[left_top_side] +=
-                (1.0 - delta_x) * (1.0 - delta_y) * velocity.y;
+                (1.0 - delta_x) * (1.0 - delta_y) * particle.velocity.y;
             self.sides.density[left_top_side] += (1.0 - delta_x) * (1.0 - delta_y);
 
             self.sides.velocity_interpolated[left_bottom_side] +=
-                (1.0 - delta_x) * delta_y * velocity.y;
+                (1.0 - delta_x) * delta_y * particle.velocity.y;
             self.sides.density[left_bottom_side] += (1.0 - delta_x) * delta_y;
 
             self.sides.velocity_interpolated[right_top_side] +=
-                delta_x * (1.0 - delta_y) * velocity.y;
+                delta_x * (1.0 - delta_y) * particle.velocity.y;
             self.sides.density[right_top_side] += delta_x * (1.0 - delta_y);
 
-            self.sides.velocity_interpolated[right_bottom_side] += delta_x * delta_y * velocity.y;
+            self.sides.velocity_interpolated[right_bottom_side] +=
+                delta_x * delta_y * particle.velocity.y;
             self.sides.density[right_bottom_side] += delta_x * delta_y;
         }
 
         //Interpolate cell densities
         {
             // Cell centers are at (0.5, 0.5) offsets
-            let rounded_x = pos.x - 0.5;
-            let rounded_y = pos.y - 0.5;
-            let delta_x = (pos.x - 0.5) - rounded_x;
-            let delta_y = (pos.y - 0.5) - rounded_y;
+            let rounded_x = particle.position.x - 0.5;
+            let rounded_y = particle.position.y - 0.5;
+            let delta_x = (particle.position.x - 0.5) - rounded_x;
+            let delta_y = (particle.position.y - 0.5) - rounded_y;
 
             let left_top_cell = Point(rounded_x as i64, rounded_y as i64);
             let left_bottom_cell = left_top_cell.down();
@@ -172,20 +173,17 @@ impl Grid {
         }
 
         self.cells_particle_count[coord] += 1;
+        Some(particle)
     }
 
     #[inline(never)]
-    pub fn insert_particles(
-        &mut self,
-        position: &[Point<f64>],
-        velocity: &[Point<f64>],
-        state: &mut [ParticleState],
-    ) {
+    pub fn insert_particles(&mut self, particles: Vec<Particle>) -> Vec<Particle> {
         let _span = tracy_client::span!("insert_particles");
 
-        for i in 0..position.len() {
-            self.insert_particle(position[i], velocity[i], &mut state[i], false);
-        }
+        let particles = particles
+            .into_iter()
+            .filter_map(|particle| self.insert_particle(particle, true))
+            .collect();
 
         //Collect fluid cells
         for c in self.inner_bounds.iter_indices() {
@@ -240,6 +238,8 @@ impl Grid {
             let density = self.sides.density[side].max(MIN_DENSITY);
             self.sides.velocity_interpolated[side] /= density;
         }
+
+        particles
     }
 
     #[inline(never)]

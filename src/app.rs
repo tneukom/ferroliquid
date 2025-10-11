@@ -99,13 +99,12 @@ impl EguiApp {
     }
 
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
-        let desired_size = egui::vec2(100.0, 100.0);
+        let desired_size = egui::vec2(1000.0, 1000.0);
         let (response, painter) = ui.allocate_painter(desired_size, egui::Sense::click());
         let rect = response.rect;
-        let painter = ui.painter();
         draw_simulation(
             &self.simulation,
-            painter,
+            &painter,
             rect,
             &self.simulation_draw_settings,
         );
