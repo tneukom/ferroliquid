@@ -95,6 +95,11 @@ impl EguiApp {
             println!("time to simulate: {}", instant.elapsed().as_secs_f64());
         }
 
+        ui.label(format!(
+            "Particle count:{}",
+            self.simulation.particles.len()
+        ));
+
         simulation_draw_settings_widget(ui, &mut self.simulation_draw_settings);
     }
 

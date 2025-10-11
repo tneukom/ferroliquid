@@ -4,6 +4,8 @@ use crate::interpolator::interpolate_div_free_velocity;
 use crate::math::point::Point;
 use crate::math::rect::Rect;
 use crate::sides::Side;
+use itertools::Itertools;
+use num_traits::float::TotalOrder;
 
 pub struct Particle {
     pub position: Point<f64>,
@@ -11,6 +13,7 @@ pub struct Particle {
 }
 
 pub struct Simulation {
+    pub i_step: usize,
     pub dt: f64,
     pub grid: Grid,
     pub particles: Vec<Particle>,
@@ -21,6 +24,7 @@ impl Simulation {
 
     pub fn new(bounds: Rect<i64>, dt: f64) -> Self {
         Self {
+            i_step: 0,
             dt,
             grid: Grid::new(bounds),
             particles: Vec::new(),
@@ -86,37 +90,51 @@ impl Simulation {
         let bounds = self.grid.bounds.as_f64();
         let inset_bounds = bounds.padded(-1.0);
 
-        self.particles.retain_mut(|particle| {
-            let mut position = particle.position;
-            let velocity = Point::ZERO;
+        // Perturb the velocity a tiny amount to dissolve clumps.
+        // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
+        let random_velocity_c = 1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
 
-            debug_assert!(bounds.contains(particle.position));
+        // Quite a bit faster than retain_mut for some reason
+        // See https://github.com/rust-lang/rust/issues/91497
+        // Rust should optimize filter_map().collect()
+        // See https://www.reddit.com/r/rust/comments/16hx79e/when_does_vecinto_itermapcollect_reallocate_and/
+        self.particles = std::mem::take(&mut self.particles)
+            .into_iter()
+            .filter_map(|mut particle| {
+                let mut position = particle.position;
+                let velocity = Point::ZERO;
 
-            // Perturb the velocity a tiny amount to dissolve clumps.
-            // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
-            let random_velocity_c = 1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
+                debug_assert!(bounds.contains(particle.position));
 
-            //Euler integration
-            for _ in 0..steps {
-                debug_assert!(bounds.contains(position));
+                //Euler integration
+                for _ in 0..steps {
+                    debug_assert!(bounds.contains(position));
 
-                let velocity = interpolate_div_free_velocity(&self.grid.sides, position, velocity);
-                debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
+                    let velocity =
+                        interpolate_div_free_velocity(&self.grid.sides, position, velocity);
+                    debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
 
-                position = position + step_dt * random_velocity_c * velocity;
+                    position = position + step_dt * random_velocity_c * velocity;
 
-                if !inset_bounds.contains(position) {
-                    return false;
+                    if !inset_bounds.contains(position) {
+                        return None;
+                    }
                 }
-            }
 
-            particle.position = position;
-            true
-        })
+                particle.position = position;
+                Some(particle)
+            })
+            .collect();
     }
 
     pub fn create_particle(&mut self, position: Point<f64>, velocity: Point<f64>) {
         self.particles.push(Particle { position, velocity });
+    }
+
+    pub fn sort_particles(&mut self) {
+        let _span = tracy_client::span!("sorting");
+        self.particles
+            .sort_by_key(|particle| particle.position.as_i64())
     }
 
     #[inline(never)]
@@ -134,6 +152,11 @@ impl Simulation {
         self.interpolate_particle_velocities_from_grid();
 
         self.integrate(6);
+
+        if self.i_step % 32 == 0 {
+            self.sort_particles();
+        }
+        self.i_step += 1;
     }
 
     pub fn fill(&mut self, coord: Point<i64>, velocity: Point<f64>) {

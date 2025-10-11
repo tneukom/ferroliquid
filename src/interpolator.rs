@@ -12,11 +12,14 @@ pub fn interpolate_div_free_velocity(
     pos: Point<f64>,
     fallback_velocity: Point<f64>,
 ) -> Point<f64> {
-    let floored_pos = pos.floor();
-    let coord = floored_pos.as_i64();
+    debug_assert!(pos.x >= 0.0 && pos.y >= 0.0);
+    // Because x, y are non-negative we can truncate instead of floor, which seems to be slower
+    let coord = pos.as_i64();
+    let fractional_pos = pos - coord.as_f64();
 
-    // TODO: fractional pos
-    let relative_pos = pos - floored_pos;
+    // let floored_pos = pos.floor();
+    // let coord = floored_pos.as_i64();
+    // let fractional_pos = pos - floored_pos;
 
     let left_side = Side::vertical(coord);
     let top_side = Side::horizontal(coord);
@@ -26,8 +29,8 @@ pub fn interpolate_div_free_velocity(
     let lower_horizontal = sides.get_div_free_velocity(top_side, fallback_velocity.y);
     let upper_horizontal = sides.get_div_free_velocity(top_side.down(), fallback_velocity.y);
 
-    let x = interpolate_linear(lower_vertical, upper_vertical, relative_pos.x);
-    let y = interpolate_linear(lower_horizontal, upper_horizontal, relative_pos.y);
+    let x = interpolate_linear(lower_vertical, upper_vertical, fractional_pos.x);
+    let y = interpolate_linear(lower_horizontal, upper_horizontal, fractional_pos.y);
 
     Point(x, y)
 }
