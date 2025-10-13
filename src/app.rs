@@ -1,27 +1,22 @@
-use crate::simulation::Simulation;
-use crate::simulation_painter::{
-    SimulationDrawSettings, draw_simulation, simulation_draw_settings_widget,
-};
 use crate::{
     math::{point::Point, rect::Rect},
-    painting::view_painter::ViewPainter,
-    view::{View, ViewInput, ViewSettings},
+    painting::simulation_painter::SimulationPainter,
+    simulation::Simulation,
+    simulation_painter::{
+        SimulationDrawSettings, draw_simulation, simulation_draw_settings_widget,
+    },
 };
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::{sync::Arc, time::Instant};
 
 pub struct EguiApp {
-    view_painter: Arc<Mutex<ViewPainter>>,
-    pub view_settings: ViewSettings,
-
     gl: Arc<glow::Context>,
-    view: View,
 
     simulation: Simulation,
-
     simulation_draw_settings: SimulationDrawSettings,
 
-    view_input: ViewInput,
+    simulation_painter: SimulationPainter,
+
+    particles_egui_texture: Option<egui::load::SizedTexture>,
 
     run: bool,
 }
@@ -30,11 +25,6 @@ impl EguiApp {
     const ICON_SIZE: f32 = 20.0;
 
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // let gl = cc.gl.as_ref().map(|arc| arc.as_ref());
-        let gl_arc = cc.gl.clone().unwrap();
-        let gl = gl_arc.as_ref();
-        let view_painter = ViewPainter::new(gl);
-
         let gl = cc.gl.clone().unwrap();
 
         let bounds = Rect::low_size(Point::ZERO, Point(80, 80));
@@ -50,15 +40,15 @@ impl EguiApp {
         }
         // simulation.create_particle(Point(5.5, 5.5), Point(0.0, 5.0));
 
+        let simulation_painter = SimulationPainter::new(&gl, bounds);
+
         Self {
-            view_painter: Arc::new(Mutex::new(view_painter)),
-            view: View::new(),
-            view_settings: ViewSettings::default(),
             simulation,
             gl,
-            view_input: ViewInput::EMPTY,
             simulation_draw_settings: SimulationDrawSettings::default(),
             run: false,
+            simulation_painter,
+            particles_egui_texture: None,
         }
     }
 
@@ -121,8 +111,22 @@ impl EguiApp {
 }
 
 impl eframe::App for EguiApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        if self.particles_egui_texture.is_none() {
+            let texture = &self.simulation_painter.particles_texture;
+            let texture_id = frame.register_native_glow_texture(texture.id);
+            let sized_texture = egui::load::SizedTexture::new(
+                texture_id,
+                [texture.width as f32, texture.height as f32],
+            );
+            self.particles_egui_texture = Some(sized_texture);
+        }
+
         // let dt = ctx.input(|input| input.unstable_dt) as f64;
+        unsafe {
+            self.simulation_painter
+                .paint(&self.gl, &self.simulation.particles);
+        }
 
         tracy_client::frame_mark();
 
@@ -144,6 +148,15 @@ impl eframe::App for EguiApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             self.central_panel_ui(ui);
+        });
+
+        egui::Window::new("paint").show(ctx, |ui| {
+            if let Some(particles_egui_texture) = self.particles_egui_texture {
+                let image = egui::Image::from_texture(particles_egui_texture).uv(
+                    egui::Rect::from_min_max(egui::Pos2::new(0.0, 1.0), egui::Pos2::new(1.0, 0.0)),
+                );
+                ui.add(image);
+            }
         });
 
         // self.view

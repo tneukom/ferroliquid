@@ -9,6 +9,7 @@ pub enum GlResource {
     Program(glow::Program),
     Shader(glow::Shader),
     VertexArray(glow::VertexArray),
+    Framebuffer(glow::Framebuffer),
 }
 
 static GARBAGE: Mutex<Vec<GlResource>> = Mutex::new(Vec::new());
@@ -28,6 +29,7 @@ pub unsafe fn gl_gc(gl: &glow::Context) {
             GlResource::Program(program) => gl.delete_program(program),
             GlResource::Shader(shader) => gl.delete_shader(shader),
             GlResource::VertexArray(vertex_array) => gl.delete_vertex_array(vertex_array),
+            GlResource::Framebuffer(framebuffer) => gl.delete_framebuffer(framebuffer),
         }
     }
 }

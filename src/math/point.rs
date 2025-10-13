@@ -1,5 +1,7 @@
-use crate::math::generic::{Dot, Num, SignedNum};
-use crate::sides::Direction;
+use crate::{
+    math::generic::{Dot, Num, SignedNum},
+    sides::Direction,
+};
 use num_traits::{AsPrimitive, real::Real};
 use std::{
     cmp::Ordering,

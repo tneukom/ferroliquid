@@ -1,11 +1,10 @@
-use crate::field::Field;
-use crate::grid::CellType;
-use crate::math::point::Point;
-use crate::math::rect::Rect;
-use crate::sides::{Side, SideField, SideOrientation};
-use crate::simulation::Simulation;
-use egui::util::undoer::Settings;
-use std::borrow::Borrow;
+use crate::{
+    field::Field,
+    grid::CellType,
+    math::{point::Point, rect::Rect},
+    sides::{Side, SideField, SideOrientation},
+    simulation::Simulation,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SimulationDrawSettings {

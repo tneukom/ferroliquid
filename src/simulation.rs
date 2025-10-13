@@ -1,11 +1,10 @@
-use crate::constants::{ALPHA, TARGET_DENSITY, TARGET_DENSITY_I};
-use crate::grid::{Grid, ParticleState};
-use crate::interpolator::interpolate_div_free_velocity;
-use crate::math::point::Point;
-use crate::math::rect::Rect;
-use crate::sides::Side;
-use itertools::Itertools;
-use num_traits::float::TotalOrder;
+use crate::{
+    constants::{ALPHA, TARGET_DENSITY, TARGET_DENSITY_I},
+    grid::Grid,
+    interpolator::interpolate_div_free_velocity,
+    math::{point::Point, rect::Rect},
+    sides::Side,
+};
 
 pub struct Particle {
     pub position: Point<f64>,
@@ -175,7 +174,7 @@ impl Simulation {
             .retain(|particle| !rect.contains(particle.position));
 
         let n_fill_particles = (rect.area() * TARGET_DENSITY) as i64;
-        for i in 0..n_fill_particles {
+        for _ in 0..n_fill_particles {
             let position = Point(
                 rect.left() + rect.width() * fastrand::f64(),
                 rect.top() + rect.height() * fastrand::f64(),

@@ -1,5 +1,7 @@
-use crate::math::point::Point;
-use crate::sides::{Side, Sides};
+use crate::{
+    math::point::Point,
+    sides::{Side, Sides},
+};
 
 pub fn interpolate_linear(lower: f64, upper: f64, relative: f64) -> f64 {
     (1.0 - relative) * lower + relative * upper

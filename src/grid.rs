@@ -1,11 +1,11 @@
-use crate::constants::TARGET_DENSITY;
-use crate::field::Field;
-use crate::math::point::Point;
-use crate::math::rect::Rect;
-use crate::sides::{Direction, Side, Sides};
-use crate::simulation::Particle;
-use crate::solver::Solver;
-use itertools::Itertools;
+use crate::{
+    constants::TARGET_DENSITY,
+    field::Field,
+    math::{point::Point, rect::Rect},
+    sides::{Direction, Side, Sides},
+    simulation::Particle,
+    solver::Solver,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellType {

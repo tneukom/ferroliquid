@@ -24,7 +24,6 @@ pub(crate) mod simulation;
 pub(crate) mod simulation_painter;
 pub(crate) mod solver;
 pub(crate) mod utils;
-pub(crate) mod view;
 pub(crate) mod widgets;
 
 #[cfg(target_arch = "wasm32")]

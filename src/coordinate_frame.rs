@@ -2,37 +2,33 @@
 // normalized device coordinates and window coordinates.
 
 // OpenGL normalized device coordinates (device coordinates for short)
-// -1,1         1,1
-//  ┌────────────┐
-//  │            │
-//  │            │
-//  └────────────┘
-// -1,-1        1,-1
+// -1,1             1,1
+//  ┌────────────────┐
+//  │                │
+//  │                │
+//  └────────────────┘
+// -1,-1            1,-1
 
-// Window coordinates
-// These are not the same as OpenGL window coordinates! The opengl window coordinates origin is at
-// the bottom left of the window and depends on glViewport arguments. For example in the egui
-// custom painting callback the glViewport is set to the rectangle of the control.
-// see https://gdbooks.gitbooks.io/legacyopengl/content/Chapter4/CoordinateTransforms.html
-// 0,0          w,0
-//  ┌────────────┐
-//  │            │
-//  │            │
-//  └────────────┘
-// 0,h          w,h
-// where w, h = window_size
-// Center of window frame is at w/h, h/2
-
-// View coordinates
-// 0,0          w,0
-//  ┌────────────┐
-//  │            │
-//  │            │
-//  └────────────┘
-// 0,h          w,h
-// where w, h = view_port.size()
+// Simulation coordinates
+// top_left     top_right
+//  ┌────────────────┐
+//  │                │
+//  │                │
+//  └────────────────┘
+// bottom_left  bottom_right
 
 use crate::math::{affine_map::AffineMap, point::Point, rect::Rect};
+
+pub fn affine_device_from_simulation(simulation_bounds: Rect<f64>) -> AffineMap<f64> {
+    AffineMap::map_points(
+        simulation_bounds.top_left(),
+        Point(-1.0, 1.0),
+        simulation_bounds.top_right(),
+        Point(1.0, 1.0),
+        simulation_bounds.bottom_left(),
+        Point(-1.0, -1.0),
+    )
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct CoordinateFrames {

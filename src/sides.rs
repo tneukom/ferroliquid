@@ -1,8 +1,11 @@
-use crate::field::Field;
-use crate::math::point::Point;
-use crate::math::rect::Rect;
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Index, IndexMut};
+use crate::{
+    field::Field,
+    math::{point::Point, rect::Rect},
+};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    ops::{Add, Index, IndexMut},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
