@@ -8,6 +8,7 @@ use glow::{HasContext, PixelUnpackData};
 
 pub struct GlTexture {
     pub id: glow::Texture,
+    pub owns_handle: bool,
     pub width: i64,
     pub height: i64,
 }
@@ -25,6 +26,7 @@ pub enum TextureFormat {
     R16U,
     R8,
     RGBA32F,
+    R32F,
 }
 
 impl TextureFormat {
@@ -34,6 +36,7 @@ impl TextureFormat {
             Self::R16U => glow::R16UI,
             Self::R8 => glow::R8,
             Self::RGBA32F => glow::RGBA32F,
+            Self::R32F => glow::R32F,
         }
     }
 
@@ -43,6 +46,7 @@ impl TextureFormat {
             Self::R16U => glow::RED_INTEGER,
             Self::R8 => glow::RED,
             Self::RGBA32F => glow::RGBA,
+            Self::R32F => glow::RED,
         }
     }
 
@@ -53,12 +57,14 @@ impl TextureFormat {
             Self::R16U => glow::UNSIGNED_SHORT,
             Self::R8 => glow::UNSIGNED_BYTE,
             Self::RGBA32F => glow::FLOAT,
+            Self::R32F => glow::FLOAT,
         }
     }
 }
 
 impl GlTexture {
-    pub unsafe fn from_size(gl: &glow::Context, width: i64, height: i64, filter: Filter) -> Self {
+    /// Does not call glTexImage2d!
+    pub unsafe fn new(gl: &glow::Context, width: i64, height: i64, filter: Filter) -> Self {
         let id = gl.create_texture().expect("Failed to create texture");
 
         gl.active_texture(glow::TEXTURE0);
@@ -77,14 +83,53 @@ impl GlTexture {
             glow::CLAMP_TO_EDGE as i32,
         );
 
-        GlTexture { id, width, height }
+        GlTexture {
+            id,
+            width,
+            height,
+            owns_handle: true,
+        }
+    }
+
+    /// Calls glTexImage2d with null
+    pub unsafe fn empty(
+        gl: &glow::Context,
+        width: i64,
+        height: i64,
+        format: TextureFormat,
+        filter: Filter,
+    ) -> Self {
+        let mut texture = Self::new(gl, width, height, filter);
+        texture.texture_image_bytes(gl, format, None);
+        texture
     }
 
     /// Bitmap colorspace is assumed to be SRGB
     pub unsafe fn from_bitmap(gl: &glow::Context, bitmap: &RgbaField, filter: Filter) -> Self {
-        let mut texture = Self::from_size(gl, bitmap.width(), bitmap.height(), filter);
+        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter);
         texture.texture_image_srgba8(gl, bitmap);
         texture
+    }
+
+    unsafe fn texture_image_bytes(
+        &mut self,
+        gl: &glow::Context,
+        format: TextureFormat,
+        bytes: Option<&[u8]>,
+    ) {
+        gl.active_texture(glow::TEXTURE0);
+        gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
+        gl.tex_image_2d(
+            glow::TEXTURE_2D,
+            0,
+            format.internal_format() as i32,
+            self.width as i32,
+            self.height as i32,
+            0,
+            format.format(),
+            format.ty(),
+            PixelUnpackData::Slice(bytes),
+        );
     }
 
     unsafe fn texture_image_raw<T: Pod>(
@@ -97,20 +142,7 @@ impl GlTexture {
         assert_eq!(bitmap.height(), self.height);
 
         let bitmap_bytes: &[u8] = cast_slice(bitmap.as_slice());
-
-        gl.active_texture(glow::TEXTURE0);
-        gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
-        gl.tex_image_2d(
-            glow::TEXTURE_2D,
-            0,
-            format.internal_format() as i32,
-            bitmap.width() as i32,
-            bitmap.height() as i32,
-            0,
-            format.format(),
-            format.ty(),
-            PixelUnpackData::Slice(Some(bitmap_bytes)),
-        );
+        self.texture_image_bytes(gl, format, Some(bitmap_bytes));
     }
 
     pub unsafe fn texture_image_srgba8(&mut self, gl: &glow::Context, bitmap: &Field<Rgba8>) {
@@ -188,6 +220,8 @@ impl GlTexture {
 
 impl Drop for GlTexture {
     fn drop(&mut self) {
-        gl_release(GlResource::Texture(self.id));
+        if self.owns_handle {
+            gl_release(GlResource::Texture(self.id));
+        }
     }
 }

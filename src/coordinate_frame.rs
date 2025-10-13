@@ -17,6 +17,14 @@
 //  └────────────────┘
 // bottom_left  bottom_right
 
+// OpenGL texture coordinates
+// 0,1             1,1
+//  ┌────────────────┐
+//  │                │
+//  │                │
+//  └────────────────┘
+// 0,0             1,0
+
 use crate::math::{affine_map::AffineMap, point::Point, rect::Rect};
 
 pub fn affine_device_from_simulation(simulation_bounds: Rect<f64>) -> AffineMap<f64> {

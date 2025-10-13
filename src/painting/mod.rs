@@ -1,3 +1,4 @@
+mod effect_painter;
 pub(crate) mod gl_buffer;
 pub(crate) mod gl_framebuffer;
 pub(crate) mod gl_garbage;
@@ -6,4 +7,5 @@ mod particle_painter;
 mod rect_vertices;
 pub(crate) mod shader;
 pub(crate) mod simulation_painter;
+mod step_painter;
 mod utils;

@@ -1,4 +1,4 @@
-use crate::painting::gl_texture::GlTexture;
+use crate::{math::point::Point, painting::gl_texture::GlTexture};
 use glow::HasContext;
 
 pub struct GlFramebuffer {
@@ -8,32 +8,61 @@ pub struct GlFramebuffer {
 }
 
 impl GlFramebuffer {
-    pub unsafe fn new(gl: &glow::Context, texture: &GlTexture) -> Self {
+    pub unsafe fn new(gl: &glow::Context, width: i64, height: i64) -> Self {
         let id = gl.create_framebuffer().unwrap();
-        gl.bind_framebuffer(glow::DRAW_FRAMEBUFFER, Some(id));
+
+        Self { id, width, height }
+    }
+
+    pub unsafe fn viewport(&self, gl: &glow::Context) {
+        gl.viewport(0, 0, self.width as i32, self.height as i32);
+    }
+
+    pub unsafe fn with_color_attachments(gl: &glow::Context, attachments: &[&GlTexture]) -> Self {
+        let first_attachment = attachments.first().unwrap();
+        let framebuffer = Self::new(gl, first_attachment.width, first_attachment.height);
+
+        framebuffer.bind(gl);
+        for (i, attachment) in attachments.iter().enumerate() {
+            framebuffer.attach_color(gl, attachment, i as u32);
+        }
+        let draw_buffers: Vec<u32> = (0..attachments.len() as u32)
+            .map(|i| glow::COLOR_ATTACHMENT0 + i)
+            .collect();
+        gl.draw_buffers(&draw_buffers);
+
+        framebuffer.assert_complete(gl);
+        framebuffer.unbind(gl);
+
+        framebuffer
+    }
+
+    pub fn size(&self) -> Point<i64> {
+        return Point(self.width, self.height);
+    }
+
+    /// Needs to be bound
+    pub unsafe fn attach_color(&self, gl: &glow::Context, texture: &GlTexture, i_attachment: u32) {
+        assert!(i_attachment < 32);
+        assert_eq!(texture.size(), self.size());
 
         gl.framebuffer_texture_2d(
             glow::DRAW_FRAMEBUFFER,
-            glow::COLOR_ATTACHMENT0,
+            glow::COLOR_ATTACHMENT0 + i_attachment,
             glow::TEXTURE_2D,
             Some(texture.id),
             0,
         );
+    }
 
+    /// Needs to be bound
+    pub unsafe fn assert_complete(&self, gl: &glow::Context) {
         let status = gl.check_framebuffer_status(glow::DRAW_FRAMEBUFFER);
         if status != glow::FRAMEBUFFER_COMPLETE {
             panic!(
                 "Framebuffer incomplete: {}",
                 Self::display_framebuffer_status(status)
             );
-        }
-
-        gl.bind_framebuffer(glow::DRAW_FRAMEBUFFER, None);
-
-        Self {
-            id,
-            width: texture.width,
-            height: texture.height,
         }
     }
 
