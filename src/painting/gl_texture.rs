@@ -8,7 +8,6 @@ use glow::{HasContext, PixelUnpackData};
 
 pub struct GlTexture {
     pub id: glow::Texture,
-    pub owns_handle: bool,
     pub width: i64,
     pub height: i64,
 }
@@ -83,12 +82,7 @@ impl GlTexture {
             glow::CLAMP_TO_EDGE as i32,
         );
 
-        GlTexture {
-            id,
-            width,
-            height,
-            owns_handle: true,
-        }
+        GlTexture { id, width, height }
     }
 
     /// Calls glTexImage2d with null
@@ -220,8 +214,6 @@ impl GlTexture {
 
 impl Drop for GlTexture {
     fn drop(&mut self) {
-        if self.owns_handle {
-            gl_release(GlResource::Texture(self.id));
-        }
+        gl_release(GlResource::Texture(self.id));
     }
 }

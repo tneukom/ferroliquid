@@ -1,8 +1,6 @@
 use crate::{
-    field::Field,
-    math::{rect::Rect, rgba8::Rgba8},
+    math::rect::Rect,
     painting::{
-        effect_painter::EffectPainter,
         gl_framebuffer::GlFramebuffer,
         gl_texture::{Filter, GlTexture, TextureFormat},
         particle_painter::ParticlePainter,
@@ -11,15 +9,16 @@ use crate::{
     simulation::Particle,
 };
 use glow::HasContext;
+use std::sync::Arc;
 
 pub struct SimulationPainter {
     pub simulation_bounds: Rect<i64>,
-    pub particle_density_texture: GlTexture,
-    pub particle_advection_texture: GlTexture,
+    pub particle_density_texture: Arc<GlTexture>,
+    pub particle_advection_texture: Arc<GlTexture>,
     pub particles_framebuffer: GlFramebuffer,
     pub particle_painter: ParticlePainter,
 
-    pub step_texture: GlTexture,
+    pub step_texture: Arc<GlTexture>,
     pub step_framebuffer: GlFramebuffer,
     pub step_painter: StepPainter,
 }
@@ -47,11 +46,11 @@ impl SimulationPainter {
 
         Self {
             simulation_bounds,
-            particle_density_texture,
-            particle_advection_texture,
+            particle_density_texture: Arc::new(particle_density_texture),
+            particle_advection_texture: Arc::new(particle_advection_texture),
             particles_framebuffer,
             particle_painter,
-            step_texture,
+            step_texture: Arc::new(step_texture),
             step_framebuffer,
             step_painter,
         }

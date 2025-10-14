@@ -1,3 +1,4 @@
+use crate::painting::blit_painter::BlitPainter;
 use crate::{
     math::{point::Point, rect::Rect},
     painting::{gl_texture::GlTexture, simulation_painter::SimulationPainter},
@@ -15,6 +16,7 @@ pub struct EguiApp {
     simulation_draw_settings: SimulationDrawSettings,
 
     simulation_painter: SimulationPainter,
+    blit_painter: Arc<BlitPainter>,
 
     density_texture: DisplayTexture,
     advection_texture: DisplayTexture,
@@ -43,16 +45,24 @@ impl EguiApp {
         // simulation.create_particle(Point(5.5, 5.5), Point(0.0, 5.0));
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
+        let blit_painter = BlitPainter::new(&gl);
 
         Self {
             simulation,
             gl,
             simulation_draw_settings: SimulationDrawSettings::default(),
             run: false,
+            blit_painter: Arc::new(blit_painter),
+            density_texture: DisplayTexture::new(
+                "Density",
+                simulation_painter.particle_density_texture.clone(),
+            ),
+            advection_texture: DisplayTexture::new(
+                "Advection",
+                simulation_painter.particle_advection_texture.clone(),
+            ),
+            step_texture: DisplayTexture::new("Step", simulation_painter.step_texture.clone()),
             simulation_painter,
-            density_texture: DisplayTexture::new("Density".to_owned()),
-            advection_texture: DisplayTexture::new("Advection".to_owned()),
-            step_texture: DisplayTexture::new("Step".to_owned()),
         }
     }
 
@@ -97,9 +107,9 @@ impl EguiApp {
         simulation_draw_settings_widget(ui, &mut self.simulation_draw_settings);
 
         ui.heading("Textures");
-        Self::texture_window(ui, &mut self.density_texture);
-        Self::texture_window(ui, &mut self.advection_texture);
-        Self::texture_window(ui, &mut self.step_texture);
+        Self::texture_window(ui, self.blit_painter.clone(), &mut self.density_texture);
+        Self::texture_window(ui, self.blit_painter.clone(), &mut self.advection_texture);
+        Self::texture_window(ui, self.blit_painter.clone(), &mut self.step_texture);
     }
 
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
@@ -118,18 +128,35 @@ impl EguiApp {
         ctx.input(|input| input.screen_rect.width() < 800.0)
     }
 
-    pub fn texture_window(ui: &mut egui::Ui, display_texture: &mut DisplayTexture) {
+    fn texture_ui(ui: &mut egui::Ui, blit_painter: Arc<BlitPainter>, texture: Arc<GlTexture>) {
+        let cb = egui_glow::CallbackFn::new(move |_info, painter| {
+            let gl = painter.gl().as_ref();
+            unsafe {
+                blit_painter.draw(gl, &texture);
+            }
+        });
+
+        let size = egui::vec2(400.0, 400.0);
+        let (egui_rect, _response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
+
+        let callback = egui::PaintCallback {
+            rect: egui_rect,
+            callback: Arc::new(cb),
+        };
+        ui.painter().add(callback);
+    }
+
+    pub fn texture_window(
+        ui: &mut egui::Ui,
+        painter: Arc<BlitPainter>,
+        display_texture: &mut DisplayTexture,
+    ) {
         ui.checkbox(&mut display_texture.show, &display_texture.title);
 
         if display_texture.show {
             let window = egui::Window::new(display_texture.title.clone());
             window.show(ui.ctx(), |ui| {
-                if let Some(egui_texture) = display_texture.egui_texture() {
-                    let vertically_mirrored_uv =
-                        egui::Rect::from_min_max(egui::pos2(0.0, 1.0), egui::pos2(1.0, 0.0));
-                    let image = egui::Image::from_texture(egui_texture).uv(vertically_mirrored_uv);
-                    ui.add(image);
-                }
+                Self::texture_ui(ui, painter, display_texture.texture.clone());
             });
         }
     }
@@ -138,16 +165,7 @@ impl EguiApp {
 }
 
 impl eframe::App for EguiApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        self.density_texture
-            .set_texture(frame, &mut self.simulation_painter.particle_density_texture);
-        self.advection_texture.set_texture(
-            frame,
-            &mut self.simulation_painter.particle_advection_texture,
-        );
-        self.step_texture
-            .set_texture(frame, &mut self.simulation_painter.step_texture);
-
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // let dt = ctx.input(|input| input.unstable_dt) as f64;
         unsafe {
             self.simulation_painter
@@ -185,46 +203,16 @@ impl eframe::App for EguiApp {
 
 pub struct DisplayTexture {
     pub title: String,
-    pub registered: Option<(glow::Texture, egui::load::SizedTexture)>,
     pub show: bool,
+    pub texture: Arc<GlTexture>,
 }
 
 impl DisplayTexture {
-    pub fn new(title: String) -> Self {
+    pub fn new(title: impl Into<String>, texture: Arc<GlTexture>) -> Self {
         Self {
-            title,
-            registered: None,
+            title: title.into(),
             show: false,
+            texture,
         }
-    }
-
-    fn native_texture(&self) -> Option<glow::Texture> {
-        self.registered.map(|(native_texture, _)| native_texture)
-    }
-
-    pub fn egui_texture(&self) -> Option<egui::load::SizedTexture> {
-        self.registered
-            .map(|(_, egui_texture)| egui_texture)
-            .clone()
-    }
-
-    pub fn set_texture(&mut self, frame: &mut eframe::Frame, texture: &mut GlTexture) {
-        if let Some(registered_native) = self.native_texture()
-            && registered_native.0 == texture.id.0
-        {
-            // Texture is already registered
-            return;
-        }
-
-        // egui takes ownership of the texture handle and will call glDelete when the last
-        // TextureHandle is dropped.
-        let texture_id = frame.register_native_glow_texture(texture.id);
-        // Egui owns the handle now
-        texture.owns_handle = false;
-        let sized_texture = egui::load::SizedTexture::new(
-            texture_id,
-            [texture.width as f32, texture.height as f32],
-        );
-        self.registered = Some((texture.id, sized_texture));
     }
 }

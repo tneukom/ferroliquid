@@ -4,7 +4,6 @@ use crate::{
     painting::{
         gl_buffer::{GlBuffer, GlBufferTarget, GlVertexArrayObject},
         shader::{Shader, VertexAttribDesc},
-        utils::check_error,
     },
     simulation::Particle,
 };

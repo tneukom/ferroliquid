@@ -1,9 +1,6 @@
-use crate::{
-    coordinate_frame::affine_device_from_simulation,
-    painting::{
-        gl_buffer::{GlBuffer, GlBufferTarget, GlVertexArrayObject},
-        shader::{Shader, VertexAttribDesc},
-    },
+use crate::painting::{
+    gl_buffer::{GlBuffer, GlBufferTarget, GlVertexArrayObject},
+    shader::{Shader, VertexAttribDesc},
 };
 use glow::HasContext;
 use std::mem::offset_of;
