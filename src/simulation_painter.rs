@@ -2,7 +2,7 @@ use crate::{
     field::Field,
     grid::CellType,
     math::{point::Point, rect::Rect},
-    sides::{Side, SideField, SideOrientation},
+    sides::{Orientation, Side, SideField},
     simulation::Simulation,
 };
 
@@ -69,8 +69,8 @@ pub fn draw_side_field(
     for side in field.indices() {
         // Compute the world-space center of the side depending on orientation
         let world_pos = match side.orientation {
-            SideOrientation::Vertical => side.index.as_f64() + Point(0.0, 0.5),
-            SideOrientation::Horizontal => side.index.as_f64() + Point(0.5, 0.0),
+            Orientation::Vertical => side.index.as_f64() + Point(0.0, 0.5),
+            Orientation::Horizontal => side.index.as_f64() + Point(0.5, 0.0),
         };
 
         let velocity = field[side];

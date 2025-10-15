@@ -8,5 +8,6 @@ pub(crate) mod particle_painter;
 pub(crate) mod rect_vertices;
 pub(crate) mod shader;
 pub(crate) mod simulation_painter;
-mod step_painter;
+pub(crate) mod smoothing_painter;
+pub(crate) mod step_painter;
 mod utils;

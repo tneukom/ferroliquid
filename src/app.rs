@@ -21,6 +21,8 @@ pub struct EguiApp {
     density_texture: DisplayTexture,
     advection_texture: DisplayTexture,
     step_texture: DisplayTexture,
+    vertical_smoothed_texture: DisplayTexture,
+    horizontal_smoothed_texture: DisplayTexture,
 
     run: bool,
 }
@@ -62,6 +64,14 @@ impl EguiApp {
                 simulation_painter.particle_advection_texture.clone(),
             ),
             step_texture: DisplayTexture::new("Step", simulation_painter.step_texture.clone()),
+            vertical_smoothed_texture: DisplayTexture::new(
+                "Vertical Smoothed",
+                simulation_painter.vertical_smoothed_texture.clone(),
+            ),
+            horizontal_smoothed_texture: DisplayTexture::new(
+                "Horizontal Smoothed",
+                simulation_painter.horizontal_smoothed_texture.clone(),
+            ),
             simulation_painter,
         }
     }
@@ -86,7 +96,7 @@ impl EguiApp {
 
         if self.run || step_clicked {
             // Run simulation step
-            let fill_rect = Rect::low_size(Point(4.0, 4.0), Point(8.0, 8.0));
+            let fill_rect = Rect::low_size(Point(4.0, 4.0), Point(4.0, 4.0));
             let velocity = Point(20.0, 0.0);
             self.simulation.fill_rectangle(fill_rect, velocity);
             // for coord in fill_rect.iter_indices() {
@@ -110,6 +120,16 @@ impl EguiApp {
         Self::texture_window(ui, self.blit_painter.clone(), &mut self.density_texture);
         Self::texture_window(ui, self.blit_painter.clone(), &mut self.advection_texture);
         Self::texture_window(ui, self.blit_painter.clone(), &mut self.step_texture);
+        Self::texture_window(
+            ui,
+            self.blit_painter.clone(),
+            &mut self.vertical_smoothed_texture,
+        );
+        Self::texture_window(
+            ui,
+            self.blit_painter.clone(),
+            &mut self.horizontal_smoothed_texture,
+        );
     }
 
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
@@ -167,10 +187,12 @@ impl EguiApp {
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // let dt = ctx.input(|input| input.unstable_dt) as f64;
+        // let instant = Instant::now();
         unsafe {
             self.simulation_painter
                 .paint(&self.gl, &self.simulation.particles);
         }
+        // println!("time to render: {}", instant.elapsed().as_secs_f64());
 
         tracy_client::frame_mark();
 

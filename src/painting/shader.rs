@@ -203,21 +203,28 @@ impl Shader {
     }
 
     pub unsafe fn uniform<T: AssignUniform>(&self, gl: &glow::Context, name: &str, arg: T) {
-        match self.uniforms.get(name) {
-            None => {
-                // println!("Uniform {name} does not exist in shader");
-                // for name in self.uniforms.keys() {
-                //     println!("existing name: {name}");
-                // }
-            }
-            Some(active_uniform) => {
-                let location = gl
-                    .get_uniform_location(self.program, &active_uniform.name)
-                    .expect("Failed to get uniform location");
+        // TODO: glGetActiveUniform returns array[0] for an array uniform, so the commented
+        //   code doesn't work.
+        // match self.uniforms.get(name) {
+        //     None => {
+        //         println!("Uniform {name} does not exist in shader");
+        //         for name in self.uniforms.keys() {
+        //             println!("existing name: {name}");
+        //         }
+        //     }
+        //     Some(active_uniform) => {
+        //         let location = gl
+        //             .get_uniform_location(self.program, &active_uniform.name)
+        //             .expect("Failed to get uniform location");
+        //
+        //         self.uniform_location(gl, &location, arg)
+        //     }
+        // }
+        let location = gl
+            .get_uniform_location(self.program, &name)
+            .expect("Failed to get uniform location");
 
-                self.uniform_location(gl, &location, arg)
-            }
-        }
+        self.uniform_location(gl, &location, arg)
     }
 
     // inline void uniform(int location, std::array<float, 4> const& value)
@@ -299,15 +306,16 @@ impl AssignUniform for &AffineMap<f64> {
     }
 }
 
-impl AssignUniform for &[Point<f64>] {
+impl AssignUniform for &[Point<f32>] {
     unsafe fn assign_uniform(gl: &glow::Context, location: &glow::UniformLocation, value: Self) {
-        // array of floats [x, y, x, y, ...]
-        let mut buf = Vec::with_capacity(value.len() * 2);
-        for v in value {
-            buf.push(v.x as f32);
-            buf.push(v.y as f32);
-        }
+        let buf: &[f32] = bytemuck::cast_slice(value);
         gl.uniform_2_f32_slice(Some(location), &buf);
+    }
+}
+
+impl AssignUniform for &[f32] {
+    unsafe fn assign_uniform(gl: &glow::Context, location: &glow::UniformLocation, value: Self) {
+        gl.uniform_1_f32_slice(Some(location), value);
     }
 }
 

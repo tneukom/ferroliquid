@@ -3,8 +3,8 @@ precision highp float;
 
 in vec2 pass_uv;
 
-uniform mediump sampler2D texture;
-uniform mediump float edge;
+uniform sampler2D texture;
+uniform float edge;
 
 out float out_density;
 

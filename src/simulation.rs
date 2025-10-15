@@ -150,7 +150,7 @@ impl Simulation {
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid();
 
-        self.integrate(6);
+        self.integrate(4);
 
         if self.i_step % 32 == 0 {
             self.sort_particles();

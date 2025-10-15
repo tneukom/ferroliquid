@@ -2,6 +2,7 @@ use crate::{
     math::generic::{Dot, Num, SignedNum},
     sides::Direction,
 };
+use bytemuck::{Pod, Zeroable};
 use num_traits::{AsPrimitive, real::Real};
 use std::{
     cmp::Ordering,
@@ -11,10 +12,15 @@ use std::{
 };
 
 #[derive(Copy, Clone, Debug, Default)]
+#[repr(C)]
 pub struct Point<T> {
     pub x: T,
     pub y: T,
 }
+
+unsafe impl<T: Zeroable> Zeroable for Point<T> {}
+
+unsafe impl<T: Pod> Pod for Point<T> {}
 
 #[allow(non_snake_case)]
 pub const fn Point<T>(x: T, y: T) -> Point<T> {

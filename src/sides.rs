@@ -20,12 +20,12 @@ impl Direction {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SideOrientation {
+pub enum Orientation {
     Vertical,
     Horizontal,
 }
 
-impl SideOrientation {
+impl Orientation {
     pub fn unicode_symbol(self) -> char {
         match self {
             Self::Vertical => '|',
@@ -38,21 +38,21 @@ impl SideOrientation {
 /// Each pixel has therefore 6 sides, see docs/sides_and_corners.jpg
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Side {
-    pub orientation: SideOrientation,
+    pub orientation: Orientation,
     pub index: Point<i64>,
 }
 
 impl Side {
-    pub const fn new(orientation: SideOrientation, index: Point<i64>) -> Self {
+    pub const fn new(orientation: Orientation, index: Point<i64>) -> Self {
         Self { orientation, index }
     }
 
     pub const fn vertical(index: Point<i64>) -> Self {
-        Self::new(SideOrientation::Vertical, index)
+        Self::new(Orientation::Vertical, index)
     }
 
     pub const fn horizontal(index: Point<i64>) -> Self {
-        Self::new(SideOrientation::Horizontal, index)
+        Self::new(Orientation::Horizontal, index)
     }
 
     pub fn up(self) -> Self {
@@ -111,8 +111,8 @@ impl Side {
 
     pub fn lower_cell(self) -> Point<i64> {
         match self.orientation {
-            SideOrientation::Vertical => self.upper_cell().left(),
-            SideOrientation::Horizontal => self.upper_cell().up(),
+            Orientation::Vertical => self.upper_cell().left(),
+            Orientation::Horizontal => self.upper_cell().up(),
         }
     }
 }
@@ -233,8 +233,8 @@ impl<T> Index<Side> for SideField<T> {
 
     fn index(&self, side: Side) -> &Self::Output {
         match side.orientation {
-            SideOrientation::Vertical => &self.vertical[side.index],
-            SideOrientation::Horizontal => &self.horizontal[side.index],
+            Orientation::Vertical => &self.vertical[side.index],
+            Orientation::Horizontal => &self.horizontal[side.index],
         }
     }
 }
@@ -242,8 +242,8 @@ impl<T> Index<Side> for SideField<T> {
 impl<T> IndexMut<Side> for SideField<T> {
     fn index_mut(&mut self, side: Side) -> &mut Self::Output {
         match side.orientation {
-            SideOrientation::Vertical => &mut self.vertical[side.index],
-            SideOrientation::Horizontal => &mut self.horizontal[side.index],
+            Orientation::Vertical => &mut self.vertical[side.index],
+            Orientation::Horizontal => &mut self.horizontal[side.index],
         }
     }
 }
