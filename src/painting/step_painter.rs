@@ -1,6 +1,17 @@
 use crate::painting::{effect_painter::EffectPainter, gl_texture::GlTexture};
 use glow::HasContext;
 
+#[derive(Debug, Clone)]
+pub struct StepPainterSettings {
+    pub edge: f64,
+}
+
+impl Default for StepPainterSettings {
+    fn default() -> Self {
+        Self { edge: 0.5 }
+    }
+}
+
 pub struct StepPainter {
     effect_painter: EffectPainter,
 }
@@ -14,13 +25,20 @@ impl StepPainter {
         Self { effect_painter }
     }
 
-    pub unsafe fn draw(&self, gl: &glow::Context, texture: &GlTexture) {
+    pub unsafe fn draw(
+        &self,
+        gl: &glow::Context,
+        texture: &GlTexture,
+        settings: &StepPainterSettings,
+    ) {
         self.effect_painter.setup_draw(gl);
 
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(texture.id));
         self.effect_painter.shader.uniform(gl, "texture", 0i32);
-        self.effect_painter.shader.uniform(gl, "edge", 0.05);
+        self.effect_painter
+            .shader
+            .uniform(gl, "edge", settings.edge);
 
         self.effect_painter.draw(gl);
     }

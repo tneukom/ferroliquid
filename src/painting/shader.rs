@@ -220,9 +220,9 @@ impl Shader {
         //         self.uniform_location(gl, &location, arg)
         //     }
         // }
-        let location = gl
-            .get_uniform_location(self.program, &name)
-            .expect("Failed to get uniform location");
+        let Some(location) = gl.get_uniform_location(self.program, &name) else {
+            panic!("Failed to get uniform location for {name}")
+        };
 
         self.uniform_location(gl, &location, arg)
     }

@@ -256,8 +256,8 @@ impl Grid {
             let cell_fluid_index = self.cells_fluid_index[c];
             let row = &mut solver.rows[cell_fluid_index];
 
-            // let density_correction = self.cells_density[c] - TARGET_DENSITY;
-            let density_correction = 0.0;
+            let density_correction = self.cells_density[c] - TARGET_DENSITY;
+            // let density_correction = 0.0;
 
             // flow from outside pressure: div (l * grad p)
             for direction in Direction::ALL {

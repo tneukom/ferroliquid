@@ -21,6 +21,7 @@ impl GlBufferTarget {
 pub struct GlBuffer<T> {
     pub id: glow::Buffer,
     pub target: GlBufferTarget,
+    pub len: usize,
 
     phantom: PhantomData<T>,
 }
@@ -32,14 +33,20 @@ impl<T> GlBuffer<T> {
         // context.buffer_data_u8(target, &[], glow::STATIC_DRAW);
         // context.bind_buffer(target, None);
         GlBuffer {
+            len: 0,
             id,
             target,
             phantom: PhantomData,
         }
     }
 
-    pub unsafe fn buffer_data(&self, gl: &glow::Context, data: &[T]) {
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub unsafe fn buffer_data(&mut self, gl: &glow::Context, data: &[T]) {
         // data as slice of u8
+        self.len = data.len();
         let data_bytes = data.align_to::<u8>().1;
         let gl_target = self.target.to_gl_enum();
         gl.bind_buffer(gl_target, Some(self.id));

@@ -14,8 +14,16 @@ impl BlitPainter {
         Self { effect_painter }
     }
 
-    pub unsafe fn draw(&self, gl: &glow::Context, texture: &GlTexture) {
+    pub unsafe fn draw(&self, gl: &glow::Context, texture: &GlTexture, alpha_blend: bool) {
         self.effect_painter.setup_draw(gl);
+
+        if alpha_blend {
+            gl.enable(glow::BLEND);
+            gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
+            gl.blend_equation(glow::FUNC_ADD);
+        } else {
+            gl.disable(glow::BLEND);
+        }
 
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(texture.id));

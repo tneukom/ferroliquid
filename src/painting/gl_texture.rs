@@ -22,6 +22,7 @@ pub enum Filter {
 #[derive(Debug, Clone, Copy)]
 pub enum TextureFormat {
     SRGBA8,
+    RGBA8,
     R16U,
     R8,
     RGBA32F,
@@ -32,6 +33,7 @@ impl TextureFormat {
     pub fn internal_format(self) -> u32 {
         match self {
             Self::SRGBA8 => glow::SRGB8_ALPHA8,
+            Self::RGBA8 => glow::RGBA8,
             Self::R16U => glow::R16UI,
             Self::R8 => glow::R8,
             Self::RGBA32F => glow::RGBA32F,
@@ -42,6 +44,7 @@ impl TextureFormat {
     pub fn format(self) -> u32 {
         match self {
             Self::SRGBA8 => glow::RGBA,
+            Self::RGBA8 => glow::RGBA,
             Self::R16U => glow::RED_INTEGER,
             Self::R8 => glow::RED,
             Self::RGBA32F => glow::RGBA,
@@ -53,6 +56,7 @@ impl TextureFormat {
     pub fn ty(self) -> u32 {
         match self {
             Self::SRGBA8 => glow::UNSIGNED_BYTE,
+            Self::RGBA8 => glow::UNSIGNED_BYTE,
             Self::R16U => glow::UNSIGNED_SHORT,
             Self::R8 => glow::UNSIGNED_BYTE,
             Self::RGBA32F => glow::FLOAT,
@@ -99,7 +103,11 @@ impl GlTexture {
     }
 
     /// Bitmap colorspace is assumed to be SRGB
-    pub unsafe fn from_bitmap(gl: &glow::Context, bitmap: &RgbaField, filter: Filter) -> Self {
+    pub unsafe fn from_srgba_bitmap(
+        gl: &glow::Context,
+        bitmap: &RgbaField,
+        filter: Filter,
+    ) -> Self {
         let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter);
         texture.texture_image_srgba8(gl, bitmap);
         texture
@@ -126,7 +134,7 @@ impl GlTexture {
         );
     }
 
-    unsafe fn texture_image_raw<T: Pod>(
+    pub unsafe fn texture_image_raw<T: Pod>(
         &mut self,
         gl: &glow::Context,
         format: TextureFormat,

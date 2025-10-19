@@ -38,6 +38,17 @@ pub fn affine_device_from_simulation(simulation_bounds: Rect<f64>) -> AffineMap<
     )
 }
 
+pub fn affine_uv_from_simulation(simulation_bounds: Rect<f64>) -> AffineMap<f64> {
+    AffineMap::map_points(
+        simulation_bounds.top_left(),
+        Point(0.0, 1.0),
+        simulation_bounds.top_right(),
+        Point(1.0, 1.0),
+        simulation_bounds.bottom_left(),
+        Point(0.0, 0.0),
+    )
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct CoordinateFrames {
     pub window_size: Point<f64>,

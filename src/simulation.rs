@@ -8,6 +8,7 @@ use crate::{
 
 pub struct Particle {
     pub position: Point<f64>,
+    pub previous_position: Point<f64>,
     pub velocity: Point<f64>,
 }
 
@@ -100,6 +101,7 @@ impl Simulation {
         self.particles = std::mem::take(&mut self.particles)
             .into_iter()
             .filter_map(|mut particle| {
+                particle.previous_position = particle.position;
                 let mut position = particle.position;
                 let velocity = Point::ZERO;
 
@@ -127,7 +129,11 @@ impl Simulation {
     }
 
     pub fn create_particle(&mut self, position: Point<f64>, velocity: Point<f64>) {
-        self.particles.push(Particle { position, velocity });
+        self.particles.push(Particle {
+            position,
+            velocity,
+            previous_position: position,
+        });
     }
 
     pub fn sort_particles(&mut self) {

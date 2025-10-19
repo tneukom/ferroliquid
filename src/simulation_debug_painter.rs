@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy)]
-pub struct SimulationDrawSettings {
+pub struct SimulationDebugDrawSettings {
     particles: bool,
     particle_velocity_labels: bool,
     velocity_interpolated: bool,
@@ -20,9 +20,10 @@ pub struct SimulationDrawSettings {
     cell_types: bool,
     boundary_constant: bool,
     boundary_linear: bool,
+    density: bool,
 }
 
-impl Default for SimulationDrawSettings {
+impl Default for SimulationDebugDrawSettings {
     fn default() -> Self {
         Self {
             particles: true,
@@ -37,11 +38,15 @@ impl Default for SimulationDrawSettings {
             cell_types: false,
             boundary_constant: false,
             boundary_linear: false,
+            density: false,
         }
     }
 }
 
-pub fn simulation_draw_settings_widget(ui: &mut egui::Ui, settings: &mut SimulationDrawSettings) {
+pub fn simulation_draw_settings_widget(
+    ui: &mut egui::Ui,
+    settings: &mut SimulationDebugDrawSettings,
+) {
     ui.checkbox(&mut settings.particles, "Particles");
     ui.checkbox(
         &mut settings.particle_velocity_labels,
@@ -57,6 +62,7 @@ pub fn simulation_draw_settings_widget(ui: &mut egui::Ui, settings: &mut Simulat
     ui.checkbox(&mut settings.cell_types, "Cell Types");
     ui.checkbox(&mut settings.boundary_constant, "Boundary Constant");
     ui.checkbox(&mut settings.boundary_linear, "Boundary Linear");
+    ui.checkbox(&mut settings.density, "Density");
 }
 
 pub fn draw_side_field(
@@ -160,11 +166,11 @@ pub fn draw_simulation(
     simulation: &Simulation,
     painter: &egui::Painter,
     mut ui_rect: egui::Rect,
-    settings: &SimulationDrawSettings,
+    settings: &SimulationDebugDrawSettings,
 ) {
     ui_rect = ui_rect.translate(egui::Vec2::splat(10.0));
 
-    let draw_scale = 10.0;
+    let draw_scale = 30.0;
     let font = egui::FontId::new(9.0, egui::FontFamily::Monospace);
 
     if settings.grid {
@@ -255,6 +261,16 @@ pub fn draw_simulation(
             ui_rect,
             &simulation.grid.cells_pressure,
         );
+    }
+
+    if settings.density {
+        draw_cell_field(
+            painter,
+            font.clone(),
+            draw_scale,
+            ui_rect,
+            &simulation.grid.cells_density,
+        )
     }
 
     if settings.divergence {
