@@ -1,5 +1,4 @@
 use crate::{
-    constants::{ALPHA, TARGET_DENSITY, TARGET_DENSITY_I},
     grid::Grid,
     interpolator::interpolate_div_free_velocity,
     math::{point::Point, rect::Rect},
@@ -10,6 +9,23 @@ pub struct Particle {
     pub position: Point<f64>,
     pub previous_position: Point<f64>,
     pub velocity: Point<f64>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SimulationSettings {
+    pub density_correction_strength: f64,
+    pub target_density: f64,
+    pub alpha: f64,
+}
+
+impl Default for SimulationSettings {
+    fn default() -> Self {
+        Self {
+            density_correction_strength: 0.5,
+            target_density: 5.0,
+            alpha: 0.05,
+        }
+    }
 }
 
 pub struct Simulation {
@@ -32,17 +48,18 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn interpolate_particle_velocities_from_grid(&mut self) {
+    pub fn interpolate_particle_velocities_from_grid(&mut self, settings: &SimulationSettings) {
         let _span = tracy_client::span!("interpolate_particle_velocities_from_grid");
 
         for particle in &mut self.particles {
             let floored_pos = particle.position.floor();
             let coord = floored_pos.as_i64();
 
-            let alpha_p = ALPHA
-                * self.dt
-                * 17.0
-                * (-0.5 * self.grid.cells_particle_count[coord] as f64).exp();
+            // let alpha_p = ALPHA
+            //     * self.dt
+            //     * 17.0
+            //     * (-0.5 * self.grid.cells_particle_count[coord] as f64).exp();
+            let alpha_p = settings.alpha;
             let fractional_pos = particle.position - floored_pos;
 
             let top_coeff = 1.0 - fractional_pos.y;
@@ -143,18 +160,18 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn step(&mut self) {
+    pub fn step(&mut self, settings: &SimulationSettings) {
         let _span = tracy_client::span!("step");
 
         self.grid.clear();
 
         self.particles = self
             .grid
-            .insert_particles(std::mem::take(&mut self.particles));
-        self.grid.solve_pressure();
+            .insert_particles(std::mem::take(&mut self.particles), settings);
+        self.grid.solve_pressure(settings);
 
         //Rebuild particles
-        self.interpolate_particle_velocities_from_grid();
+        self.interpolate_particle_velocities_from_grid(settings);
 
         self.integrate(4);
 
@@ -164,22 +181,27 @@ impl Simulation {
         self.i_step += 1;
     }
 
-    pub fn fill(&mut self, coord: Point<i64>, velocity: Point<f64>) {
+    pub fn fill(&mut self, coord: Point<i64>, velocity: Point<f64>, settings: &SimulationSettings) {
         let offset = coord.as_f64();
 
-        for _ in 0..TARGET_DENSITY_I {
+        for _ in 0..settings.target_density as i64 {
             let delta = Point(fastrand::f64(), fastrand::f64());
             self.create_particle(offset + delta, velocity);
         }
     }
 
     #[inline(never)]
-    pub fn fill_rectangle(&mut self, rect: Rect<f64>, velocity: Point<f64>) {
+    pub fn fill_rectangle(
+        &mut self,
+        rect: Rect<f64>,
+        velocity: Point<f64>,
+        settings: &SimulationSettings,
+    ) {
         // Clear all current particles in the given rect
         self.particles
             .retain(|particle| !rect.contains(particle.position));
 
-        let n_fill_particles = (rect.area() * TARGET_DENSITY) as i64;
+        let n_fill_particles = (rect.area() * settings.target_density) as i64;
         for _ in 0..n_fill_particles {
             let position = Point(
                 rect.left() + rect.width() * fastrand::f64(),

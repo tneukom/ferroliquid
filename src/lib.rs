@@ -11,7 +11,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 pub mod app;
 pub(crate) mod camera;
-pub(crate) mod constants;
 pub(crate) mod coordinate_frame;
 pub(crate) mod field;
 pub(crate) mod grid;

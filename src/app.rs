@@ -9,7 +9,7 @@ use crate::{
         gl_texture::GlTexture,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
-    simulation::Simulation,
+    simulation::{Simulation, SimulationSettings},
     simulation_debug_painter::{
         SimulationDebugDrawSettings, draw_simulation, simulation_draw_settings_widget,
     },
@@ -27,6 +27,7 @@ pub struct EguiApp {
     gl: Arc<glow::Context>,
 
     simulation: Simulation,
+    simulation_settings: SimulationSettings,
     inflows: Vec<Inflow>,
     simulation_draw_settings: SimulationDebugDrawSettings,
 
@@ -53,14 +54,14 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
-        let bounds = Rect::low_size(Point::ZERO, Point(40, 40));
+        let bounds = Rect::low_size(Point::ZERO, Point(80, 80));
         let mut simulation = Simulation::new(bounds, 1.0 / 60.0);
 
         // Solid walls
         for x in bounds.left()..bounds.right() {
             simulation.grid.make_solid(Point(x, bounds.bottom() - 1));
         }
-        for y in bounds.top() + 20..bounds.bottom() {
+        for y in bounds.top() + 40..bounds.bottom() {
             simulation.grid.make_solid(Point(bounds.left() + 3, y));
             simulation.grid.make_solid(Point(bounds.right() - 4, y));
         }
@@ -85,6 +86,7 @@ impl EguiApp {
 
         Self {
             simulation,
+            simulation_settings: SimulationSettings::default(),
             inflows,
             gl,
             simulation_draw_settings: SimulationDebugDrawSettings::default(),
@@ -124,7 +126,11 @@ impl EguiApp {
         if self.run || step_clicked {
             // Run simulation step
             for inflow in &self.inflows {
-                self.simulation.fill_rectangle(inflow.rect, inflow.velocity);
+                self.simulation.fill_rectangle(
+                    inflow.rect,
+                    inflow.velocity,
+                    &self.simulation_settings,
+                );
             }
             // for coord in fill_rect.iter_indices() {
             //     self.simulation.fill(coord, velocity);
@@ -132,7 +138,7 @@ impl EguiApp {
 
             self.simulation.apply_force(Point(0.0, 60.0));
             let instant = Instant::now();
-            self.simulation.step();
+            self.simulation.step(&self.simulation_settings);
             println!("time to simulate: {}", instant.elapsed().as_secs_f64());
         }
 
@@ -141,9 +147,52 @@ impl EguiApp {
             self.simulation.particles.len()
         ));
 
+        ui.heading("Simulation Settings");
+        Self::simulation_settings_ui(ui, &mut self.simulation_settings);
+
+        ui.heading("Simulation");
         simulation_draw_settings_widget(ui, &mut self.simulation_draw_settings);
 
         ui.heading("Textures");
+        self.texture_windows(ui);
+
+        ui.heading("Rendering");
+        Self::simulation_painter_settings_ui(ui, &mut self.simulation_painter_settings);
+    }
+
+    pub fn simulation_settings_ui(ui: &mut egui::Ui, settings: &mut SimulationSettings) {
+        egui::Grid::new("simulation_settings_grid")
+            .num_columns(2)
+            // .spacing([40.0, 4.0])
+            .striped(true)
+            .show(ui, |ui| {
+                ui.label("Density correction");
+                ui.add(
+                    egui::DragValue::new(&mut settings.density_correction_strength)
+                        .range(0.0..=2.0)
+                        .speed(0.01),
+                );
+                ui.end_row();
+
+                ui.label("Target density");
+                ui.add(
+                    egui::DragValue::new(&mut settings.target_density)
+                        .range(1.0..=16.0)
+                        .speed(0.1),
+                );
+                ui.end_row();
+
+                ui.label("Viscosity");
+                ui.add(
+                    egui::DragValue::new(&mut settings.alpha)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+                ui.end_row();
+            });
+    }
+
+    fn texture_windows(&mut self, ui: &mut egui::Ui) {
         self.texture_window.window(
             ui,
             &mut self.density_texture,
@@ -199,8 +248,6 @@ impl EguiApp {
             self.simulation_painter.color_texture_to.clone(),
             self.simulation_painter.particle_dots_texture.clone(),
         );
-
-        Self::simulation_painter_settings_ui(ui, &mut self.simulation_painter_settings);
     }
 
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
@@ -228,7 +275,7 @@ impl EguiApp {
 
         egui::Grid::new("simulation_painter_settings")
             .num_columns(2)
-            .spacing([40.0, 4.0])
+            // .spacing([40.0, 4.0])
             .striped(true)
             .show(ui, |ui| {
                 ui.label("Particle point size");

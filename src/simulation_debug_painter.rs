@@ -170,7 +170,7 @@ pub fn draw_simulation(
 ) {
     ui_rect = ui_rect.translate(egui::Vec2::splat(10.0));
 
-    let draw_scale = 30.0;
+    let draw_scale = 10.0;
     let font = egui::FontId::new(9.0, egui::FontFamily::Monospace);
 
     if settings.grid {
