@@ -10,9 +10,9 @@ use crate::{
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
     simulation::{Simulation, SimulationSettings},
-    simulation_debug_painter::{
-        SimulationDebugDrawSettings, debug_simulation_scene_ui, draw_simulation,
-        simulation_draw_settings_widget,
+    simulation_debug_ui::{
+        SimulationDebugDrawSettings, SimulationDebugWindow, debug_simulation_scene_ui,
+        draw_simulation, simulation_draw_settings_widget,
     },
     widgets::choice_buttons,
 };
@@ -31,9 +31,7 @@ pub struct EguiApp {
     simulation_settings: SimulationSettings,
     inflows: Vec<Inflow>,
 
-    show_debug_window: bool,
-    debug_scene_rect: egui::Rect,
-    simulation_debug_draw_settings: SimulationDebugDrawSettings,
+    simulation_debug_window: SimulationDebugWindow,
 
     simulation_painter: SimulationPainter,
     simulation_painter_settings: SimulationPainterSettings,
@@ -93,9 +91,7 @@ impl EguiApp {
             simulation_settings: SimulationSettings::default(),
             inflows,
             gl,
-            show_debug_window: false,
-            debug_scene_rect: egui::Rect::ZERO,
-            simulation_debug_draw_settings: SimulationDebugDrawSettings::default(),
+            simulation_debug_window: SimulationDebugWindow::new(),
             simulation_painter_settings: SimulationPainterSettings::default(),
             run: false,
             texture_window,
@@ -126,6 +122,9 @@ impl EguiApp {
     // }
 
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
+        self.simulation_debug_window
+            .window_toggle(ui, &self.simulation);
+
         ui.checkbox(&mut self.run, "Run");
         let step_clicked = ui.button("Step").clicked();
 
@@ -152,29 +151,6 @@ impl EguiApp {
             "Particle count:{}",
             self.simulation.particles.len()
         ));
-
-        ui.toggle_value(&mut self.show_debug_window, "Debug Window");
-
-        egui::Window::new("Debug Window")
-            .open(&mut self.show_debug_window)
-            .collapsible(false)
-            .show(ui.ctx(), |ui| {
-                egui::SidePanel::left("debug_controls").show_inside(ui, |ui| {
-                    simulation_draw_settings_widget(ui, &mut self.simulation_debug_draw_settings);
-                });
-
-                debug_simulation_scene_ui(
-                    ui,
-                    &mut self.debug_scene_rect,
-                    &self.simulation,
-                    &self.simulation_debug_draw_settings,
-                );
-
-                // Doesn't work properly, see https://github.com/emilk/egui/issues/901
-                // egui::CentralPanel::default().show_inside(ui, |ui| {
-                //
-                // });
-            });
 
         ui.heading("Simulation Settings");
         Self::simulation_settings_ui(ui, &mut self.simulation_settings);
@@ -276,18 +252,18 @@ impl EguiApp {
         );
     }
 
-    pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
-        // let desired_size = egui::vec2(1000.0, 1000.0);
-        let available_size = ui.available_size();
-        let (response, painter) = ui.allocate_painter(available_size, egui::Sense::click());
-        let rect = response.rect;
-        draw_simulation(
-            &self.simulation,
-            &painter,
-            rect,
-            &self.simulation_debug_draw_settings,
-        );
-    }
+    // pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
+    //     // let desired_size = egui::vec2(1000.0, 1000.0);
+    //     let available_size = ui.available_size();
+    //     let (response, painter) = ui.allocate_painter(available_size, egui::Sense::click());
+    //     let rect = response.rect;
+    //     draw_simulation(
+    //         &self.simulation,
+    //         &painter,
+    //         rect,
+    //         &self.simulation_debug_draw_settings,
+    //     );
+    // }
 
     fn screen_is_narrow(ctx: &egui::Context) -> bool {
         ctx.input(|input| input.screen_rect.width() < 800.0)

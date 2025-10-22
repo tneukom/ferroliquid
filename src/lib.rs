@@ -20,7 +20,7 @@ pub(crate) mod painting;
 pub(crate) mod palettes;
 pub(crate) mod sides;
 pub(crate) mod simulation;
-pub(crate) mod simulation_debug_painter;
+pub(crate) mod simulation_debug_ui;
 pub(crate) mod solver;
 pub(crate) mod utils;
 pub(crate) mod widgets;

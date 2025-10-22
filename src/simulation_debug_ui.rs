@@ -320,3 +320,44 @@ pub fn debug_simulation_scene_ui(
             draw_simulation(simulation, &painter, rect, settings);
         });
 }
+
+pub struct SimulationDebugWindow {
+    show_window: bool,
+    debug_scene_rect: egui::Rect,
+    simulation_debug_draw_settings: SimulationDebugDrawSettings,
+}
+
+impl SimulationDebugWindow {
+    pub fn new() -> Self {
+        Self {
+            show_window: false,
+            debug_scene_rect: egui::Rect::ZERO,
+            simulation_debug_draw_settings: SimulationDebugDrawSettings::default(),
+        }
+    }
+
+    pub fn window_toggle(&mut self, ui: &mut egui::Ui, simulation: &Simulation) {
+        ui.toggle_value(&mut self.show_window, "Debug Window");
+
+        egui::Window::new("Debug Window")
+            .open(&mut self.show_window)
+            .collapsible(false)
+            .show(ui.ctx(), |ui| {
+                egui::SidePanel::left("debug_controls").show_inside(ui, |ui| {
+                    simulation_draw_settings_widget(ui, &mut self.simulation_debug_draw_settings);
+                });
+
+                debug_simulation_scene_ui(
+                    ui,
+                    &mut self.debug_scene_rect,
+                    simulation,
+                    &self.simulation_debug_draw_settings,
+                );
+
+                // Doesn't work properly, see https://github.com/emilk/egui/issues/901
+                // egui::CentralPanel::default().show_inside(ui, |ui| {
+                //
+                // });
+            });
+    }
+}
