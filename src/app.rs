@@ -11,10 +11,12 @@ use crate::{
     },
     simulation::{Simulation, SimulationSettings},
     simulation_debug_painter::{
-        SimulationDebugDrawSettings, draw_simulation, simulation_draw_settings_widget,
+        SimulationDebugDrawSettings, debug_simulation_scene_ui, draw_simulation,
+        simulation_draw_settings_widget,
     },
     widgets::choice_buttons,
 };
+use egui::Widget;
 use std::{sync::Arc, time::Instant};
 
 pub struct Inflow {
@@ -29,7 +31,9 @@ pub struct EguiApp {
     simulation: Simulation,
     simulation_settings: SimulationSettings,
     inflows: Vec<Inflow>,
-    simulation_draw_settings: SimulationDebugDrawSettings,
+
+    debug_scene_rect: egui::Rect,
+    simulation_debug_draw_settings: SimulationDebugDrawSettings,
 
     simulation_painter: SimulationPainter,
     simulation_painter_settings: SimulationPainterSettings,
@@ -89,7 +93,8 @@ impl EguiApp {
             simulation_settings: SimulationSettings::default(),
             inflows,
             gl,
-            simulation_draw_settings: SimulationDebugDrawSettings::default(),
+            debug_scene_rect: egui::Rect::ZERO,
+            simulation_debug_draw_settings: SimulationDebugDrawSettings::default(),
             simulation_painter_settings: SimulationPainterSettings::default(),
             run: false,
             texture_window,
@@ -151,7 +156,7 @@ impl EguiApp {
         Self::simulation_settings_ui(ui, &mut self.simulation_settings);
 
         ui.heading("Simulation");
-        simulation_draw_settings_widget(ui, &mut self.simulation_draw_settings);
+        simulation_draw_settings_widget(ui, &mut self.simulation_debug_draw_settings);
 
         ui.heading("Textures");
         self.texture_windows(ui);
@@ -259,7 +264,7 @@ impl EguiApp {
             &self.simulation,
             &painter,
             rect,
-            &self.simulation_draw_settings,
+            &self.simulation_debug_draw_settings,
         );
     }
 
@@ -366,8 +371,17 @@ impl eframe::App for EguiApp {
             self.side_panel_ui(ui);
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.central_panel_ui(ui);
+        // egui::CentralPanel::default().show(ctx, |ui| {
+        //     self.central_panel_ui(ui);
+        // });
+
+        egui::Window::new("Scene").show(ctx, |ui| {
+            debug_simulation_scene_ui(
+                ui,
+                &mut self.debug_scene_rect,
+                &self.simulation,
+                &self.simulation_debug_draw_settings,
+            );
         });
 
         // self.view
