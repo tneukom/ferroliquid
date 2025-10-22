@@ -16,7 +16,6 @@ use crate::{
     },
     widgets::choice_buttons,
 };
-use egui::Widget;
 use std::{sync::Arc, time::Instant};
 
 pub struct Inflow {
@@ -32,6 +31,7 @@ pub struct EguiApp {
     simulation_settings: SimulationSettings,
     inflows: Vec<Inflow>,
 
+    show_debug_window: bool,
     debug_scene_rect: egui::Rect,
     simulation_debug_draw_settings: SimulationDebugDrawSettings,
 
@@ -93,6 +93,7 @@ impl EguiApp {
             simulation_settings: SimulationSettings::default(),
             inflows,
             gl,
+            show_debug_window: false,
             debug_scene_rect: egui::Rect::ZERO,
             simulation_debug_draw_settings: SimulationDebugDrawSettings::default(),
             simulation_painter_settings: SimulationPainterSettings::default(),
@@ -152,11 +153,31 @@ impl EguiApp {
             self.simulation.particles.len()
         ));
 
+        ui.toggle_value(&mut self.show_debug_window, "Debug Window");
+
+        egui::Window::new("Debug Window")
+            .open(&mut self.show_debug_window)
+            .collapsible(false)
+            .show(ui.ctx(), |ui| {
+                egui::SidePanel::left("debug_controls").show_inside(ui, |ui| {
+                    simulation_draw_settings_widget(ui, &mut self.simulation_debug_draw_settings);
+                });
+
+                debug_simulation_scene_ui(
+                    ui,
+                    &mut self.debug_scene_rect,
+                    &self.simulation,
+                    &self.simulation_debug_draw_settings,
+                );
+
+                // Doesn't work properly, see https://github.com/emilk/egui/issues/901
+                // egui::CentralPanel::default().show_inside(ui, |ui| {
+                //
+                // });
+            });
+
         ui.heading("Simulation Settings");
         Self::simulation_settings_ui(ui, &mut self.simulation_settings);
-
-        ui.heading("Simulation");
-        simulation_draw_settings_widget(ui, &mut self.simulation_debug_draw_settings);
 
         ui.heading("Textures");
         self.texture_windows(ui);
@@ -374,15 +395,6 @@ impl eframe::App for EguiApp {
         // egui::CentralPanel::default().show(ctx, |ui| {
         //     self.central_panel_ui(ui);
         // });
-
-        egui::Window::new("Scene").show(ctx, |ui| {
-            debug_simulation_scene_ui(
-                ui,
-                &mut self.debug_scene_rect,
-                &self.simulation,
-                &self.simulation_debug_draw_settings,
-            );
-        });
 
         // self.view
         //     .handle_input(&mut self.view_input, &mut self.view_settings);
