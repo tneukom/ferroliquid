@@ -13,7 +13,7 @@ use crate::{
     sides::Orientation,
     simulation::Simulation,
 };
-use glow::HasContext;
+use glow::{Context, HasContext};
 use std::{mem::swap, sync::Arc};
 
 #[derive(Clone, Default, Debug)]
@@ -56,7 +56,7 @@ pub struct SimulationPainter {
 
     pub water_texture: Arc<GlTexture>,
     pub water_framebuffer: GlFramebuffer,
-    pub water_painter: WaterPainter,
+    pub water_painter: Arc<WaterPainter>,
 }
 
 impl SimulationPainter {
@@ -120,7 +120,7 @@ impl SimulationPainter {
             smooth_painter,
             water_texture: Arc::new(water_texture),
             water_framebuffer,
-            water_painter,
+            water_painter: Arc::new(water_painter),
             color_texture_from: Arc::new(color_texture_from),
             color_framebuffer_from,
             color_texture_to: Arc::new(color_texture_to),
@@ -134,7 +134,7 @@ impl SimulationPainter {
         &mut self,
         gl: &glow::Context,
         simulation: &Simulation,
-        inflows: impl IntoIterator<Item = (Rect<f64>, Rgba8)>,
+        inflows: &mut dyn Iterator<Item = (Rect<f64>, Rgba8)>,
         settings: &SimulationPainterSettings,
     ) {
         // Fill color for inflows
@@ -151,18 +151,36 @@ impl SimulationPainter {
         self.particle_painter
             .update_particles(gl, &simulation.particles);
 
+        self.particles(gl, &settings.particles);
+
+        self.particle_dots(gl);
+
+        self.color_rects(gl, inflows);
+
+        // Color advection
+        self.advect(gl);
+
+        self.step(gl, &settings.step);
+
+        self.smooth_vertical(gl, &settings.smooth);
+
+        self.smooth_horizontal(gl, &settings.smooth);
+
+        self.water(gl, &settings.water);
+    }
+
+    unsafe fn particles(&mut self, gl: &Context, settings: &ParticlePainterSettings) {
         // Draw particles
         self.particles_framebuffer.bind(gl);
         self.particles_framebuffer.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
         gl.clear(glow::COLOR_BUFFER_BIT);
-        self.particle_painter.draw_particles(
-            gl,
-            self.simulation_bounds.as_f64(),
-            &settings.particles,
-        );
+        self.particle_painter
+            .draw_particles(gl, self.simulation_bounds.as_f64(), settings);
         self.particles_framebuffer.unbind(gl);
+    }
 
+    unsafe fn particle_dots(&mut self, gl: &Context) {
         // Draw particle dots (for debugging)
         self.particle_dots_framebuffer.bind(gl);
         self.particle_dots_framebuffer.viewport(gl);
@@ -171,17 +189,24 @@ impl SimulationPainter {
         self.particle_painter
             .draw_particle_dots(gl, self.simulation_bounds.as_f64());
         self.particle_dots_framebuffer.unbind(gl);
+    }
 
+    unsafe fn color_rects(
+        &mut self,
+        gl: &Context,
+        inflows: &mut dyn Iterator<Item = (Rect<f64>, Rgba8)>,
+    ) {
         self.color_framebuffer_from.bind(gl);
         self.color_framebuffer_from.viewport(gl);
-        let padded_inflows = inflows
+        let mut padded_inflows = inflows
             .into_iter()
             .map(|(rect, color)| (rect.padded(0.5), color));
         self.rect_painter
-            .draw(gl, padded_inflows, self.simulation_bounds.as_f64());
+            .draw(gl, &mut padded_inflows, self.simulation_bounds.as_f64());
         self.color_framebuffer_from.unbind(gl);
+    }
 
-        // Color advection
+    unsafe fn advect(&mut self, gl: &Context) {
         self.color_framebuffer_to.bind(gl);
         self.color_framebuffer_to.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -193,40 +218,38 @@ impl SimulationPainter {
             self.simulation_bounds.as_f64(),
         );
         self.color_framebuffer_to.unbind(gl);
+    }
 
-        // Step effect
+    unsafe fn step(&mut self, gl: &Context, settings: &StepPainterSettings) {
         self.step_framebuffer.bind(gl);
         self.step_framebuffer.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
         gl.clear(glow::COLOR_BUFFER_BIT);
-
-        self.step_painter
-            .draw(gl, &self.density_texture, &settings.step);
+        self.step_painter.draw(gl, &self.density_texture, settings);
         self.step_framebuffer.unbind(gl);
+    }
 
-        // Vertical smoothing
+    unsafe fn smooth_vertical(&mut self, gl: &Context, settings: &SmoothPainterSettings) {
         self.vertical_smoothed_framebuffer.bind(gl);
         self.vertical_smoothed_framebuffer.viewport(gl);
-        self.smooth_painter.draw(
-            gl,
-            &self.step_texture,
-            Orientation::Vertical,
-            &settings.smooth,
-        );
+        self.smooth_painter
+            .draw(gl, &self.step_texture, Orientation::Vertical, settings);
         self.vertical_smoothed_framebuffer.unbind(gl);
+    }
 
-        // Horizontal smoothing
+    unsafe fn smooth_horizontal(&mut self, gl: &Context, settings: &SmoothPainterSettings) {
         self.horizontal_smoothed_framebuffer.bind(gl);
         self.horizontal_smoothed_framebuffer.viewport(gl);
         self.smooth_painter.draw(
             gl,
             &self.vertical_smoothed_texture,
             Orientation::Horizontal,
-            &settings.smooth,
+            settings,
         );
         self.horizontal_smoothed_framebuffer.unbind(gl);
+    }
 
-        // Draw water
+    pub unsafe fn water(&mut self, gl: &glow::Context, settings: &WaterPainterSettings) {
         self.water_framebuffer.bind(gl);
         self.water_framebuffer.viewport(gl);
         gl.clear_color(0.2, 0.2, 0.2, 1.0);
@@ -235,7 +258,7 @@ impl SimulationPainter {
             gl,
             &self.horizontal_smoothed_texture,
             &self.color_texture_to,
-            &settings.water,
+            settings,
         );
         self.water_framebuffer.unbind(gl);
     }

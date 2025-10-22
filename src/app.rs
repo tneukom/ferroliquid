@@ -169,18 +169,31 @@ impl EguiApp {
             });
     }
 
-    // pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
-    //     // let desired_size = egui::vec2(1000.0, 1000.0);
-    //     let available_size = ui.available_size();
-    //     let (response, painter) = ui.allocate_painter(available_size, egui::Sense::click());
-    //     let rect = response.rect;
-    //     draw_simulation(
-    //         &self.simulation,
-    //         &painter,
-    //         rect,
-    //         &self.simulation_debug_draw_settings,
-    //     );
-    // }
+    pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
+        let water_painter = self.simulation_painter.water_painter.clone();
+        let density_texture = self.simulation_painter.density_texture.clone();
+        let color_texture = self.simulation_painter.color_texture_to.clone();
+        let settings = self.simulation_painter_settings.water.clone();
+
+        let cb = {
+            egui_glow::CallbackFn::new(move |_info, painter| {
+                let gl = painter.gl().as_ref();
+                unsafe {
+                    water_painter.draw(gl, &density_texture, &color_texture, &settings);
+                }
+            })
+        };
+
+        let size = 16 * self.simulation.grid.bounds.size();
+        let (egui_rect, _response) =
+            ui.allocate_exact_size(size.as_f64().into(), egui::Sense::click_and_drag());
+
+        let callback = egui::PaintCallback {
+            rect: egui_rect,
+            callback: Arc::new(cb),
+        };
+        ui.painter().add(callback);
+    }
 
     fn screen_is_narrow(ctx: &egui::Context) -> bool {
         ctx.input(|input| input.screen_rect.width() < 800.0)
@@ -261,7 +274,7 @@ impl eframe::App for EguiApp {
             self.simulation_painter.paint(
                 &self.gl,
                 &self.simulation,
-                inflows,
+                &mut inflows.iter().copied(),
                 &self.simulation_painter_settings,
             );
         }
@@ -285,9 +298,9 @@ impl eframe::App for EguiApp {
             self.side_panel_ui(ui);
         });
 
-        // egui::CentralPanel::default().show(ctx, |ui| {
-        //     self.central_panel_ui(ui);
-        // });
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.central_panel_ui(ui);
+        });
 
         // self.view
         //     .handle_input(&mut self.view_input, &mut self.view_settings);
