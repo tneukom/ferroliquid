@@ -164,7 +164,7 @@ pub fn divergence(u: &SideField<f64>, coord: Point<i64>) -> f64 {
 pub fn draw_simulation(
     simulation: &Simulation,
     painter: &egui::Painter,
-    mut ui_rect: egui::Rect,
+    ui_rect: egui::Rect,
     settings: &SimulationDebugDrawSettings,
 ) {
     // ui_rect = ui_rect.translate(egui::Vec2::splat(10.0));

@@ -4,17 +4,10 @@ use crate::{
         rect::Rect,
         rgba8::{Rgba, Rgba8},
     },
-    painting::{
-        blit_painter::BlitPainter,
-        gl_texture::GlTexture,
-        simulation_painter::{SimulationPainter, SimulationPainterSettings},
-    },
+    painting::simulation_painter::{SimulationPainter, SimulationPainterSettings},
+    render_debug_ui::RenderDebugUi,
     simulation::{Simulation, SimulationSettings},
-    simulation_debug_ui::{
-        SimulationDebugDrawSettings, SimulationDebugWindow, debug_simulation_scene_ui,
-        draw_simulation, simulation_draw_settings_widget,
-    },
-    widgets::choice_buttons,
+    simulation_debug_ui::SimulationDebugWindow,
 };
 use std::{sync::Arc, time::Instant};
 
@@ -32,20 +25,10 @@ pub struct EguiApp {
     inflows: Vec<Inflow>,
 
     simulation_debug_window: SimulationDebugWindow,
+    render_debug_ui: RenderDebugUi,
 
     simulation_painter: SimulationPainter,
     simulation_painter_settings: SimulationPainterSettings,
-
-    density_texture: TextureWindowOptions,
-    advection_texture: TextureWindowOptions,
-    step_texture: TextureWindowOptions,
-    vertical_smoothed_texture: TextureWindowOptions,
-    horizontal_smoothed_texture: TextureWindowOptions,
-    water_texture: TextureWindowOptions,
-    color_texture_from: TextureWindowOptions,
-    color_texture_to: TextureWindowOptions,
-
-    texture_window: TextureWindow,
 
     run: bool,
 }
@@ -71,8 +54,6 @@ impl EguiApp {
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 
-        let texture_window = TextureWindow::new(&gl);
-
         let inflows = vec![
             Inflow {
                 rect: Rect::low_size(Point(4.0, 4.0), Point(2.0, 2.0)),
@@ -90,20 +71,12 @@ impl EguiApp {
             simulation,
             simulation_settings: SimulationSettings::default(),
             inflows,
-            gl,
             simulation_debug_window: SimulationDebugWindow::new(),
+            render_debug_ui: RenderDebugUi::new(&gl),
             simulation_painter_settings: SimulationPainterSettings::default(),
             run: false,
-            texture_window,
-            density_texture: TextureWindowOptions::new("Density"),
-            advection_texture: TextureWindowOptions::new("Advection"),
-            step_texture: TextureWindowOptions::new("Step"),
-            vertical_smoothed_texture: TextureWindowOptions::new("Vertical Smoothed"),
-            horizontal_smoothed_texture: TextureWindowOptions::new("Horizontal Smoothed"),
-            water_texture: TextureWindowOptions::new("Water"),
-            color_texture_to: TextureWindowOptions::new("Color To"),
-            color_texture_from: TextureWindowOptions::new("Color From"),
             simulation_painter,
+            gl,
         }
     }
 
@@ -155,11 +128,13 @@ impl EguiApp {
         ui.heading("Simulation Settings");
         Self::simulation_settings_ui(ui, &mut self.simulation_settings);
 
-        ui.heading("Textures");
-        self.texture_windows(ui);
+        ui.collapsing("Render Debug", |ui| {
+            self.render_debug_ui.windows(ui, &self.simulation_painter);
+        });
 
-        ui.heading("Rendering");
-        Self::simulation_painter_settings_ui(ui, &mut self.simulation_painter_settings);
+        ui.collapsing("Render Settings", |ui| {
+            Self::simulation_painter_settings_ui(ui, &mut self.simulation_painter_settings);
+        });
     }
 
     pub fn simulation_settings_ui(ui: &mut egui::Ui, settings: &mut SimulationSettings) {
@@ -192,64 +167,6 @@ impl EguiApp {
                 );
                 ui.end_row();
             });
-    }
-
-    fn texture_windows(&mut self, ui: &mut egui::Ui) {
-        self.texture_window.window(
-            ui,
-            &mut self.density_texture,
-            self.simulation_painter.density_texture.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.advection_texture,
-            self.simulation_painter.advection_texture.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.step_texture,
-            self.simulation_painter.step_texture.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.horizontal_smoothed_texture,
-            self.simulation_painter.horizontal_smoothed_texture.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.vertical_smoothed_texture,
-            self.simulation_painter.vertical_smoothed_texture.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.water_texture,
-            self.simulation_painter.water_texture.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.color_texture_from,
-            self.simulation_painter.color_texture_from.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
-
-        self.texture_window.window(
-            ui,
-            &mut self.color_texture_to,
-            self.simulation_painter.color_texture_to.clone(),
-            self.simulation_painter.particle_dots_texture.clone(),
-        );
     }
 
     // pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
@@ -376,82 +293,6 @@ impl eframe::App for EguiApp {
         //     .handle_input(&mut self.view_input, &mut self.view_settings);
 
         ctx.request_repaint();
-    }
-}
-
-pub struct TextureWindow {
-    pub blit_painter: Arc<BlitPainter>,
-}
-
-impl TextureWindow {
-    pub unsafe fn new(gl: &glow::Context) -> Self {
-        let blit_painter = BlitPainter::new(gl);
-
-        Self {
-            blit_painter: Arc::new(blit_painter),
-        }
-    }
-
-    /// Actually paint the texture with the given options.
-    fn texture_ui(
-        &self,
-        ui: &mut egui::Ui,
-        options: &TextureWindowOptions,
-        texture: Arc<GlTexture>,
-        dots: Arc<GlTexture>,
-    ) {
-        let size = options.scale as i64 * texture.size();
-
-        let cb = {
-            let blit_painter = self.blit_painter.clone();
-            let paint_dots = options.paint_dots;
-            egui_glow::CallbackFn::new(move |_info, painter| {
-                let gl = painter.gl().as_ref();
-                unsafe {
-                    blit_painter.draw(gl, &texture, false);
-                    if paint_dots {
-                        blit_painter.draw(gl, &dots, true);
-                    }
-                }
-            })
-        };
-
-        let (egui_rect, _response) =
-            ui.allocate_exact_size(size.as_f64().into(), egui::Sense::click_and_drag());
-
-        let callback = egui::PaintCallback {
-            rect: egui_rect,
-            callback: Arc::new(cb),
-        };
-        ui.painter().add(callback);
-    }
-
-    pub fn window(
-        &self,
-        ui: &mut egui::Ui,
-        options: &mut TextureWindowOptions,
-        texture: Arc<GlTexture>,
-        dots: Arc<GlTexture>,
-    ) {
-        ui.checkbox(&mut options.show, &options.title);
-
-        if options.show {
-            let window = egui::Window::new(options.title.clone());
-            window.show(ui.ctx(), |ui| {
-                ui.horizontal(|ui| {
-                    ui.checkbox(&mut options.paint_dots, "Paint dots");
-
-                    choice_buttons(
-                        ui,
-                        Some("Scale:"),
-                        [(1, "1x"), (2, "2x"), (3, "3x")],
-                        &mut options.scale,
-                    );
-                });
-
-                self.texture_ui(ui, options, texture, dots);
-            });
-        }
     }
 }
 
