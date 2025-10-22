@@ -80,20 +80,6 @@ impl EguiApp {
         }
     }
 
-    // fn icon_button<'a>(
-    //     show_label: bool,
-    //     icon: ImageSource<'a>,
-    //     label: &'a str,
-    // ) -> egui::Button<'a> {
-    //     let icon_size = egui::Vec2::splat(Self::ICON_SIZE);
-    //     let icon = icon.atom_size(icon_size);
-    //     if show_label {
-    //         styled_button((icon, label))
-    //     } else {
-    //         styled_button(icon)
-    //     }
-    // }
-
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
         self.simulation_debug_window
             .window_toggle(ui, &self.simulation);
@@ -308,29 +294,6 @@ impl eframe::App for EguiApp {
         ctx.request_repaint();
     }
 }
-
-// #[derive(Clone, Copy, Debug)]
-// pub enum TextureScale {
-//     Scale1,
-//     Scale2,
-//     Scale3,
-// }
-//
-// impl TextureScale {
-//     pub const ALL: [Self; 3] = [Self::Scale1, Self::Scale2, Self::Scale3];
-// }
-//
-// impl ReflectEnum for TextureScale {
-//     fn all() -> &'static [Self] {
-//         &Self::ALL
-//     }
-//
-//     fn as_str(self) -> &'static str {
-//         match self {
-//
-//         }
-//     }
-// }
 
 pub struct TextureWindowOptions {
     pub title: String,
