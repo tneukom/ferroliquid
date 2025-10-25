@@ -47,8 +47,11 @@ cached = "0.55.1"
 # Add "enable" flag to enable tracy-client, causes issues with stacktrace on Windows, see trace_stacktrace_missing.md
 tracy-client = { version = "0.18.1", default-features = false, features = ["enable", "system-tracing",
     "context-switch-tracing", "code-transfer", "callstack-inlines", "only-localhost"] }
-weak-table = { version = "0.3.2", features = ["ahash"] }
 fastrand = { version = "2.3.0" }
+slotmap = "1.0.7"
+# enum_dispatch doesn't work well with RustRover
+#enum_dispatch = "0.3.13"
+enum_delegate = "0.2.0"
 
 [profile.release]
 debug = true

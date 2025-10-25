@@ -89,7 +89,7 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn apply_force(&mut self, force: Point<f64>) {
+    pub fn apply_constant_force(&mut self, force: Point<f64>) {
         let add = self.dt * force;
 
         for particle in &mut self.particles {

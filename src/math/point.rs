@@ -144,6 +144,17 @@ impl<T: SignedNum> Point<T> {
             Direction::Right => self.right(),
         }
     }
+
+    // Return counterclockwise orthogonal vector (with x pointing right and y pointing up)
+    // (1,0) -> (0,1)
+    // (0,1) -> (-1,0)
+    pub fn perp_ccw(self) -> Self {
+        Self::new(-self.y, self.x)
+    }
+
+    pub fn perp_cw(self) -> Self {
+        Self::new(self.y, -self.x)
+    }
 }
 
 impl<T: Real + Num> Point<T> {

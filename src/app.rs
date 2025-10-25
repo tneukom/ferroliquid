@@ -1,4 +1,5 @@
 use crate::{
+    forces::{Force, Gravity, PlacedForce, Swirl, UniformForce},
     math::{
         point::Point,
         rect::Rect,
@@ -9,6 +10,8 @@ use crate::{
     simulation::{Simulation, SimulationSettings},
     simulation_debug_ui::SimulationDebugWindow,
 };
+use egui::Sense;
+use slotmap::SlotMap;
 use std::{sync::Arc, time::Instant};
 
 pub struct Inflow {
@@ -16,6 +19,8 @@ pub struct Inflow {
     velocity: Point<f64>,
     color: Rgba8,
 }
+
+slotmap::new_key_type! { struct ForceKey; }
 
 pub struct EguiApp {
     gl: Arc<glow::Context>,
@@ -31,6 +36,9 @@ pub struct EguiApp {
     simulation_painter_settings: SimulationPainterSettings,
 
     run: bool,
+
+    forces: SlotMap<ForceKey, PlacedForce>,
+    selected_force: Option<ForceKey>,
 }
 
 impl EguiApp {
@@ -67,6 +75,10 @@ impl EguiApp {
             },
         ];
 
+        let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
+        let mut forces = SlotMap::with_key();
+        forces.insert(gravity);
+
         Self {
             simulation,
             simulation_settings: SimulationSettings::default(),
@@ -77,6 +89,8 @@ impl EguiApp {
             run: false,
             simulation_painter,
             gl,
+            forces,
+            selected_force: None,
         }
     }
 
@@ -100,7 +114,16 @@ impl EguiApp {
             //     self.simulation.fill(coord, velocity);
             // }
 
-            self.simulation.apply_force(Point(0.0, 60.0));
+            for placed_force in self.forces.values() {
+                println!("{}", placed_force.position);
+                placed_force.force.apply(
+                    placed_force.position,
+                    &mut self.simulation.particles,
+                    self.simulation.dt,
+                );
+            }
+
+            // self.simulation.apply_constant_force(Point(0.0, 60.0));
             let instant = Instant::now();
             self.simulation.step(&self.simulation_settings);
             println!("time to simulate: {}", instant.elapsed().as_secs_f64());
@@ -110,6 +133,31 @@ impl EguiApp {
             "Particle count:{}",
             self.simulation.particles.len()
         ));
+
+        if ui.button("Add Gravity").clicked() {
+            let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
+            self.forces.insert(gravity);
+        }
+
+        if ui.button("Add Swirl").clicked() {
+            let swirl = PlacedForce::new(Swirl::default(), Point(10.0, 10.0));
+            self.forces.insert(swirl);
+        }
+
+        if ui.button("Add Uniform Force").clicked() {
+            let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
+            self.forces.insert(uniform);
+        }
+
+        if let Some(force_key) = self.selected_force {
+            let force = &mut self.forces[force_key];
+            force.force.settings_ui(ui);
+
+            if ui.button("Delete force").clicked() {
+                self.forces.remove(force_key);
+                self.selected_force = None;
+            }
+        }
 
         ui.heading("Simulation Settings");
         Self::simulation_settings_ui(ui, &mut self.simulation_settings);
@@ -170,7 +218,8 @@ impl EguiApp {
             })
         };
 
-        let size = 16 * self.simulation.grid.bounds.size();
+        const CELL_SIZE: i64 = 16;
+        let size = CELL_SIZE * self.simulation.grid.bounds.size();
         let (egui_rect, _response) =
             ui.allocate_exact_size(size.as_f64().into(), egui::Sense::click_and_drag());
 
@@ -179,6 +228,42 @@ impl EguiApp {
             callback: Arc::new(cb),
         };
         ui.painter().add(callback);
+
+        // Forces
+        for (key, placed_force) in &mut self.forces {
+            let image_source = placed_force.force.image();
+            let image = egui::Image::new(image_source).sense(Sense::drag());
+
+            let mut egui_position =
+                egui_rect.left_top() + (CELL_SIZE as f64 * placed_force.position).into();
+            let response = ui.put(
+                egui::Rect::from_center_size(egui_position.into(), egui::vec2(64.0, 64.0)),
+                image,
+            );
+
+            // Red circle around selected force
+            if Some(key) == self.selected_force {
+                let stroke = egui::Stroke::new(2.0, egui::Color32::RED);
+                ui.painter()
+                    .circle_stroke(response.rect.center(), 32.0, stroke);
+            }
+
+            if response.dragged() {
+                egui_position += response.drag_delta();
+                let offset: Point<f64> = (egui_position - egui_rect.left_top()).into();
+                placed_force.position = offset / CELL_SIZE as f64;
+                self.selected_force = Some(key);
+            }
+
+            if response.clicked() {
+                self.selected_force = Some(key);
+            }
+        }
+
+        // ui.put()
+        // egui::Area::new("the_force".into()).show(ui.ctx(), |ui| {
+        //     ui.image(image);
+        // });
     }
 
     fn screen_is_narrow(ctx: &egui::Context) -> bool {

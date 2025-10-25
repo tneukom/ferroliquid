@@ -13,6 +13,7 @@ pub mod app;
 pub(crate) mod camera;
 pub(crate) mod coordinate_frame;
 pub(crate) mod field;
+pub(crate) mod forces;
 pub(crate) mod grid;
 pub(crate) mod interpolator;
 pub(crate) mod math;
