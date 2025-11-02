@@ -268,13 +268,13 @@ pub struct Sides {
 impl Sides {
     pub fn new(bounds: Rect<i64>) -> Self {
         Self {
-            velocity_interpolated: SideField::defaults(bounds),
-            velocity_div_free: SideField::defaults(bounds),
-            velocity_correction: SideField::defaults(bounds),
-            density: SideField::defaults(bounds),
-            defined: SideField::defaults(bounds),
+            velocity_interpolated: SideField::filled(bounds, 0.0),
+            velocity_div_free: SideField::filled(bounds, 0.0),
+            velocity_correction: SideField::filled(bounds, 0.0),
+            density: SideField::filled(bounds, 0.0),
+            defined: SideField::filled(bounds, 0.0),
 
-            boundary_constant: SideField::defaults(bounds),
+            boundary_constant: SideField::filled(bounds, 0.0),
             boundary_linear: SideField::filled(bounds, 1.0),
         }
     }
@@ -291,6 +291,12 @@ impl Sides {
         //this->defined[coord] = 1.0;
         self.boundary_constant[side] = 0.0;
         self.boundary_linear[side] = 0.0;
+    }
+
+    /// Clear boundary condition on all sides
+    pub fn clear_solid(&mut self) {
+        self.boundary_constant.fill(0.0);
+        self.boundary_linear.fill(1.0);
     }
 
     pub fn make_fluid(&mut self, side: Side) {

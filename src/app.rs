@@ -5,10 +5,14 @@ use crate::{
         rect::Rect,
         rgba8::{Rgba, Rgba8},
     },
-    painting::simulation_painter::{SimulationPainter, SimulationPainterSettings},
+    painting::{
+        simulation_painter::{SimulationPainter, SimulationPainterSettings},
+        wall_painter::WallPaintingMode,
+    },
     render_debug_ui::RenderDebugUi,
     simulation::{Simulation, SimulationSettings},
     simulation_debug_ui::SimulationDebugWindow,
+    walls::Walls,
 };
 use egui::Sense;
 use slotmap::SlotMap;
@@ -28,6 +32,7 @@ pub struct EguiApp {
     simulation: Simulation,
     simulation_settings: SimulationSettings,
     inflows: Vec<Inflow>,
+    walls: Walls,
 
     simulation_debug_window: SimulationDebugWindow,
     render_debug_ui: RenderDebugUi,
@@ -47,20 +52,24 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
-        let bounds = Rect::low_size(Point::ZERO, Point(80, 80));
-        let mut simulation = Simulation::new(bounds, 1.0 / 60.0);
+        let simulation_bounds = Rect::low_size(Point::ZERO, Point(80, 80));
+        let wall_bounds = Rect::low_size(Point::ZERO, Point(40, 40));
+        let mut simulation = Simulation::new(simulation_bounds, 1.0 / 60.0);
+        let mut walls = Walls::new(wall_bounds);
 
         // Solid walls
-        for x in bounds.left()..bounds.right() {
-            simulation.grid.make_solid(Point(x, bounds.bottom() - 1));
+        for x in wall_bounds.left()..wall_bounds.right() {
+            walls.make_solid(Point(x, wall_bounds.bottom() - 1));
         }
-        for y in bounds.top() + 40..bounds.bottom() {
-            simulation.grid.make_solid(Point(bounds.left() + 3, y));
-            simulation.grid.make_solid(Point(bounds.right() - 4, y));
+        for y in wall_bounds.top() + 10..wall_bounds.bottom() {
+            walls.make_solid(Point(wall_bounds.left() + 3, y));
+            walls.make_solid(Point(wall_bounds.right() - 4, y));
         }
-        // simulation.create_particle(Point(5.5, 5.5), Point(0.0, 5.0));
+        walls.make_solid(Point(20, 20));
 
-        let simulation_painter = SimulationPainter::new(&gl, bounds);
+        simulation.grid.assign_solid_from_walls(&walls);
+
+        let simulation_painter = SimulationPainter::new(&gl, simulation_bounds);
 
         let inflows = vec![
             Inflow {
@@ -83,6 +92,7 @@ impl EguiApp {
             simulation,
             simulation_settings: SimulationSettings::default(),
             inflows,
+            walls,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
             simulation_painter_settings: SimulationPainterSettings::default(),
@@ -205,15 +215,36 @@ impl EguiApp {
 
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
         let water_painter = self.simulation_painter.water_painter.clone();
+        let wall_painter = self.simulation_painter.wall_painter.clone();
         let density_texture = self.simulation_painter.density_texture.clone();
         let color_texture = self.simulation_painter.color_texture_to.clone();
         let settings = self.simulation_painter_settings.water.clone();
+
+        // TODO: Don't clone
+        let walls = self.walls.clone();
 
         let cb = {
             egui_glow::CallbackFn::new(move |_info, painter| {
                 let gl = painter.gl().as_ref();
                 unsafe {
+                    wall_painter.lock().unwrap().draw(
+                        gl,
+                        &walls,
+                        WallPaintingMode::BackgroundBrush,
+                    );
+
                     water_painter.draw(gl, &density_texture, &color_texture, &settings);
+
+                    wall_painter
+                        .lock()
+                        .unwrap()
+                        .draw(gl, &walls, WallPaintingMode::Pen);
+
+                    wall_painter.lock().unwrap().draw(
+                        gl,
+                        &walls,
+                        WallPaintingMode::ForegroundBrush,
+                    );
                 }
             })
         };

@@ -18,13 +18,13 @@ pub(crate) mod grid;
 pub(crate) mod interpolator;
 pub(crate) mod math;
 pub(crate) mod painting;
-pub(crate) mod palettes;
 pub(crate) mod render_debug_ui;
 pub(crate) mod sides;
 pub(crate) mod simulation;
 pub(crate) mod simulation_debug_ui;
 pub(crate) mod solver;
 pub(crate) mod utils;
+pub(crate) mod walls;
 pub(crate) mod widgets;
 
 #[cfg(target_arch = "wasm32")]

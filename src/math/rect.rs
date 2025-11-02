@@ -228,6 +228,10 @@ impl<T: Num> Rect<T> {
         Self::new(self.x.padded(padding), self.y.padded(padding))
     }
 
+    pub fn padded_xy(self, padding: Point<T>) -> Self {
+        Self::new(self.x.padded(padding.x), self.y.padded(padding.y))
+    }
+
     pub fn contains_point(self, p: Point<T>) -> bool {
         self.x.contains(p.x) && self.y.contains(p.y)
     }

@@ -4,6 +4,7 @@ use crate::{
     sides::{Direction, Side, Sides},
     simulation::{Particle, SimulationSettings},
     solver::Solver,
+    walls::Walls,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +48,20 @@ impl Grid {
             fluid_cells: Vec::new(),
             bounds,
         }
+    }
+
+    pub fn assign_solid_from_walls(&mut self, walls: &Walls) {
+        self.clear_solid();
+        for coord in self.inner_bounds.iter_indices() {
+            if walls.is_solid(coord) {
+                self.make_solid(coord);
+            }
+        }
+    }
+
+    pub fn clear_solid(&mut self) {
+        self.cells_type.fill(CellType::Air);
+        self.sides.clear_solid();
     }
 
     pub fn make_solid(&mut self, coord: Point<i64>) {

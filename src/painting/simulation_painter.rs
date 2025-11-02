@@ -8,13 +8,17 @@ use crate::{
         rect_painter::RectPainter,
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
         step_painter::{StepPainter, StepPainterSettings},
+        wall_painter::WallPainter,
         water_painter::{WaterPainter, WaterPainterSettings},
     },
     sides::Orientation,
     simulation::Simulation,
 };
 use glow::{Context, HasContext};
-use std::{mem::swap, sync::Arc};
+use std::{
+    mem::swap,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Clone, Default, Debug)]
 pub struct SimulationPainterSettings {
@@ -57,6 +61,8 @@ pub struct SimulationPainter {
     pub water_texture: Arc<GlTexture>,
     pub water_framebuffer: GlFramebuffer,
     pub water_painter: Arc<WaterPainter>,
+
+    pub wall_painter: Arc<Mutex<WallPainter>>,
 }
 
 impl SimulationPainter {
@@ -101,6 +107,8 @@ impl SimulationPainter {
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
+        let wall_painter = WallPainter::new(gl);
+
         Self {
             i_step: 0,
             simulation_bounds,
@@ -127,6 +135,7 @@ impl SimulationPainter {
             color_framebuffer_to,
             advect_painter,
             rect_painter,
+            wall_painter: Arc::new(Mutex::new(wall_painter)),
         }
     }
 

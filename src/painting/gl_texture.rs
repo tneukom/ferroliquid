@@ -113,6 +113,12 @@ impl GlTexture {
         texture
     }
 
+    pub unsafe fn from_rgba_bitmap(gl: &glow::Context, bitmap: &RgbaField, filter: Filter) -> Self {
+        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter);
+        texture.texture_image_rgba8(gl, bitmap);
+        texture
+    }
+
     unsafe fn texture_image_bytes(
         &mut self,
         gl: &glow::Context,
@@ -145,6 +151,10 @@ impl GlTexture {
 
         let bitmap_bytes: &[u8] = cast_slice(bitmap.as_slice());
         self.texture_image_bytes(gl, format, Some(bitmap_bytes));
+    }
+
+    pub unsafe fn texture_image_rgba8(&mut self, gl: &glow::Context, bitmap: &Field<Rgba8>) {
+        self.texture_image_raw(gl, TextureFormat::RGBA8, bitmap);
     }
 
     pub unsafe fn texture_image_srgba8(&mut self, gl: &glow::Context, bitmap: &Field<Rgba8>) {
@@ -205,12 +215,17 @@ impl GlTexture {
 
     /// Affine map from bitmap coordinates (0,0 at top left) to Gltexture coordinates.
     pub fn gltexture_from_bitmap(&self) -> AffineMap<f64> {
+        Self::gltexture_from_bitmap_with_size(self.size())
+    }
+
+    /// Affine map transformation bitmap coordinates to gltexture coordinates
+    pub fn gltexture_from_bitmap_with_size(size: Point<i64>) -> AffineMap<f64> {
         AffineMap::map_points(
             Point(0.0, 0.0),
             Point(0.0, 0.0),
-            Point(self.width as f64, 0.0),
+            Point(size.x as f64, 0.0),
             Point(1.0, 0.0),
-            Point(0.0, self.height as f64),
+            Point(0.0, size.y as f64),
             Point(0.0, 1.0),
         )
     }

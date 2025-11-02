@@ -5,7 +5,6 @@ use crate::{
         rect::Rect,
         rgba8::{Rgb8, Rgba8},
     },
-    palettes::Palette,
     utils::ReflectEnum,
 };
 use cached::proc_macro::cached;
@@ -39,38 +38,6 @@ pub fn rgba_button(ui: &mut egui::Ui, rgba: Rgba8, selected: bool) -> egui::Resp
     ui.add(button)
 }
 
-fn palette_btn_style(ui: &mut egui::Ui) {
-    // 2 pixel padding and spacing
-    ui.style_mut().spacing.button_padding = egui::Vec2::splat(2.0);
-    ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
-
-    // Set padding color to same as panel background
-    let padding_fill = ui.style_mut().visuals.panel_fill;
-    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = padding_fill;
-    ui.style_mut().visuals.widgets.active.weak_bg_fill = padding_fill;
-    ui.style_mut().visuals.widgets.noninteractive.weak_bg_fill = padding_fill;
-}
-
-pub fn palette_widget(ui: &mut egui::Ui, palette: &Palette, rgba: &mut Rgba8) -> bool {
-    let mut color_set = false;
-
-    ui.scope(|ui| {
-        palette_btn_style(ui);
-
-        // 8 colors per row
-        ui.horizontal_wrapped(|ui| {
-            for &choice in &palette.colors {
-                if rgba_button(ui, choice, choice == *rgba).clicked() {
-                    *rgba = choice;
-                    color_set = true;
-                }
-            }
-        });
-    });
-
-    color_set
-}
-
 pub fn styled_button<'a>(atoms: impl IntoAtoms<'a>) -> egui::Button<'a> {
     egui::Button::new(atoms).corner_radius(4)
 }
@@ -82,55 +49,6 @@ pub fn icon_button<'a>(icon: egui::ImageSource<'a>, size: f32) -> egui::Button<'
 
 pub fn styled_space(ui: &mut egui::Ui) {
     ui.add_space(6.0);
-}
-
-fn palette_chooser(ui: &mut egui::Ui) -> &'static Palette {
-    // Id local to the widget
-    // let palette_memory_id = ui.make_persistent_id("active_palette");
-
-    // Global Id
-    let palette_memory_id = egui::Id::new("active_palette");
-
-    let mut active_palette: usize = ui
-        .memory(|memory| memory.data.get_temp(palette_memory_id))
-        .unwrap_or(0);
-    let palettes = Palette::palettes();
-
-    // Show a list of palette buttons instead
-    ui.horizontal_wrapped(|ui| {
-        for (i_palette, palette) in palettes.iter().enumerate() {
-            let button = styled_button(&palette.name).selected(active_palette == i_palette);
-            if ui.add(button).clicked() {
-                active_palette = i_palette;
-            }
-        }
-    });
-
-    ui.memory_mut(|memory| memory.data.insert_temp(palette_memory_id, active_palette));
-    let palette = &palettes[active_palette];
-
-    // Link to palette
-    ui.hyperlink_to("Link", &palette.link);
-
-    palette
-}
-
-/// Return true if the color was changed
-pub fn color_chooser(ui: &mut egui::Ui, color: &mut Rgba8) -> bool {
-    let palette = palette_chooser(ui);
-
-    // Palette itself
-    palette_widget(ui, &palette, color)
-}
-
-pub fn rgb_chooser(ui: &mut egui::Ui, rgb: &mut Rgb8) -> bool {
-    let palette = palette_chooser(ui);
-    styled_space(ui);
-
-    let mut rgba = Rgba8::from_rgb(*rgb);
-    let changed = palette_widget(ui, &palette, &mut rgba);
-    *rgb = rgba.rgb();
-    changed
 }
 
 pub fn enum_combo<T: ReflectEnum + PartialEq + 'static>(

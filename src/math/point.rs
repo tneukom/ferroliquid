@@ -269,6 +269,30 @@ where
     }
 }
 
+/// Cwise Mul
+impl<T> Mul for Point<T>
+where
+    T: Mul<Output = T> + Copy,
+{
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        Point::new(self.x * rhs.x, self.y * rhs.y)
+    }
+}
+
+/// Cwise Diu
+impl<T> Div for Point<T>
+where
+    T: Div<Output = T> + Copy,
+{
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Point::new(self.x / rhs.x, self.y / rhs.y)
+    }
+}
+
 /// Right multiplication
 impl<T> Mul<T> for Point<T>
 where
@@ -314,7 +338,7 @@ where
     type Output = Point<T>;
 
     fn div(self, rhs: T) -> Self::Output {
-        Point::new(self.x.div(rhs), self.y.div(rhs))
+        Point::new(self.x / rhs, self.y / rhs)
     }
 }
 
