@@ -21,9 +21,9 @@ pub struct SimulationSettings {
 impl Default for SimulationSettings {
     fn default() -> Self {
         Self {
-            density_correction_strength: 0.5,
-            target_density: 5.0,
-            alpha: 0.05,
+            density_correction_strength: 2.0,
+            target_density: 8.0,
+            alpha: 0.02,
         }
     }
 }

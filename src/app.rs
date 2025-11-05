@@ -221,6 +221,7 @@ impl EguiApp {
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
         let simulation_painter = self.simulation_painter.clone();
         let settings = self.simulation_painter_settings.clone();
+        let simulation_bounds = self.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
         let walls = self.walls.clone();
@@ -239,12 +240,14 @@ impl EguiApp {
 
                     simulation_painter.water_painter.draw(
                         gl,
-                        &simulation_painter.density_texture,
+                        &simulation_painter.horizontal_smoothed_texture,
                         &simulation_painter.color_texture_to,
                         &settings.water,
                     );
 
-                    // particle_painter.lock().unwrap().draw_particle_dots(gl, settings.)
+                    simulation_painter
+                        .particle_painter
+                        .draw_particle_dots(gl, simulation_bounds);
 
                     simulation_painter
                         .wall_painter
@@ -353,7 +356,7 @@ impl EguiApp {
                 ui.label("Water edge low");
                 ui.add(
                     egui::DragValue::new(&mut settings.water.edge_low)
-                        .range(0.0..=1.0)
+                        .range(0.0..=2.0)
                         .speed(0.005),
                 );
                 ui.end_row();
@@ -361,7 +364,23 @@ impl EguiApp {
                 ui.label("Water edge high");
                 ui.add(
                     egui::DragValue::new(&mut settings.water.edge_high)
-                        .range(0.0..=1.0)
+                        .range(0.0..=2.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+
+                ui.label("Water darken edge low");
+                ui.add(
+                    egui::DragValue::new(&mut settings.water.darken_edge_low)
+                        .range(0.0..=2.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+
+                ui.label("Water darken edge high");
+                ui.add(
+                    egui::DragValue::new(&mut settings.water.darken_edge_high)
+                        .range(0.0..=2.0)
                         .speed(0.005),
                 );
                 ui.end_row();

@@ -5,6 +5,8 @@ use glow::HasContext;
 pub struct WaterPainterSettings {
     pub edge_low: f64,
     pub edge_high: f64,
+    pub darken_edge_low: f64,
+    pub darken_edge_high: f64,
 }
 
 impl Default for WaterPainterSettings {
@@ -12,6 +14,8 @@ impl Default for WaterPainterSettings {
         Self {
             edge_low: 0.85,
             edge_high: 0.9,
+            darken_edge_low: 0.85,
+            darken_edge_high: 1.0,
         }
     }
 }
@@ -61,6 +65,12 @@ impl WaterPainter {
         self.effect_painter
             .shader
             .uniform(gl, "edge_high", settings.edge_high);
+        self.effect_painter
+            .shader
+            .uniform(gl, "darken_edge_low", settings.darken_edge_low);
+        self.effect_painter
+            .shader
+            .uniform(gl, "darken_edge_high", settings.darken_edge_high);
 
         self.effect_painter.draw(gl);
     }
