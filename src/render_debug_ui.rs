@@ -1,11 +1,9 @@
 use crate::{
     app::TextureWindowOptions,
-    painting::{
-        blit_painter::BlitPainter, gl_texture::GlTexture, simulation_painter::SimulationPainter,
-    },
+    painting::{blit_painter::BlitPainter, simulation_painter::SimulationPainter},
     widgets::choice_buttons,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub struct Textures {
     density_texture: TextureWindowOptions,
@@ -21,14 +19,27 @@ pub struct Textures {
 impl Textures {
     pub fn new() -> Self {
         Self {
-            density_texture: TextureWindowOptions::new("Density"),
-            advection_texture: TextureWindowOptions::new("Advection"),
-            step_texture: TextureWindowOptions::new("Step"),
-            vertical_smoothed_texture: TextureWindowOptions::new("Vertical Smoothed"),
-            horizontal_smoothed_texture: TextureWindowOptions::new("Horizontal Smoothed"),
-            water_texture: TextureWindowOptions::new("Water"),
-            color_texture_to: TextureWindowOptions::new("Color To"),
-            color_texture_from: TextureWindowOptions::new("Color From"),
+            density_texture: TextureWindowOptions::new("Density", |painter| {
+                &painter.density_texture
+            }),
+            advection_texture: TextureWindowOptions::new("Advection", |painter| {
+                &painter.advection_texture
+            }),
+            step_texture: TextureWindowOptions::new("Step", |painter| &painter.step_texture),
+            vertical_smoothed_texture: TextureWindowOptions::new("Vertical Smoothed", |painter| {
+                &painter.vertical_smoothed_texture
+            }),
+            horizontal_smoothed_texture: TextureWindowOptions::new(
+                "Horizontal Smoothed",
+                |painter| &painter.horizontal_smoothed_texture,
+            ),
+            water_texture: TextureWindowOptions::new("Water", |painter| &painter.water_texture),
+            color_texture_to: TextureWindowOptions::new("Color To", |painter| {
+                &painter.color_texture_to
+            }),
+            color_texture_from: TextureWindowOptions::new("Color From", |painter| {
+                &painter.color_texture_from
+            }),
         }
     }
 }
@@ -51,21 +62,27 @@ impl RenderDebugUi {
     /// Actually paint the texture with the given options.
     fn texture_ui(
         ui: &mut egui::Ui,
-        blit_painter: Arc<BlitPainter>,
-        options: &TextureWindowOptions,
-        texture: Arc<GlTexture>,
-        dots: Arc<GlTexture>,
+        simulation_painter: Arc<Mutex<SimulationPainter>>,
+        options: TextureWindowOptions,
     ) {
-        let size = options.scale as i64 * texture.size();
+        let size = {
+            let simulation_painter = simulation_painter.lock().unwrap();
+            let texture = (options.get_texture)(&simulation_painter);
+            options.scale as i64 * texture.size()
+        };
 
         let cb = {
             let paint_dots = options.paint_dots;
             egui_glow::CallbackFn::new(move |_info, painter| {
+                let simulation_painter = simulation_painter.lock().unwrap();
                 let gl = painter.gl().as_ref();
+                let texture = (options.get_texture)(&simulation_painter);
+                let dots = &simulation_painter.particle_dots_texture;
+
                 unsafe {
-                    blit_painter.draw(gl, &texture, false);
+                    simulation_painter.blit_painter.draw(gl, &texture, false);
                     if paint_dots {
-                        blit_painter.draw(gl, &dots, true);
+                        simulation_painter.blit_painter.draw(gl, &dots, true);
                     }
                 }
             })
@@ -83,10 +100,8 @@ impl RenderDebugUi {
 
     pub fn window(
         ui: &mut egui::Ui,
-        blit_painter: Arc<BlitPainter>,
+        simulation_painter: Arc<Mutex<SimulationPainter>>,
         options: &mut TextureWindowOptions,
-        texture: Arc<GlTexture>,
-        dots: Arc<GlTexture>,
     ) {
         ui.checkbox(&mut options.show, &options.title);
 
@@ -104,74 +119,62 @@ impl RenderDebugUi {
                     );
                 });
 
-                Self::texture_ui(ui, blit_painter, options, texture, dots);
+                Self::texture_ui(ui, simulation_painter, options.clone());
             });
         }
     }
 
-    pub fn windows(&mut self, ui: &mut egui::Ui, simulation_painter: &SimulationPainter) {
+    pub fn windows(
+        &mut self,
+        ui: &mut egui::Ui,
+        simulation_painter: Arc<Mutex<SimulationPainter>>,
+    ) {
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.density_texture,
-            simulation_painter.density_texture.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.advection_texture,
-            simulation_painter.advection_texture.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.step_texture,
-            simulation_painter.step_texture.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.horizontal_smoothed_texture,
-            simulation_painter.horizontal_smoothed_texture.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.vertical_smoothed_texture,
-            simulation_painter.vertical_smoothed_texture.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.water_texture,
-            simulation_painter.water_texture.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.color_texture_from,
-            simulation_painter.color_texture_from.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
 
         Self::window(
             ui,
-            self.blit_painter.clone(),
+            simulation_painter.clone(),
             &mut self.textures.color_texture_to,
-            simulation_painter.color_texture_to.clone(),
-            simulation_painter.particle_dots_texture.clone(),
         );
     }
 }

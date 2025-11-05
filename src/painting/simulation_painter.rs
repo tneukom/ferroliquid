@@ -2,6 +2,7 @@ use crate::{
     math::{rect::Rect, rgba8::Rgba8},
     painting::{
         advect_painter::AdvectPainter,
+        blit_painter::BlitPainter,
         gl_framebuffer::GlFramebuffer,
         gl_texture::{Filter, GlTexture, TextureFormat},
         particle_painter::{ParticlePainter, ParticlePainterSettings},
@@ -15,10 +16,7 @@ use crate::{
     simulation::Simulation,
 };
 use glow::{Context, HasContext};
-use std::{
-    mem::swap,
-    sync::{Arc, Mutex},
-};
+use std::mem::swap;
 
 #[derive(Clone, Default, Debug)]
 pub struct SimulationPainterSettings {
@@ -32,37 +30,39 @@ pub struct SimulationPainter {
     pub i_step: usize,
 
     pub simulation_bounds: Rect<i64>,
-    pub density_texture: Arc<GlTexture>,
-    pub advection_texture: Arc<GlTexture>,
+    pub density_texture: GlTexture,
+    pub advection_texture: GlTexture,
     pub particles_framebuffer: GlFramebuffer,
     pub particle_painter: ParticlePainter,
 
-    pub particle_dots_texture: Arc<GlTexture>,
+    pub particle_dots_texture: GlTexture,
     pub particle_dots_framebuffer: GlFramebuffer,
 
-    pub step_texture: Arc<GlTexture>,
+    pub step_texture: GlTexture,
     pub step_framebuffer: GlFramebuffer,
     pub step_painter: StepPainter,
 
-    pub vertical_smoothed_texture: Arc<GlTexture>,
+    pub vertical_smoothed_texture: GlTexture,
     pub vertical_smoothed_framebuffer: GlFramebuffer,
-    pub horizontal_smoothed_texture: Arc<GlTexture>,
+    pub horizontal_smoothed_texture: GlTexture,
     pub horizontal_smoothed_framebuffer: GlFramebuffer,
     pub smooth_painter: SmoothPainter,
 
-    pub color_texture_from: Arc<GlTexture>,
+    pub color_texture_from: GlTexture,
     pub color_framebuffer_from: GlFramebuffer,
-    pub color_texture_to: Arc<GlTexture>,
+    pub color_texture_to: GlTexture,
     pub color_framebuffer_to: GlFramebuffer,
     pub advect_painter: AdvectPainter,
 
     pub rect_painter: RectPainter,
 
-    pub water_texture: Arc<GlTexture>,
+    pub water_texture: GlTexture,
     pub water_framebuffer: GlFramebuffer,
-    pub water_painter: Arc<WaterPainter>,
+    pub water_painter: WaterPainter,
 
-    pub wall_painter: Arc<Mutex<WallPainter>>,
+    pub wall_painter: WallPainter,
+
+    pub blit_painter: BlitPainter,
 }
 
 impl SimulationPainter {
@@ -109,33 +109,36 @@ impl SimulationPainter {
 
         let wall_painter = WallPainter::new(gl);
 
+        let blit_painter = BlitPainter::new(gl);
+
         Self {
             i_step: 0,
             simulation_bounds,
-            density_texture: Arc::new(density_texture),
-            advection_texture: Arc::new(advection_texture),
+            density_texture,
+            advection_texture,
             particles_framebuffer,
-            particle_dots_texture: Arc::new(particle_dots_texture),
+            particle_dots_texture,
             particle_dots_framebuffer,
             particle_painter,
-            step_texture: Arc::new(step_texture),
+            step_texture,
             step_framebuffer,
             step_painter,
-            vertical_smoothed_texture: Arc::new(vertical_smoothed_texture),
+            vertical_smoothed_texture,
             vertical_smoothed_framebuffer,
-            horizontal_smoothed_texture: Arc::new(horizontal_smoothed_texture),
+            horizontal_smoothed_texture,
             horizontal_smoothed_framebuffer,
             smooth_painter,
-            water_texture: Arc::new(water_texture),
+            water_texture,
             water_framebuffer,
-            water_painter: Arc::new(water_painter),
-            color_texture_from: Arc::new(color_texture_from),
+            water_painter,
+            color_texture_from,
             color_framebuffer_from,
-            color_texture_to: Arc::new(color_texture_to),
+            color_texture_to,
             color_framebuffer_to,
             advect_painter,
             rect_painter,
-            wall_painter: Arc::new(Mutex::new(wall_painter)),
+            wall_painter,
+            blit_painter,
         }
     }
 

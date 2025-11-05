@@ -6,6 +6,7 @@ use crate::{
         rgba8::{Rgba, Rgba8},
     },
     painting::{
+        gl_texture::GlTexture,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
         wall_painter::WallPaintingMode,
     },
@@ -16,7 +17,10 @@ use crate::{
 };
 use egui::Sense;
 use slotmap::SlotMap;
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 pub struct Inflow {
     rect: Rect<f64>,
@@ -37,7 +41,7 @@ pub struct EguiApp {
     simulation_debug_window: SimulationDebugWindow,
     render_debug_ui: RenderDebugUi,
 
-    simulation_painter: SimulationPainter,
+    simulation_painter: Arc<Mutex<SimulationPainter>>,
     simulation_painter_settings: SimulationPainterSettings,
 
     run: bool,
@@ -97,7 +101,7 @@ impl EguiApp {
             render_debug_ui: RenderDebugUi::new(&gl),
             simulation_painter_settings: SimulationPainterSettings::default(),
             run: false,
-            simulation_painter,
+            simulation_painter: Arc::new(Mutex::new(simulation_painter)),
             gl,
             forces,
             selected_force: None,
@@ -173,7 +177,8 @@ impl EguiApp {
         Self::simulation_settings_ui(ui, &mut self.simulation_settings);
 
         ui.collapsing("Render Debug", |ui| {
-            self.render_debug_ui.windows(ui, &self.simulation_painter);
+            self.render_debug_ui
+                .windows(ui, self.simulation_painter.clone());
         });
 
         ui.collapsing("Render Settings", |ui| {
@@ -214,11 +219,8 @@ impl EguiApp {
     }
 
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
-        let water_painter = self.simulation_painter.water_painter.clone();
-        let wall_painter = self.simulation_painter.wall_painter.clone();
-        let density_texture = self.simulation_painter.density_texture.clone();
-        let color_texture = self.simulation_painter.color_texture_to.clone();
-        let settings = self.simulation_painter_settings.water.clone();
+        let simulation_painter = self.simulation_painter.clone();
+        let settings = self.simulation_painter_settings.clone();
 
         // TODO: Don't clone
         let walls = self.walls.clone();
@@ -226,21 +228,29 @@ impl EguiApp {
         let cb = {
             egui_glow::CallbackFn::new(move |_info, painter| {
                 let gl = painter.gl().as_ref();
+                let mut simulation_painter = simulation_painter.lock().unwrap();
+
                 unsafe {
-                    wall_painter.lock().unwrap().draw(
+                    simulation_painter.wall_painter.draw(
                         gl,
                         &walls,
                         WallPaintingMode::BackgroundBrush,
                     );
 
-                    water_painter.draw(gl, &density_texture, &color_texture, &settings);
+                    simulation_painter.water_painter.draw(
+                        gl,
+                        &simulation_painter.density_texture,
+                        &simulation_painter.color_texture_to,
+                        &settings.water,
+                    );
 
-                    wall_painter
-                        .lock()
-                        .unwrap()
+                    // particle_painter.lock().unwrap().draw_particle_dots(gl, settings.)
+
+                    simulation_painter
+                        .wall_painter
                         .draw(gl, &walls, WallPaintingMode::Pen);
 
-                    wall_painter.lock().unwrap().draw(
+                    simulation_painter.wall_painter.draw(
                         gl,
                         &walls,
                         WallPaintingMode::ForegroundBrush,
@@ -373,7 +383,7 @@ impl eframe::App for EguiApp {
         // let instant = Instant::now();
 
         unsafe {
-            self.simulation_painter.paint(
+            self.simulation_painter.lock().unwrap().paint(
                 &self.gl,
                 &self.simulation,
                 &mut inflows.iter().copied(),
@@ -411,20 +421,26 @@ impl eframe::App for EguiApp {
     }
 }
 
+#[derive(Clone)]
 pub struct TextureWindowOptions {
     pub title: String,
     pub show: bool,
     pub scale: usize,
     pub paint_dots: bool,
+    pub get_texture: Arc<dyn Fn(&SimulationPainter) -> &GlTexture + 'static + Send + Sync>,
 }
 
 impl TextureWindowOptions {
-    pub fn new(title: impl Into<String>) -> Self {
+    pub fn new(
+        title: impl Into<String>,
+        get_texture: impl Fn(&SimulationPainter) -> &GlTexture + 'static + Send + Sync,
+    ) -> Self {
         Self {
             title: title.into(),
             show: false,
             scale: 1,
             paint_dots: false,
+            get_texture: Arc::new(get_texture),
         }
     }
 }

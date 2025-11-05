@@ -1,10 +1,6 @@
 use crate::{
     field::RgbaField,
-    math::{
-        point::Point,
-        rect::Rect,
-        rgba8::{Rgb8, Rgba8},
-    },
+    math::{point::Point, rect::Rect, rgba8::Rgba8},
     utils::ReflectEnum,
 };
 use cached::proc_macro::cached;
