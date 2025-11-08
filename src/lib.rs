@@ -10,12 +10,14 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub mod app;
+pub(crate) mod blocks;
 pub(crate) mod camera;
 pub(crate) mod coordinate_frame;
 pub(crate) mod field;
 pub(crate) mod forces;
 pub(crate) mod grid;
 pub(crate) mod interpolator;
+pub(crate) mod line_drawing;
 pub(crate) mod math;
 pub(crate) mod painting;
 pub(crate) mod render_debug_ui;
@@ -24,7 +26,6 @@ pub(crate) mod simulation;
 pub(crate) mod simulation_debug_ui;
 pub(crate) mod solver;
 pub(crate) mod utils;
-pub(crate) mod walls;
 pub(crate) mod widgets;
 
 #[cfg(target_arch = "wasm32")]

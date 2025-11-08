@@ -16,7 +16,7 @@ pub struct Field<T> {
 pub type RgbaField = Field<Rgba8>;
 
 pub fn field_linear_index(bounds: Rect<i64>, index: Point<i64>) -> Option<usize> {
-    if !bounds.half_open_contains(index.point()) {
+    if !bounds.contains_index(index.point()) {
         None
     } else {
         let i = (index.x() - bounds.x.low) + (index.y() - bounds.y.low) * bounds.width();

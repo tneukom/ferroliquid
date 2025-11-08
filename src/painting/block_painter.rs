@@ -1,4 +1,5 @@
 use crate::{
+    blocks::{BlockPalette, Blocks},
     coordinate_frame::affine_device_from_simulation,
     field::RgbaField,
     math::{point::Point, rect::Rect, rgba8::Rgba8},
@@ -7,7 +8,6 @@ use crate::{
         shader::VertexAttribDesc,
         sprite_painter::{SpritePainter, TileSheet},
     },
-    walls::{WallPalette, Walls},
 };
 use glow::HasContext;
 use std::mem::offset_of;
@@ -18,20 +18,20 @@ struct WallAux {
     pub pen_color: Rgba8,
 }
 
-pub enum WallPaintingMode {
+pub enum BlockPaintingMode {
     BackgroundBrush = 0,
     Pen = 1,
     ForegroundBrush = 2,
 }
 
-pub struct WallPainter {
+pub struct BlockPainter {
     sprite_painter: SpritePainter<WallAux>,
     tile_sheet: TileSheet,
     line_texture: GlTexture,
     wall_texture: GlTexture,
 }
 
-impl WallPainter {
+impl BlockPainter {
     pub unsafe fn new(gl: &glow::Context) -> Self {
         let vs_source = include_str!("shaders/walls.vert");
         let fs_source = include_str!("shaders/walls.frag");
@@ -75,7 +75,7 @@ impl WallPainter {
         }
     }
 
-    pub unsafe fn draw(&mut self, gl: &glow::Context, walls: &Walls, mode: WallPaintingMode) {
+    pub unsafe fn draw(&mut self, gl: &glow::Context, walls: &Blocks, mode: BlockPaintingMode) {
         let mut sprites = Vec::new();
 
         let tile_choices = [
@@ -87,9 +87,9 @@ impl WallPainter {
             Point(1, 1),
         ];
 
-        let palettes = WallPalette::palettes();
+        let palettes = BlockPalette::palettes();
 
-        for (coord, wall) in walls.walls.enumerate() {
+        for (coord, wall) in walls.blocks.enumerate() {
             if let Some(wall) = wall {
                 let target_rect = Rect::low_size(coord.as_f64(), Point::ONE);
                 let tile_index = tile_choices[wall.tile_choice % tile_choices.len()];
@@ -111,7 +111,7 @@ impl WallPainter {
         gl.blend_equation(glow::FUNC_ADD);
 
         // Assume one wall per simulation cell.
-        let device_from_simulation = affine_device_from_simulation(walls.walls.bounds().as_f64());
+        let device_from_simulation = affine_device_from_simulation(walls.blocks.bounds().as_f64());
 
         self.sprite_painter.setup_draw(
             gl,

@@ -409,6 +409,10 @@ macro_rules! impl_iter_indices {
             pub fn iter_indices(self) -> impl Iterator<Item = Point<$t>> + Clone {
                 self.iter_half_open()
             }
+
+            pub fn contains_index(self, index: Point<$t>) -> bool {
+                self.half_open_contains(index)
+            }
         }
     };
 }

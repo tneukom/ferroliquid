@@ -35,7 +35,7 @@ pub fn rgba_button(ui: &mut egui::Ui, rgba: Rgba8, selected: bool) -> egui::Resp
 }
 
 pub fn styled_button<'a>(atoms: impl IntoAtoms<'a>) -> egui::Button<'a> {
-    egui::Button::new(atoms).corner_radius(4)
+    egui::Button::new(atoms).corner_radius(2)
 }
 
 pub fn icon_button<'a>(icon: egui::ImageSource<'a>, size: f32) -> egui::Button<'a> {

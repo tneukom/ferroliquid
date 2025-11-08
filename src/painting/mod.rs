@@ -1,5 +1,6 @@
 pub(crate) mod advect_painter;
 pub(crate) mod blit_painter;
+pub(crate) mod block_painter;
 pub(crate) mod effect_painter;
 pub(crate) mod gl_buffer;
 pub(crate) mod gl_framebuffer;
@@ -13,5 +14,4 @@ pub(crate) mod smoothing_painter;
 pub(crate) mod sprite_painter;
 pub(crate) mod step_painter;
 mod utils;
-pub(crate) mod wall_painter;
 pub(crate) mod water_painter;

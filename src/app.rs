@@ -1,21 +1,23 @@
 use crate::{
+    blocks::{Block, BlockKind, BlockPalette, Blocks},
     forces::{Force, Gravity, PlacedForce, Swirl, UniformForce},
+    line_drawing::slope_draw_thin_line,
     math::{
+        arrow::Arrow,
         point::Point,
         rect::Rect,
         rgba8::{Rgba, Rgba8},
     },
     painting::{
+        block_painter::BlockPaintingMode,
         gl_texture::GlTexture,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
-        wall_painter::WallPaintingMode,
     },
     render_debug_ui::RenderDebugUi,
     simulation::{Simulation, SimulationSettings},
     simulation_debug_ui::SimulationDebugWindow,
-    walls::Walls,
+    widgets::icon_button,
 };
-use egui::Sense;
 use slotmap::SlotMap;
 use std::{
     sync::{Arc, Mutex},
@@ -28,6 +30,38 @@ pub struct Inflow {
     color: Rgba8,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Tool {
+    Pointer,
+    Block(BlockKind),
+}
+
+impl Tool {
+    pub fn iter() -> impl Iterator<Item = Self> {
+        [Self::Pointer]
+            .into_iter()
+            .chain(BlockKind::ALL.into_iter().map(Tool::Block))
+    }
+
+    pub fn egui_icon(self) -> egui::ImageSource<'static> {
+        match self {
+            Self::Pointer => egui::include_image!("icons/pointer.png"),
+            Self::Block(BlockKind::Square) => egui::include_image!("icons/block_square.png"),
+            Self::Block(BlockKind::L) => egui::include_image!("icons/block_l.png"),
+            Self::Block(BlockKind::L90) => egui::include_image!("icons/block_l90.png"),
+            Self::Block(BlockKind::L180) => egui::include_image!("icons/block_l180.png"),
+            Self::Block(BlockKind::L270) => egui::include_image!("icons/block_l270.png"),
+        }
+    }
+
+    pub fn is_block(self) -> bool {
+        match self {
+            Tool::Pointer => false,
+            Tool::Block(_) => true,
+        }
+    }
+}
+
 slotmap::new_key_type! { struct ForceKey; }
 
 pub struct EguiApp {
@@ -36,7 +70,7 @@ pub struct EguiApp {
     simulation: Simulation,
     simulation_settings: SimulationSettings,
     inflows: Vec<Inflow>,
-    walls: Walls,
+    blocks: Blocks,
 
     simulation_debug_window: SimulationDebugWindow,
     render_debug_ui: RenderDebugUi,
@@ -48,10 +82,13 @@ pub struct EguiApp {
 
     forces: SlotMap<ForceKey, PlacedForce>,
     selected_force: Option<ForceKey>,
+
+    tool: Tool,
 }
 
 impl EguiApp {
     const ICON_SIZE: f32 = 20.0;
+    const CELL_SIZE: i64 = 16;
 
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
@@ -59,19 +96,19 @@ impl EguiApp {
         let simulation_bounds = Rect::low_size(Point::ZERO, Point(80, 80));
         let wall_bounds = Rect::low_size(Point::ZERO, Point(40, 40));
         let mut simulation = Simulation::new(simulation_bounds, 1.0 / 60.0);
-        let mut walls = Walls::new(wall_bounds);
+        let mut walls = Blocks::new(wall_bounds);
 
         // Solid walls
-        for x in wall_bounds.left()..wall_bounds.right() {
-            walls.make_solid(Point(x, wall_bounds.bottom() - 1));
-        }
-        for y in wall_bounds.top() + 10..wall_bounds.bottom() {
-            walls.make_solid(Point(wall_bounds.left() + 3, y));
-            walls.make_solid(Point(wall_bounds.right() - 4, y));
-        }
-        walls.make_solid(Point(20, 20));
-
-        simulation.grid.assign_solid_from_walls(&walls);
+        // for x in wall_bounds.left()..wall_bounds.right() {
+        //     walls.make_solid(Point(x, wall_bounds.bottom() - 1));
+        // }
+        // for y in wall_bounds.top() + 10..wall_bounds.bottom() {
+        //     walls.make_solid(Point(wall_bounds.left() + 3, y));
+        //     walls.make_solid(Point(wall_bounds.right() - 4, y));
+        // }
+        // walls.make_solid(Point(20, 20));
+        //
+        // simulation.grid.assign_solid_from_walls(&walls);
 
         let simulation_painter = SimulationPainter::new(&gl, simulation_bounds);
 
@@ -96,7 +133,7 @@ impl EguiApp {
             simulation,
             simulation_settings: SimulationSettings::default(),
             inflows,
-            walls,
+            blocks: walls,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
             simulation_painter_settings: SimulationPainterSettings::default(),
@@ -105,6 +142,7 @@ impl EguiApp {
             gl,
             forces,
             selected_force: None,
+            tool: Tool::Pointer,
         }
     }
 
@@ -139,6 +177,8 @@ impl EguiApp {
 
             // self.simulation.apply_constant_force(Point(0.0, 60.0));
             let instant = Instant::now();
+            self.blocks
+                .assign_simulation_grid(&mut self.simulation.grid);
             self.simulation.step(&self.simulation_settings);
             println!("time to simulate: {}", instant.elapsed().as_secs_f64());
         }
@@ -147,6 +187,17 @@ impl EguiApp {
             "Particle count:{}",
             self.simulation.particles.len()
         ));
+
+        // Tool buttons
+        ui.horizontal(|ui| {
+            for tool_choice in Tool::iter() {
+                let button =
+                    icon_button(tool_choice.egui_icon(), 24.0).selected(self.tool == tool_choice);
+                if ui.add(button).clicked() {
+                    self.tool = tool_choice;
+                }
+            }
+        });
 
         if ui.button("Add Gravity").clicked() {
             let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
@@ -218,13 +269,13 @@ impl EguiApp {
             });
     }
 
-    pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
+    pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         let simulation_painter = self.simulation_painter.clone();
         let settings = self.simulation_painter_settings.clone();
         let simulation_bounds = self.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
-        let walls = self.walls.clone();
+        let walls = self.blocks.clone();
 
         let cb = {
             egui_glow::CallbackFn::new(move |_info, painter| {
@@ -235,7 +286,7 @@ impl EguiApp {
                     simulation_painter.wall_painter.draw(
                         gl,
                         &walls,
-                        WallPaintingMode::BackgroundBrush,
+                        BlockPaintingMode::BackgroundBrush,
                     );
 
                     simulation_painter.water_painter.draw(
@@ -251,21 +302,48 @@ impl EguiApp {
 
                     simulation_painter
                         .wall_painter
-                        .draw(gl, &walls, WallPaintingMode::Pen);
+                        .draw(gl, &walls, BlockPaintingMode::Pen);
 
                     simulation_painter.wall_painter.draw(
                         gl,
                         &walls,
-                        WallPaintingMode::ForegroundBrush,
+                        BlockPaintingMode::ForegroundBrush,
                     );
                 }
             })
         };
 
-        const CELL_SIZE: i64 = 16;
-        let size = CELL_SIZE * self.simulation.grid.bounds.size();
-        let (egui_rect, _response) =
-            ui.allocate_exact_size(size.as_f64().into(), egui::Sense::click_and_drag());
+        let size = Self::CELL_SIZE * self.simulation.grid.bounds.size();
+        let sense = if self.tool.is_block() {
+            egui::Sense::click_and_drag()
+        } else {
+            egui::Sense::empty()
+        };
+        let (egui_rect, response) = ui.allocate_exact_size(size.as_f64().into(), sense);
+        if response.dragged()
+            && let Some(pointer_pos) = response.interact_pointer_pos()
+        {
+            let drag_current: Point<f64> = (pointer_pos - egui_rect.left_top()).into();
+            let drag_delta: Point<f64> = response.drag_delta().into();
+            let drag_previous = drag_current - drag_delta;
+
+            // Two simulation cells per block
+            let simulation_drag_previous = drag_previous / (2.0 * Self::CELL_SIZE as f64);
+            let simulation_drag_current = drag_current / (2.0 * Self::CELL_SIZE as f64);
+            let arrow = Arrow::new(
+                simulation_drag_previous.floor().as_i64(),
+                simulation_drag_current.floor().as_i64(),
+            );
+
+            for coord in slope_draw_thin_line(arrow) {
+                if self.blocks.bounds().contains_index(coord) {
+                    self.blocks.set(
+                        coord,
+                        Block::new(BlockKind::Square, BlockPalette::BlueGreen),
+                    );
+                }
+            }
+        }
 
         let callback = egui::PaintCallback {
             rect: egui_rect,
@@ -273,13 +351,25 @@ impl EguiApp {
         };
         ui.painter().add(callback);
 
+        egui_rect
+    }
+
+    pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
+        let egui_rect = self.simulation_ui(ui);
+
         // Forces
         for (key, placed_force) in &mut self.forces {
             let image_source = placed_force.force.image();
-            let image = egui::Image::new(image_source).sense(Sense::drag());
+            // Only sense drag if tool is Pointer
+            let sense = if self.tool == Tool::Pointer {
+                egui::Sense::drag()
+            } else {
+                egui::Sense::empty()
+            };
+            let image = egui::Image::new(image_source).sense(sense);
 
             let mut egui_position =
-                egui_rect.left_top() + (CELL_SIZE as f64 * placed_force.position).into();
+                egui_rect.left_top() + (Self::CELL_SIZE as f64 * placed_force.position).into();
             let response = ui.put(
                 egui::Rect::from_center_size(egui_position.into(), egui::vec2(64.0, 64.0)),
                 image,
@@ -295,7 +385,7 @@ impl EguiApp {
             if response.dragged() {
                 egui_position += response.drag_delta();
                 let offset: Point<f64> = (egui_position - egui_rect.left_top()).into();
-                placed_force.position = offset / CELL_SIZE as f64;
+                placed_force.position = offset / Self::CELL_SIZE as f64;
                 self.selected_force = Some(key);
             }
 

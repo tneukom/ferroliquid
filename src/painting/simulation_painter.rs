@@ -3,13 +3,13 @@ use crate::{
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
+        block_painter::BlockPainter,
         gl_framebuffer::GlFramebuffer,
         gl_texture::{Filter, GlTexture, TextureFormat},
         particle_painter::{ParticlePainter, ParticlePainterSettings},
         rect_painter::RectPainter,
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
         step_painter::{StepPainter, StepPainterSettings},
-        wall_painter::WallPainter,
         water_painter::{WaterPainter, WaterPainterSettings},
     },
     sides::Orientation,
@@ -60,7 +60,7 @@ pub struct SimulationPainter {
     pub water_framebuffer: GlFramebuffer,
     pub water_painter: WaterPainter,
 
-    pub wall_painter: WallPainter,
+    pub wall_painter: BlockPainter,
 
     pub blit_painter: BlitPainter,
 }
@@ -107,7 +107,7 @@ impl SimulationPainter {
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
-        let wall_painter = WallPainter::new(gl);
+        let wall_painter = BlockPainter::new(gl);
 
         let blit_painter = BlitPainter::new(gl);
 

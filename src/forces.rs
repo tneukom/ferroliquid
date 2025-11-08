@@ -60,7 +60,7 @@ impl Force for Gravity {
             ui.label("Mass Density:");
             ui.add(
                 egui::DragValue::new(&mut self.mass_density)
-                    .range(1.0..=20.0)
+                    .range(1.0..=40.0)
                     .speed(0.1),
             );
         });
