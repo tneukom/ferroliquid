@@ -5,9 +5,10 @@ use crate::{
 };
 use ahash::HashMap;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockPalette {
     BlueGreen,
     RedYellow,
@@ -54,7 +55,7 @@ impl BlockPalette {
     // }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockKind {
     Square,
     L,
@@ -78,7 +79,7 @@ impl BlockKind {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Block {
     pub kind: BlockKind,
     pub tile_choice: usize,
@@ -97,7 +98,7 @@ impl Block {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blocks {
     pub blocks: Field<Option<Block>>,
 }

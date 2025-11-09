@@ -1,11 +1,12 @@
 use crate::math::generic::Num;
 use num_traits::{AsPrimitive, ConstZero};
+use serde::{Deserialize, Serialize};
 use std::{
     hash::{Hash, Hasher},
     ops::{Add, Mul, Range, RangeInclusive, Sub},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Interval<T> {
     pub low: T,
     pub high: T,

@@ -4,14 +4,16 @@ use crate::{
     math::{point::Point, rect::Rect},
     sides::Side,
 };
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Particle {
     pub position: Point<f64>,
     pub previous_position: Point<f64>,
     pub velocity: Point<f64>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationSettings {
     pub density_correction_strength: f64,
     pub target_density: f64,
@@ -62,6 +64,7 @@ impl Default for SimulationSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Simulation {
     pub i_step: usize,
     pub dt: f64,

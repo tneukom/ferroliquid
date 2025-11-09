@@ -48,10 +48,11 @@ cached = "0.55.1"
 tracy-client = { version = "0.18.1", default-features = false, features = ["enable", "system-tracing",
     "context-switch-tracing", "code-transfer", "callstack-inlines", "only-localhost"] }
 fastrand = { version = "2.3.0" }
-slotmap = "1.0.7"
+slotmap = { version = "1.0.7", features = ["serde"] }
 # enum_dispatch doesn't work well with RustRover
 #enum_dispatch = "0.3.13"
 enum_delegate = "0.2.0"
+serde = { version = "1.0.228", features = ["derive"] }
 
 [profile.release]
 debug = true

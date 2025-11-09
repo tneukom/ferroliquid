@@ -5,20 +5,16 @@ use crate::{
     simulation::{Particle, SimulationSettings},
     solver::Solver,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CellType {
     Solid = 0,
     Air = 1,
     Fluid = 2,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParticleState {
-    Dead = 0,
-    Alive = 1,
-}
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Grid {
     pub inner_bounds: Rect<i64>,
 

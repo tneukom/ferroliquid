@@ -9,17 +9,20 @@ use crate::{
     simulation::{Simulation, SimulationSettings},
     utils::monotonic_time,
 };
+use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use std::time::Instant;
 
 slotmap::new_key_type! { pub struct ForceKey; }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inflow {
     pub rect: Rect<f64>,
     pub velocity: Point<f64>,
     pub color: Rgba8,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct World {
     pub simulation: Simulation,
     pub blocks: Blocks,

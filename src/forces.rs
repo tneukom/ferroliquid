@@ -1,5 +1,6 @@
 use crate::{math::point::Point, simulation::Particle, utils::ReflectEnum, widgets::enum_combo};
 use num_traits::{Float, FloatConst};
+use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 
 #[enum_delegate::register]
@@ -20,6 +21,7 @@ pub trait Force {
     fn settings_ui(&mut self, ui: &mut egui::Ui);
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Gravity {
     pub mass_radius: f64,
     pub mass_density: f64,
@@ -54,6 +56,7 @@ impl Force for Gravity {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Swirl {
     pub force: f64,
     pub radius: f64,
@@ -101,6 +104,7 @@ impl Force for Swirl {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct UniformForce {
     pub angle: f64,
     pub strength: f64,
@@ -130,7 +134,7 @@ impl Force for UniformForce {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShockwaveKind {
     Sin,
     Constant,
@@ -171,6 +175,7 @@ impl ReflectEnum for ShockwaveKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Shockwave {
     /// Force is active in an annulus of the given radial width
     pub width: f64,
@@ -248,6 +253,7 @@ fn labeled_angle_drag_value(ui: &mut egui::Ui, label: &str, angle: &mut f64) {
     });
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[enum_delegate::implement(Force)]
 pub enum AnyForce {
     Gravity(Gravity),
@@ -256,6 +262,7 @@ pub enum AnyForce {
     Shockwave(Shockwave),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlacedForce {
     pub position: Point<f64>,
     pub force: AnyForce,

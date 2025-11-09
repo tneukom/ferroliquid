@@ -1,5 +1,6 @@
 use bytemuck::{Pod, Zeroable};
 use egui::Color32;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug},
     ops::{Add, Mul},
@@ -91,14 +92,19 @@ where
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Zeroable, Pod, PartialOrd, Ord)]
-#[repr(C, packed)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Zeroable, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(C)]
 pub struct Rgba<T> {
     pub r: T,
     pub g: T,
     pub b: T,
     pub a: T,
 }
+
+// Pod for generic Rgba<T> wants packed repr, but Serde wants not packed, so we explicitly
+// impl Pod for the types that actually need it.
+unsafe impl Pod for Rgba<u8> {}
+unsafe impl Pod for Rgba<f32> {}
 
 #[allow(non_snake_case)]
 pub const fn Rgba<T>(r: T, g: T, b: T, a: T) -> Rgba<T> {

@@ -9,7 +9,6 @@ use crate::{
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
     render_debug_ui::RenderDebugUi,
-    simulation::SimulationSettings,
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::icon_button,

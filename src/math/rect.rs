@@ -1,6 +1,7 @@
 use crate::math::{arrow::Arrow, generic::Num, interval::Interval, point::Point};
 use itertools::Itertools;
 use num_traits::{AsPrimitive, ConstZero};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -19,7 +20,7 @@ use std::{
 ///      │              │
 ///      └──────────────┘
 /// bottom left   bottom right
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Rect<T> {
     pub x: Interval<T>,
     pub y: Interval<T>,

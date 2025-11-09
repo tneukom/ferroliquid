@@ -1,13 +1,14 @@
 use crate::math::{point::Point, rect::Rect, rgba8::Rgba8};
 use data_encoding::BASE64;
 use image::ImageEncoder;
+use serde::{Deserialize, Serialize};
 use std::{
     io::Cursor,
     ops::{Index, IndexMut},
     path::Path,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Field<T> {
     bounds: Rect<i64>,
     elems: Vec<T>,

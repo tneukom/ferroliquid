@@ -2,6 +2,7 @@ use crate::{
     field::Field,
     math::{point::Point, rect::Rect},
 };
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},
     ops::{Add, Index, IndexMut},
@@ -143,7 +144,7 @@ impl Debug for Side {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SideField<T> {
     vertical: Field<T>,
     horizontal: Field<T>,
@@ -248,6 +249,7 @@ impl<T> IndexMut<Side> for SideField<T> {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sides {
     pub velocity_interpolated: SideField<f64>,
     pub velocity_div_free: SideField<f64>,

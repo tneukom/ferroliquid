@@ -4,6 +4,7 @@ use crate::{
 };
 use bytemuck::{Pod, Zeroable};
 use num_traits::{AsPrimitive, real::Real};
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
@@ -11,7 +12,7 @@ use std::{
     ops::{Add, Div, Mul, Neg, Rem, Sub},
 };
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Point<T> {
     pub x: T,
