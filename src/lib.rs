@@ -27,6 +27,7 @@ pub(crate) mod simulation_debug_ui;
 pub(crate) mod solver;
 pub(crate) mod utils;
 pub(crate) mod widgets;
+pub(crate) mod world;
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]

@@ -18,6 +18,40 @@ pub struct SimulationSettings {
     pub alpha: f64,
 }
 
+impl SimulationSettings {
+    pub fn ui(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("simulation_settings_grid")
+            .num_columns(2)
+            // .spacing([40.0, 4.0])
+            .striped(true)
+            .show(ui, |ui| {
+                ui.label("Density correction");
+                ui.add(
+                    egui::DragValue::new(&mut self.density_correction_strength)
+                        .range(0.0..=2.0)
+                        .speed(0.01),
+                );
+                ui.end_row();
+
+                ui.label("Target density");
+                ui.add(
+                    egui::DragValue::new(&mut self.target_density)
+                        .range(1.0..=16.0)
+                        .speed(0.1),
+                );
+                ui.end_row();
+
+                ui.label("Viscosity");
+                ui.add(
+                    egui::DragValue::new(&mut self.alpha)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+                ui.end_row();
+            });
+    }
+}
+
 impl Default for SimulationSettings {
     fn default() -> Self {
         Self {

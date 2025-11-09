@@ -15,16 +15,8 @@ use crate::{
     sides::Orientation,
     simulation::Simulation,
 };
-use glow::{Context, HasContext};
+use glow::HasContext;
 use std::mem::swap;
-
-#[derive(Clone, Default, Debug)]
-pub struct SimulationPainterSettings {
-    pub particles: ParticlePainterSettings,
-    pub smooth: SmoothPainterSettings,
-    pub step: StepPainterSettings,
-    pub water: WaterPainterSettings,
-}
 
 pub struct SimulationPainter {
     pub i_step: usize,
@@ -181,7 +173,7 @@ impl SimulationPainter {
         self.water(gl, &settings.water);
     }
 
-    unsafe fn particles(&mut self, gl: &Context, settings: &ParticlePainterSettings) {
+    unsafe fn particles(&mut self, gl: &glow::Context, settings: &ParticlePainterSettings) {
         // Draw particles
         self.particles_framebuffer.bind(gl);
         self.particles_framebuffer.viewport(gl);
@@ -192,7 +184,7 @@ impl SimulationPainter {
         self.particles_framebuffer.unbind(gl);
     }
 
-    unsafe fn particle_dots(&mut self, gl: &Context) {
+    unsafe fn particle_dots(&mut self, gl: &glow::Context) {
         // Draw particle dots (for debugging)
         self.particle_dots_framebuffer.bind(gl);
         self.particle_dots_framebuffer.viewport(gl);
@@ -205,7 +197,7 @@ impl SimulationPainter {
 
     unsafe fn color_rects(
         &mut self,
-        gl: &Context,
+        gl: &glow::Context,
         inflows: &mut dyn Iterator<Item = (Rect<f64>, Rgba8)>,
     ) {
         self.color_framebuffer_from.bind(gl);
@@ -218,7 +210,7 @@ impl SimulationPainter {
         self.color_framebuffer_from.unbind(gl);
     }
 
-    unsafe fn advect(&mut self, gl: &Context) {
+    unsafe fn advect(&mut self, gl: &glow::Context) {
         self.color_framebuffer_to.bind(gl);
         self.color_framebuffer_to.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -232,7 +224,7 @@ impl SimulationPainter {
         self.color_framebuffer_to.unbind(gl);
     }
 
-    unsafe fn step(&mut self, gl: &Context, settings: &StepPainterSettings) {
+    unsafe fn step(&mut self, gl: &glow::Context, settings: &StepPainterSettings) {
         self.step_framebuffer.bind(gl);
         self.step_framebuffer.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -241,7 +233,7 @@ impl SimulationPainter {
         self.step_framebuffer.unbind(gl);
     }
 
-    unsafe fn smooth_vertical(&mut self, gl: &Context, settings: &SmoothPainterSettings) {
+    unsafe fn smooth_vertical(&mut self, gl: &glow::Context, settings: &SmoothPainterSettings) {
         self.vertical_smoothed_framebuffer.bind(gl);
         self.vertical_smoothed_framebuffer.viewport(gl);
         self.smooth_painter
@@ -249,7 +241,7 @@ impl SimulationPainter {
         self.vertical_smoothed_framebuffer.unbind(gl);
     }
 
-    unsafe fn smooth_horizontal(&mut self, gl: &Context, settings: &SmoothPainterSettings) {
+    unsafe fn smooth_horizontal(&mut self, gl: &glow::Context, settings: &SmoothPainterSettings) {
         self.horizontal_smoothed_framebuffer.bind(gl);
         self.horizontal_smoothed_framebuffer.viewport(gl);
         self.smooth_painter.draw(
@@ -273,5 +265,83 @@ impl SimulationPainter {
             settings,
         );
         self.water_framebuffer.unbind(gl);
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct SimulationPainterSettings {
+    pub particles: ParticlePainterSettings,
+    pub smooth: SmoothPainterSettings,
+    pub step: StepPainterSettings,
+    pub water: WaterPainterSettings,
+}
+
+impl SimulationPainterSettings {
+    pub fn ui(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("simulation_painter_settings")
+            .num_columns(2)
+            // .spacing([40.0, 4.0])
+            .striped(true)
+            .show(ui, |ui| {
+                ui.label("Particle point size");
+                ui.add(
+                    egui::DragValue::new(&mut self.particles.point_size)
+                        .range(1.0..=40.0)
+                        .speed(0.1),
+                );
+                ui.end_row();
+
+                ui.label("Step edge");
+                ui.add(
+                    egui::DragValue::new(&mut self.step.edge)
+                        .range(0.0..=2.0)
+                        .speed(0.01),
+                );
+                ui.end_row();
+
+                ui.label("Smooth sigma");
+                ui.add(
+                    egui::DragValue::new(&mut self.smooth.sigma)
+                        .range(0.0..=1.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+
+                ui.label("Smooth radius");
+                ui.add(egui::DragValue::new(&mut self.smooth.radius).range(1..=8));
+                ui.end_row();
+
+                ui.label("Water edge low");
+                ui.add(
+                    egui::DragValue::new(&mut self.water.edge_low)
+                        .range(0.0..=2.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+
+                ui.label("Water edge high");
+                ui.add(
+                    egui::DragValue::new(&mut self.water.edge_high)
+                        .range(0.0..=2.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+
+                ui.label("Water darken edge low");
+                ui.add(
+                    egui::DragValue::new(&mut self.water.darken_edge_low)
+                        .range(0.0..=2.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+
+                ui.label("Water darken edge high");
+                ui.add(
+                    egui::DragValue::new(&mut self.water.darken_edge_high)
+                        .range(0.0..=2.0)
+                        .speed(0.005),
+                );
+                ui.end_row();
+            });
     }
 }

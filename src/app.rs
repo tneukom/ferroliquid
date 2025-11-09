@@ -1,35 +1,21 @@
 use crate::{
-    blocks::{Block, BlockKind, BlockPalette, Blocks},
+    blocks::{Block, BlockKind, BlockPalette},
     forces::{Force, Gravity, PlacedForce, Shockwave, Swirl, UniformForce},
     line_drawing::slope_draw_thin_line,
-    math::{
-        arrow::Arrow,
-        point::Point,
-        rect::Rect,
-        rgba8::{Rgba, Rgba8},
-    },
+    math::{arrow::Arrow, point::Point, rect::Rect},
     painting::{
         block_painter::BlockPaintingMode,
         gl_texture::GlTexture,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
     render_debug_ui::RenderDebugUi,
-    simulation::{Simulation, SimulationSettings},
+    simulation::SimulationSettings,
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::icon_button,
+    world::{ForceKey, World},
 };
-use slotmap::SlotMap;
-use std::{
-    sync::{Arc, Mutex},
-    time::Instant,
-};
-
-pub struct Inflow {
-    rect: Rect<f64>,
-    velocity: Point<f64>,
-    color: Rgba8,
-}
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Tool {
@@ -63,15 +49,10 @@ impl Tool {
     }
 }
 
-slotmap::new_key_type! { struct ForceKey; }
-
 pub struct EguiApp {
     gl: Arc<glow::Context>,
 
-    simulation: Simulation,
-    simulation_settings: SimulationSettings,
-    inflows: Vec<Inflow>,
-    blocks: Blocks,
+    world: World,
 
     simulation_debug_window: SimulationDebugWindow,
     render_debug_ui: RenderDebugUi,
@@ -80,8 +61,6 @@ pub struct EguiApp {
     simulation_painter_settings: SimulationPainterSettings,
 
     run: bool,
-
-    forces: SlotMap<ForceKey, PlacedForce>,
     selected_force: Option<ForceKey>,
 
     tool: Tool,
@@ -94,54 +73,19 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
-        let simulation_bounds = Rect::low_size(Point::ZERO, Point(80, 80));
-        let block_bounds = Rect::low_size(Point::ZERO, Point(40, 40));
-        let mut simulation = Simulation::new(simulation_bounds, 1.0 / 60.0);
-        let mut walls = Blocks::new(block_bounds);
+        let bounds = Rect::low_size(Point::ZERO, Point(80, 80));
+        let world = World::new(bounds);
 
-        // Solid walls
-        // for x in wall_bounds.left()..wall_bounds.right() {
-        //     walls.make_solid(Point(x, wall_bounds.bottom() - 1));
-        // }
-        // for y in wall_bounds.top() + 10..wall_bounds.bottom() {
-        //     walls.make_solid(Point(wall_bounds.left() + 3, y));
-        //     walls.make_solid(Point(wall_bounds.right() - 4, y));
-        // }
-        // walls.make_solid(Point(20, 20));
-        //
-        // simulation.grid.assign_solid_from_walls(&walls);
-
-        let simulation_painter = SimulationPainter::new(&gl, simulation_bounds);
-
-        let inflows = vec![
-            Inflow {
-                rect: Rect::low_size(Point(4.0, 4.0), Point(2.0, 2.0)),
-                velocity: Point(20.0, 00.0),
-                color: Rgba(255, 0, 0, 255),
-            },
-            Inflow {
-                rect: Rect::low_size(Point(72.0, 4.0), Point(2.0, 2.0)),
-                velocity: Point(-20.0, 00.0),
-                color: Rgba(0, 255, 0, 255),
-            },
-        ];
-
-        let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
-        let mut forces = SlotMap::with_key();
-        forces.insert(gravity);
+        let simulation_painter = SimulationPainter::new(&gl, bounds);
 
         Self {
-            simulation,
-            simulation_settings: SimulationSettings::default(),
-            inflows,
-            blocks: walls,
+            world,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
             simulation_painter_settings: SimulationPainterSettings::default(),
             run: false,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
             gl,
-            forces,
             selected_force: None,
             tool: Tool::Pointer,
         }
@@ -149,46 +93,18 @@ impl EguiApp {
 
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
         self.simulation_debug_window
-            .window_toggle(ui, &self.simulation);
+            .window_toggle(ui, &self.world.simulation);
 
         ui.checkbox(&mut self.run, "Run");
         let step_clicked = ui.button("Step").clicked();
 
         if self.run || step_clicked {
-            // Run simulation step
-            for inflow in &self.inflows {
-                self.simulation.fill_rectangle(
-                    inflow.rect,
-                    inflow.velocity,
-                    &self.simulation_settings,
-                );
-            }
-            // for coord in fill_rect.iter_indices() {
-            //     self.simulation.fill(coord, velocity);
-            // }
-
-            let time = monotonic_time();
-            for placed_force in self.forces.values() {
-                println!("{}", placed_force.position);
-                placed_force.force.apply(
-                    placed_force.position,
-                    &mut self.simulation.particles,
-                    time,
-                    self.simulation.dt,
-                );
-            }
-
-            // self.simulation.apply_constant_force(Point(0.0, 60.0));
-            let instant = Instant::now();
-            self.blocks
-                .assign_simulation_grid(&mut self.simulation.grid);
-            self.simulation.step(&self.simulation_settings);
-            println!("time to simulate: {}", instant.elapsed().as_secs_f64());
+            self.world.step();
         }
 
         ui.label(format!(
             "Particle count:{}",
-            self.simulation.particles.len()
+            self.world.simulation.particles.len()
         ));
 
         // Tool buttons
@@ -204,36 +120,36 @@ impl EguiApp {
 
         if ui.button("Add Gravity").clicked() {
             let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
-            self.forces.insert(gravity);
+            self.world.forces.insert(gravity);
         }
 
         if ui.button("Add Swirl").clicked() {
             let swirl = PlacedForce::new(Swirl::default(), Point(10.0, 10.0));
-            self.forces.insert(swirl);
+            self.world.forces.insert(swirl);
         }
 
         if ui.button("Add Uniform Force").clicked() {
             let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
-            self.forces.insert(uniform);
+            self.world.forces.insert(uniform);
         }
 
         if ui.button("Add Shockwave").clicked() {
             let shockwave = PlacedForce::new(Shockwave::default(), Point(10.0, 10.0));
-            self.forces.insert(shockwave);
+            self.world.forces.insert(shockwave);
         }
 
         if let Some(force_key) = self.selected_force {
-            let force = &mut self.forces[force_key];
+            let force = &mut self.world.forces[force_key];
             force.force.settings_ui(ui);
 
             if ui.button("Delete force").clicked() {
-                self.forces.remove(force_key);
+                self.world.forces.remove(force_key);
                 self.selected_force = None;
             }
         }
 
         ui.heading("Simulation Settings");
-        Self::simulation_settings_ui(ui, &mut self.simulation_settings);
+        self.world.settings.ui(ui);
 
         ui.collapsing("Render Debug", |ui| {
             self.render_debug_ui
@@ -241,49 +157,18 @@ impl EguiApp {
         });
 
         ui.collapsing("Render Settings", |ui| {
-            Self::simulation_painter_settings_ui(ui, &mut self.simulation_painter_settings);
+            ui.heading("Painter settings");
+            self.simulation_painter_settings.ui(ui);
         });
-    }
-
-    pub fn simulation_settings_ui(ui: &mut egui::Ui, settings: &mut SimulationSettings) {
-        egui::Grid::new("simulation_settings_grid")
-            .num_columns(2)
-            // .spacing([40.0, 4.0])
-            .striped(true)
-            .show(ui, |ui| {
-                ui.label("Density correction");
-                ui.add(
-                    egui::DragValue::new(&mut settings.density_correction_strength)
-                        .range(0.0..=2.0)
-                        .speed(0.01),
-                );
-                ui.end_row();
-
-                ui.label("Target density");
-                ui.add(
-                    egui::DragValue::new(&mut settings.target_density)
-                        .range(1.0..=16.0)
-                        .speed(0.1),
-                );
-                ui.end_row();
-
-                ui.label("Viscosity");
-                ui.add(
-                    egui::DragValue::new(&mut settings.alpha)
-                        .range(0.0..=1.0)
-                        .speed(0.01),
-                );
-                ui.end_row();
-            });
     }
 
     pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         let simulation_painter = self.simulation_painter.clone();
         let settings = self.simulation_painter_settings.clone();
-        let simulation_bounds = self.simulation.grid.bounds.as_f64();
+        let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
-        let blocks = self.blocks.clone();
+        let blocks = self.world.blocks.clone();
 
         let cb = {
             egui_glow::CallbackFn::new(move |_info, painter| {
@@ -321,7 +206,7 @@ impl EguiApp {
             })
         };
 
-        let size = Self::CELL_SIZE * self.simulation.grid.bounds.size();
+        let size = Self::CELL_SIZE * self.world.bounds().size();
         let sense = if self.tool.is_block() {
             egui::Sense::click_and_drag()
         } else {
@@ -350,8 +235,9 @@ impl EguiApp {
             );
 
             for coord in slope_draw_thin_line(arrow) {
-                if self.blocks.bounds().contains_index(coord) {
-                    self.blocks
+                if self.world.blocks.bounds().contains_index(coord) {
+                    self.world
+                        .blocks
                         .set(coord, Block::new(block_kind, BlockPalette::BlueGreen));
                 }
             }
@@ -372,7 +258,7 @@ impl EguiApp {
         let now = monotonic_time();
 
         // Forces
-        for (key, placed_force) in &mut self.forces {
+        for (key, placed_force) in &mut self.world.forces {
             let image_source = placed_force.force.image();
             // Only sense drag if tool is Pointer
             let sense = if self.tool == Tool::Pointer {
@@ -419,85 +305,13 @@ impl EguiApp {
         ctx.input(|input| input.screen_rect.width() < 800.0)
     }
 
-    pub fn simulation_painter_settings_ui(
-        ui: &mut egui::Ui,
-        settings: &mut SimulationPainterSettings,
-    ) {
-        ui.heading("Painter settings");
-
-        egui::Grid::new("simulation_painter_settings")
-            .num_columns(2)
-            // .spacing([40.0, 4.0])
-            .striped(true)
-            .show(ui, |ui| {
-                ui.label("Particle point size");
-                ui.add(
-                    egui::DragValue::new(&mut settings.particles.point_size)
-                        .range(1.0..=40.0)
-                        .speed(0.1),
-                );
-                ui.end_row();
-
-                ui.label("Step edge");
-                ui.add(
-                    egui::DragValue::new(&mut settings.step.edge)
-                        .range(0.0..=2.0)
-                        .speed(0.01),
-                );
-                ui.end_row();
-
-                ui.label("Smooth sigma");
-                ui.add(
-                    egui::DragValue::new(&mut settings.smooth.sigma)
-                        .range(0.0..=1.0)
-                        .speed(0.005),
-                );
-                ui.end_row();
-
-                ui.label("Smooth radius");
-                ui.add(egui::DragValue::new(&mut settings.smooth.radius).range(1..=8));
-                ui.end_row();
-
-                ui.label("Water edge low");
-                ui.add(
-                    egui::DragValue::new(&mut settings.water.edge_low)
-                        .range(0.0..=2.0)
-                        .speed(0.005),
-                );
-                ui.end_row();
-
-                ui.label("Water edge high");
-                ui.add(
-                    egui::DragValue::new(&mut settings.water.edge_high)
-                        .range(0.0..=2.0)
-                        .speed(0.005),
-                );
-                ui.end_row();
-
-                ui.label("Water darken edge low");
-                ui.add(
-                    egui::DragValue::new(&mut settings.water.darken_edge_low)
-                        .range(0.0..=2.0)
-                        .speed(0.005),
-                );
-                ui.end_row();
-
-                ui.label("Water darken edge high");
-                ui.add(
-                    egui::DragValue::new(&mut settings.water.darken_edge_high)
-                        .range(0.0..=2.0)
-                        .speed(0.005),
-                );
-                ui.end_row();
-            });
-    }
-
     // fn egui_texture_handle()
 }
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let inflows: Vec<_> = self
+            .world
             .inflows
             .iter()
             .map(|inflow| (inflow.rect, inflow.color))
@@ -509,7 +323,7 @@ impl eframe::App for EguiApp {
         unsafe {
             self.simulation_painter.lock().unwrap().paint(
                 &self.gl,
-                &self.simulation,
+                &self.world.simulation,
                 &mut inflows.iter().copied(),
                 &self.simulation_painter_settings,
             );
