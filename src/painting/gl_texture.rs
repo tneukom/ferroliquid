@@ -169,6 +169,12 @@ impl GlTexture {
         self.texture_image_raw(gl, TextureFormat::R8, gray)
     }
 
+    pub unsafe fn generate_mipmaps(&self, gl: &glow::Context) {
+        gl.active_texture(glow::TEXTURE0);
+        gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
+        gl.generate_mipmap(glow::TEXTURE_2D);
+    }
+
     pub unsafe fn texture_sub_image_raw<T: Pod>(
         &mut self,
         gl: &glow::Context,

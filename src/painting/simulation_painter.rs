@@ -60,7 +60,7 @@ pub struct SimulationPainter {
     pub water_framebuffer: GlFramebuffer,
     pub water_painter: WaterPainter,
 
-    pub wall_painter: BlockPainter,
+    pub block_painter: BlockPainter,
 
     pub blit_painter: BlitPainter,
 }
@@ -137,7 +137,7 @@ impl SimulationPainter {
             color_framebuffer_to,
             advect_painter,
             rect_painter,
-            wall_painter,
+            block_painter: wall_painter,
             blit_painter,
         }
     }

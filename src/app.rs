@@ -94,9 +94,9 @@ impl EguiApp {
         let gl = cc.gl.clone().unwrap();
 
         let simulation_bounds = Rect::low_size(Point::ZERO, Point(80, 80));
-        let wall_bounds = Rect::low_size(Point::ZERO, Point(40, 40));
+        let block_bounds = Rect::low_size(Point::ZERO, Point(40, 40));
         let mut simulation = Simulation::new(simulation_bounds, 1.0 / 60.0);
-        let mut walls = Blocks::new(wall_bounds);
+        let mut walls = Blocks::new(block_bounds);
 
         // Solid walls
         // for x in wall_bounds.left()..wall_bounds.right() {
@@ -275,7 +275,7 @@ impl EguiApp {
         let simulation_bounds = self.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
-        let walls = self.blocks.clone();
+        let blocks = self.blocks.clone();
 
         let cb = {
             egui_glow::CallbackFn::new(move |_info, painter| {
@@ -283,9 +283,9 @@ impl EguiApp {
                 let mut simulation_painter = simulation_painter.lock().unwrap();
 
                 unsafe {
-                    simulation_painter.wall_painter.draw(
+                    simulation_painter.block_painter.draw(
                         gl,
-                        &walls,
+                        &blocks,
                         BlockPaintingMode::BackgroundBrush,
                     );
 
@@ -301,12 +301,12 @@ impl EguiApp {
                         .draw_particle_dots(gl, simulation_bounds);
 
                     simulation_painter
-                        .wall_painter
-                        .draw(gl, &walls, BlockPaintingMode::Pen);
+                        .block_painter
+                        .draw(gl, &blocks, BlockPaintingMode::Pen);
 
-                    simulation_painter.wall_painter.draw(
+                    simulation_painter.block_painter.draw(
                         gl,
-                        &walls,
+                        &blocks,
                         BlockPaintingMode::ForegroundBrush,
                     );
                 }
@@ -320,9 +320,15 @@ impl EguiApp {
             egui::Sense::empty()
         };
         let (egui_rect, response) = ui.allocate_exact_size(size.as_f64().into(), sense);
-        if response.dragged()
+
+        if response.is_pointer_button_down_on()
             && let Some(pointer_pos) = response.interact_pointer_pos()
         {
+            let Tool::Block(block_kind) = self.tool else {
+                unreachable!();
+            };
+
+            // Draw blocks line from previous to current drag position
             let drag_current: Point<f64> = (pointer_pos - egui_rect.left_top()).into();
             let drag_delta: Point<f64> = response.drag_delta().into();
             let drag_previous = drag_current - drag_delta;
@@ -337,10 +343,8 @@ impl EguiApp {
 
             for coord in slope_draw_thin_line(arrow) {
                 if self.blocks.bounds().contains_index(coord) {
-                    self.blocks.set(
-                        coord,
-                        Block::new(BlockKind::Square, BlockPalette::BlueGreen),
-                    );
+                    self.blocks
+                        .set(coord, Block::new(block_kind, BlockPalette::BlueGreen));
                 }
             }
         }

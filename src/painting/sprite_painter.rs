@@ -16,6 +16,9 @@ pub struct Sprite {
 
     /// Rectangle to paint in target coordinates, without padding
     pub target_rect: Rect<f64>,
+
+    /// Counter-clockwise rotation in 90° steps
+    pub rotation: i64,
 }
 
 /// Helper class to draw tilemaps using SpritePainter
@@ -52,11 +55,12 @@ impl TileSheet {
     }
 
     /// rect is inner rect, without padding.
-    pub fn sprite(&self, tile_index: Point<i64>, target_rect: Rect<f64>) -> Sprite {
+    pub fn sprite(&self, tile_index: Point<i64>, target_rect: Rect<f64>, rotation: i64) -> Sprite {
         let texture_rect = Rect::low_size(
             tile_index * self.padded_tile_size(),
             self.padded_tile_size(),
         );
+
         // Add proportional padding to rect, such that
         // target_padding / target_rect.size = self.tile_padding / self.tile_size
         let target_padding =
@@ -66,6 +70,7 @@ impl TileSheet {
         Sprite {
             bitmap_rect: texture_rect,
             target_rect: padded_target_rect,
+            rotation,
         }
     }
 
@@ -150,11 +155,11 @@ impl<Aux: Copy> SpritePainter<Aux> {
                 indices.push(index + vertices.len() as u32);
             }
 
-            for (bitmap_corner, target_corner) in sprite
-                .bitmap_rect
-                .corners()
-                .into_iter()
-                .zip(sprite.target_rect.corners())
+            let mut bitmap_corners = sprite.bitmap_rect.corners();
+            bitmap_corners.rotate_right(sprite.rotation.rem_euclid(4) as usize);
+
+            for (bitmap_corner, target_corner) in
+                bitmap_corners.into_iter().zip(sprite.target_rect.corners())
             {
                 let vertex = SpriteVertex {
                     position: target_corner.as_f32().to_array(),

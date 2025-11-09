@@ -1,5 +1,5 @@
 use crate::{
-    blocks::{BlockPalette, Blocks},
+    blocks::{BlockKind, BlockPalette, Blocks},
     coordinate_frame::affine_device_from_simulation,
     field::RgbaField,
     math::{point::Point, rect::Rect, rgba8::Rgba8},
@@ -27,17 +27,17 @@ pub enum BlockPaintingMode {
 pub struct BlockPainter {
     sprite_painter: SpritePainter<WallAux>,
     tile_sheet: TileSheet,
-    line_texture: GlTexture,
-    wall_texture: GlTexture,
+    pen_texture: GlTexture,
+    brush_texture: GlTexture,
 }
 
 impl BlockPainter {
     pub unsafe fn new(gl: &glow::Context) -> Self {
-        let vs_source = include_str!("shaders/walls.vert");
-        let fs_source = include_str!("shaders/walls.frag");
+        let vs_source = include_str!("shaders/blocks.vert");
+        let fs_source = include_str!("shaders/blocks.frag");
 
-        let lines_bitmap = RgbaField::load_from_memory(include_bytes!("textures/pen.png")).unwrap();
-        let walls_bitmap =
+        let pen_bitmap = RgbaField::load_from_memory(include_bytes!("textures/pen.png")).unwrap();
+        let brush_bitmap =
             RgbaField::load_from_memory(include_bytes!("textures/brush.png")).unwrap();
 
         let tile_sheet = TileSheet {
@@ -46,8 +46,8 @@ impl BlockPainter {
             size: Point(4, 3),
         };
 
-        assert_eq!(tile_sheet.pixel_size(), lines_bitmap.size());
-        assert_eq!(tile_sheet.pixel_size(), walls_bitmap.size());
+        assert_eq!(tile_sheet.pixel_size(), pen_bitmap.size());
+        assert_eq!(tile_sheet.pixel_size(), brush_bitmap.size());
 
         let sprite_painter = SpritePainter::new(gl, vs_source, fs_source);
 
@@ -67,18 +67,24 @@ impl BlockPainter {
             stride as i32,
         );
 
+        let pen_texture = GlTexture::from_srgba_bitmap(gl, &pen_bitmap, Filter::Linear);
+        pen_texture.generate_mipmaps(gl);
+
+        let brush_texture = GlTexture::from_srgba_bitmap(gl, &brush_bitmap, Filter::Linear);
+        brush_texture.generate_mipmaps(gl);
+
         Self {
             sprite_painter,
             tile_sheet,
-            line_texture: GlTexture::from_srgba_bitmap(gl, &lines_bitmap, Filter::Linear),
-            wall_texture: GlTexture::from_srgba_bitmap(gl, &walls_bitmap, Filter::Linear),
+            pen_texture,
+            brush_texture,
         }
     }
 
-    pub unsafe fn draw(&mut self, gl: &glow::Context, walls: &Blocks, mode: BlockPaintingMode) {
+    pub unsafe fn draw(&mut self, gl: &glow::Context, blocks: &Blocks, mode: BlockPaintingMode) {
         let mut sprites = Vec::new();
 
-        let tile_choices = [
+        let square_tileset = [
             Point(0, 0),
             Point(1, 0),
             Point(2, 0),
@@ -87,15 +93,39 @@ impl BlockPainter {
             Point(1, 1),
         ];
 
+        let l_tileset = [
+            Point(2, 1),
+            Point(3, 1),
+            Point(0, 2),
+            Point(1, 2),
+            Point(2, 2),
+            Point(3, 2),
+        ];
+
         let palettes = BlockPalette::palettes();
 
-        for (coord, wall) in walls.blocks.enumerate() {
-            if let Some(wall) = wall {
+        for (coord, block) in blocks.blocks.enumerate() {
+            if let Some(block) = block {
+                let tileset = if block.kind == BlockKind::Square {
+                    square_tileset
+                } else {
+                    l_tileset
+                };
+
+                let rotation = match block.kind {
+                    BlockKind::Square => 0,
+                    BlockKind::L => 0,
+                    BlockKind::L90 => 1,
+                    BlockKind::L180 => 2,
+                    BlockKind::L270 => 3,
+                };
+
                 let target_rect = Rect::low_size(coord.as_f64(), Point::ONE);
-                let tile_index = tile_choices[wall.tile_choice % tile_choices.len()];
-                let sprite = self.tile_sheet.sprite(tile_index, target_rect);
-                let palette = &palettes[&wall.palette];
-                let color = palette[wall.color_choice % palette.len()];
+
+                let tile_index = tileset[block.tile_choice % tileset.len()];
+                let sprite = self.tile_sheet.sprite(tile_index, target_rect, rotation);
+                let palette = &palettes[&block.palette];
+                let color = palette[block.color_choice % palette.len()];
                 let aux = WallAux {
                     brush_color: color,
                     // Dark gray looks better than black
@@ -111,25 +141,25 @@ impl BlockPainter {
         gl.blend_equation(glow::FUNC_ADD);
 
         // Assume one wall per simulation cell.
-        let device_from_simulation = affine_device_from_simulation(walls.blocks.bounds().as_f64());
+        let device_from_simulation = affine_device_from_simulation(blocks.blocks.bounds().as_f64());
 
         self.sprite_painter.setup_draw(
             gl,
             sprites,
-            self.wall_texture.size(),
+            self.brush_texture.size(),
             device_from_simulation,
         );
 
         self.sprite_painter.shader.uniform(gl, "mode", mode as i32);
 
         gl.active_texture(glow::TEXTURE0);
-        gl.bind_texture(glow::TEXTURE_2D, Some(self.wall_texture.id));
+        gl.bind_texture(glow::TEXTURE_2D, Some(self.brush_texture.id));
         self.sprite_painter
             .shader
             .uniform(gl, "brush_texture", 0i32);
 
         gl.active_texture(glow::TEXTURE1);
-        gl.bind_texture(glow::TEXTURE_2D, Some(self.line_texture.id));
+        gl.bind_texture(glow::TEXTURE_2D, Some(self.pen_texture.id));
         self.sprite_painter.shader.uniform(gl, "pen_texture", 1i32);
 
         self.sprite_painter.draw(gl);
