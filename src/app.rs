@@ -1,6 +1,6 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette, Blocks},
-    forces::{Force, Gravity, PlacedForce, Swirl, UniformForce},
+    forces::{Force, Gravity, PlacedForce, Shockwave, Swirl, UniformForce},
     line_drawing::slope_draw_thin_line,
     math::{
         arrow::Arrow,
@@ -16,6 +16,7 @@ use crate::{
     render_debug_ui::RenderDebugUi,
     simulation::{Simulation, SimulationSettings},
     simulation_debug_ui::SimulationDebugWindow,
+    utils::monotonic_time,
     widgets::icon_button,
 };
 use slotmap::SlotMap;
@@ -166,11 +167,13 @@ impl EguiApp {
             //     self.simulation.fill(coord, velocity);
             // }
 
+            let time = monotonic_time();
             for placed_force in self.forces.values() {
                 println!("{}", placed_force.position);
                 placed_force.force.apply(
                     placed_force.position,
                     &mut self.simulation.particles,
+                    time,
                     self.simulation.dt,
                 );
             }
@@ -212,6 +215,11 @@ impl EguiApp {
         if ui.button("Add Uniform Force").clicked() {
             let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
             self.forces.insert(uniform);
+        }
+
+        if ui.button("Add Shockwave").clicked() {
+            let shockwave = PlacedForce::new(Shockwave::default(), Point(10.0, 10.0));
+            self.forces.insert(shockwave);
         }
 
         if let Some(force_key) = self.selected_force {
@@ -361,12 +369,14 @@ impl EguiApp {
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
         let egui_rect = self.simulation_ui(ui);
 
+        let now = monotonic_time();
+
         // Forces
         for (key, placed_force) in &mut self.forces {
             let image_source = placed_force.force.image();
             // Only sense drag if tool is Pointer
             let sense = if self.tool == Tool::Pointer {
-                egui::Sense::drag()
+                egui::Sense::click_and_drag()
             } else {
                 egui::Sense::empty()
             };
@@ -395,6 +405,7 @@ impl EguiApp {
 
             if response.clicked() {
                 self.selected_force = Some(key);
+                placed_force.force.trigger(now);
             }
         }
 
