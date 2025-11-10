@@ -6,7 +6,7 @@ use crate::{
         rect::Rect,
         rgba8::{Rgba, Rgba8},
     },
-    simulation::{Simulation, SimulationSettings},
+    simulation::{Particle, Simulation, SimulationSettings},
     utils::monotonic_time,
 };
 use serde::{Deserialize, Serialize};
@@ -111,4 +111,39 @@ impl World {
         self.simulation.step(&self.settings);
         println!("time to simulate: {}", instant.elapsed().as_secs_f64());
     }
+
+    pub fn to_save_world(&self) -> SaveWorld {
+        SaveWorld {
+            bounds: self.bounds(),
+            particles: self.simulation.particles.clone(),
+            dt: self.simulation.dt,
+            blocks: self.blocks.clone(),
+            forces: self.forces.clone(),
+            inflows: self.inflows.clone(),
+            settings: self.settings.clone(),
+        }
+    }
+
+    pub fn from_save_world(save_world: SaveWorld) -> Self {
+        let mut simulation = Simulation::new(save_world.bounds, save_world.dt);
+        simulation.particles = save_world.particles;
+        Self {
+            simulation,
+            blocks: save_world.blocks,
+            forces: save_world.forces,
+            inflows: save_world.inflows,
+            settings: save_world.settings,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveWorld {
+    pub bounds: Rect<i64>,
+    pub dt: f64,
+    pub particles: Vec<Particle>,
+    pub blocks: Blocks,
+    pub forces: SlotMap<ForceKey, PlacedForce>,
+    pub inflows: Vec<Inflow>,
+    pub settings: SimulationSettings,
 }

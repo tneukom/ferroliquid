@@ -12,9 +12,13 @@ use crate::{
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::icon_button,
-    world::{ForceKey, World},
+    world::{ForceKey, SaveWorld, World},
 };
-use std::sync::{Arc, Mutex};
+use std::{
+    fs,
+    io::{BufReader, BufWriter},
+    sync::{Arc, Mutex},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Tool {
@@ -159,6 +163,32 @@ impl EguiApp {
             ui.heading("Painter settings");
             self.simulation_painter_settings.ui(ui);
         });
+
+        if ui.button("Save").clicked() {
+            // Save as json
+            let save_world = self.world.to_save_world();
+            let world_json = serde_json::to_string_pretty(&save_world).unwrap();
+            fs::write("world.json", world_json).expect("Failed to save");
+
+            // Save a bincode
+            let file = fs::File::create("world.bin").unwrap();
+            let mut writer = BufWriter::new(file);
+            bincode::serde::encode_into_std_write(
+                &save_world,
+                &mut writer,
+                bincode::config::standard(),
+            )
+            .unwrap();
+        }
+
+        if ui.button("Load").clicked() {
+            let file = fs::File::open("world.bin").unwrap();
+            let mut reader = BufReader::new(file);
+            let save_world: SaveWorld =
+                bincode::serde::decode_from_std_read(&mut reader, bincode::config::standard())
+                    .unwrap();
+            self.world = World::from_save_world(save_world);
+        }
     }
 
     pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
