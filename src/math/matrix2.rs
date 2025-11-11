@@ -1,15 +1,15 @@
-use std::{
-    fmt::Debug,
-    ops::{Add, Mul, Sub},
-};
-
 use crate::math::{
     arrow::Arrow,
     generic::{Dot, FloatNum, Num, SignedNum},
     point::Point,
 };
+use serde::{Deserialize, Serialize};
+use std::{
+    fmt::Debug,
+    ops::{Add, Mul, Sub},
+};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Matrix2<T> {
     pub a11: T,
     pub a12: T,
@@ -65,6 +65,10 @@ impl<T: Num> Matrix2<T> {
     pub const ID: Self = Self::new(T::ONE, T::ZERO, T::ZERO, T::ONE);
     pub const ZERO: Self = Self::new(T::ZERO, T::ZERO, T::ZERO, T::ZERO);
     pub const SWAP_XY: Self = Self::new(T::ZERO, T::ONE, T::ONE, T::ZERO);
+
+    pub const fn diagonal_splat(a: T) -> Self {
+        Self::diagonal(a, a)
+    }
 
     pub const fn diagonal(a11: T, a22: T) -> Self {
         Self::new(a11, T::ZERO, T::ZERO, a22)

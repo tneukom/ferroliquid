@@ -2,7 +2,7 @@ use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     forces::{Force, Gravity, PlacedForce, Shockwave, Swirl, UniformForce},
     line_drawing::slope_draw_thin_line,
-    math::{arrow::Arrow, point::Point, rect::Rect},
+    math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
     painting::{
         block_painter::BlockPaintingMode,
         gl_texture::GlTexture,
@@ -14,6 +14,8 @@ use crate::{
     widgets::icon_button,
     world::{ForceKey, SaveWorld, World},
 };
+use egui::Vec2;
+use glow::HasContext;
 use std::{
     fs,
     io::{BufReader, BufWriter},
@@ -62,6 +64,7 @@ pub struct EguiApp {
 
     simulation_painter: Arc<Mutex<SimulationPainter>>,
     simulation_painter_settings: SimulationPainterSettings,
+    scene_rect: egui::Rect,
 
     run: bool,
     selected_force: Option<ForceKey>,
@@ -86,6 +89,7 @@ impl EguiApp {
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
             simulation_painter_settings: SimulationPainterSettings::default(),
+            scene_rect: egui::Rect::ZERO,
             run: false,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
             gl,
@@ -199,12 +203,24 @@ impl EguiApp {
         // TODO: Don't clone
         let blocks = self.world.blocks.clone();
 
-        let cb = {
-            egui_glow::CallbackFn::new(move |_info, painter| {
+        let paint_callback = {
+            egui_glow::CallbackFn::new(move |info, painter| {
                 let gl = painter.gl().as_ref();
                 let mut simulation_painter = simulation_painter.lock().unwrap();
 
+                let viewport: Rect<f64> = info.viewport.into();
+                let pixel_viewport: Rect<i32> =
+                    (viewport * info.pixels_per_point as f64).cwise_as();
+                let screen_height = info.screen_size_px[1] as i32;
+
                 unsafe {
+                    gl.viewport(
+                        pixel_viewport.left(),
+                        screen_height - pixel_viewport.height() - pixel_viewport.top(),
+                        pixel_viewport.width(),
+                        pixel_viewport.height(),
+                    );
+
                     simulation_painter.block_painter.draw(
                         gl,
                         &blocks,
@@ -241,6 +257,9 @@ impl EguiApp {
         } else {
             egui::Sense::empty()
         };
+
+        // let scene = egui::Scene::new();
+        // let response = scene.show(ui, &mut self.scene_rect, |ui| {
         let (egui_rect, response) = ui.allocate_exact_size(size.as_f64().into(), sense);
 
         if response.is_pointer_button_down_on()
@@ -274,15 +293,48 @@ impl EguiApp {
 
         let callback = egui::PaintCallback {
             rect: egui_rect,
-            callback: Arc::new(cb),
+            callback: Arc::new(paint_callback),
         };
         ui.painter().add(callback);
+
+        // });
 
         egui_rect
     }
 
+    pub fn handle(
+        ui: &mut egui::Ui,
+        key: egui::Id,
+        egui_position: Point<f64>,
+    ) -> Option<Point<f64>> {
+        // Draw handle
+        let circle = egui::Shape::circle_filled(egui_position.into(), 10.0, egui::Color32::BLUE);
+
+        let response = ui.interact(
+            circle.visual_bounding_rect(),
+            key,
+            egui::Sense::click_and_drag(),
+        );
+        ui.painter().add(circle);
+
+        if response.dragged()
+            && let Some(interact_pointer_pos) = response.interact_pointer_pos()
+        {
+            let egui_dragged_to: Point<f64> = interact_pointer_pos.into();
+            Some(egui_dragged_to)
+        } else {
+            None
+        }
+    }
+
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
         let egui_rect = self.simulation_ui(ui);
+
+        let egui_from_simulation: AffineMap<f64> = AffineMap::new(
+            Matrix2::diagonal_splat(Self::CELL_SIZE as f64),
+            egui_rect.left_top().into(),
+        );
+        let simulation_from_egui = egui_from_simulation.inv();
 
         let now = monotonic_time();
 
@@ -297,8 +349,10 @@ impl EguiApp {
             };
             let image = egui::Image::new(image_source).sense(sense);
 
-            let mut egui_position =
-                egui_rect.left_top() + (Self::CELL_SIZE as f64 * placed_force.position).into();
+            // let mut egui_position =
+            //     egui_rect.left_top() + (Self::CELL_SIZE as f64 * placed_force.position).into();
+            let mut egui_position: egui::Pos2 =
+                (egui_from_simulation * placed_force.position).into();
             let response = ui.put(
                 egui::Rect::from_center_size(egui_position.into(), egui::vec2(64.0, 64.0)),
                 image,
@@ -324,6 +378,60 @@ impl EguiApp {
             }
         }
 
+        // Inflows: A parallelogram with two handles to set the rotation and the speed
+        for (key, inflow) in &mut self.world.inflows {
+            let egui_inflow_rect = egui_from_simulation * inflow.rect();
+
+            let rect_corners = egui_inflow_rect.corners();
+            let egui_corners: Vec<egui::Pos2> = rect_corners
+                .into_iter()
+                .map(|corner| corner.into())
+                .collect();
+            let egui_color: egui::Color32 = inflow.color.into();
+            let stroke = egui::Stroke::new(2.0, egui::Color32::BLACK);
+            let polygon = egui::Shape::convex_polygon(egui_corners, egui_color, stroke);
+            let polygon_bounds = polygon.visual_bounding_rect();
+            ui.painter().add(polygon);
+
+            let response = ui.interact(
+                polygon_bounds,
+                egui::Id::new("inflow").with(key),
+                egui::Sense::click_and_drag(),
+            );
+            if response.dragged() {
+                let egui_drag_delta: Point<f64> = response.drag_delta().into();
+                let simulation_drag_delta = simulation_from_egui.linear * egui_drag_delta;
+                inflow.center = inflow.center + simulation_drag_delta;
+            }
+
+            // Speed/direction handle
+            let speed_handle_center = inflow.center + inflow.direction * inflow.speed / 20.0;
+            if let Some(egui_dragged_to) = Self::handle(
+                ui,
+                egui::Id::new("inflow_direction_handle").with(key),
+                egui_from_simulation * speed_handle_center,
+            ) {
+                let dragged_to = simulation_from_egui * egui_dragged_to;
+                let draw_delta = dragged_to - inflow.center;
+                inflow.direction = draw_delta.normalized();
+                // At most 4 cells per step at 60 fps
+                inflow.speed = (draw_delta.norm() * 20.0).min(60.0 * 3.0);
+                println!("speed: {}", inflow.speed);
+            }
+
+            // Width handle
+            let width_handle_center =
+                inflow.center + inflow.direction.perp_ccw() * 0.5 * inflow.width;
+            if let Some(egui_dragged_to) = Self::handle(
+                ui,
+                egui::Id::new("inflow_width_handle").with(key),
+                egui_from_simulation * width_handle_center,
+            ) {
+                let dragged_to = simulation_from_egui * egui_dragged_to;
+                inflow.width = (dragged_to - inflow.center).norm();
+            }
+        }
+
         // ui.put()
         // egui::Area::new("the_force".into()).show(ui.ctx(), |ui| {
         //     ui.image(image);
@@ -342,8 +450,8 @@ impl eframe::App for EguiApp {
         let inflows: Vec<_> = self
             .world
             .inflows
-            .iter()
-            .map(|inflow| (inflow.rect, inflow.color))
+            .values()
+            .map(|inflow| (inflow.rect(), inflow.color))
             .collect();
 
         // let dt = ctx.input(|input| input.unstable_dt) as f64;

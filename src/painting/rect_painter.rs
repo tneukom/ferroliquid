@@ -1,6 +1,6 @@
 use crate::{
     coordinate_frame::affine_device_from_simulation,
-    math::{rect::Rect, rgba8::Rgba8},
+    math::{parallelogram::Parallelogram, rect::Rect, rgba8::Rgba8},
     painting::{
         gl_buffer::{GlBuffer, GlBufferTarget, GlVertexArrayObject},
         shader::{Shader, VertexAttribDesc},
@@ -65,7 +65,7 @@ impl RectPainter {
     pub unsafe fn draw(
         &mut self,
         gl: &glow::Context,
-        rects: &mut dyn Iterator<Item = (Rect<f64>, Rgba8)>,
+        rects: &mut dyn Iterator<Item = (Parallelogram<f64>, Rgba8)>,
         simulation_bounds: Rect<f64>,
     ) {
         let mut vertices = Vec::new();

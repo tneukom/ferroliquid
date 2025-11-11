@@ -2,6 +2,8 @@ use crate::{
     blocks::Blocks,
     forces::{Force, Gravity, PlacedForce},
     math::{
+        affine_map::AffineMap,
+        parallelogram::Parallelogram,
         point::Point,
         rect::Rect,
         rgba8::{Rgba, Rgba8},
@@ -14,12 +16,32 @@ use slotmap::SlotMap;
 use std::time::Instant;
 
 slotmap::new_key_type! { pub struct ForceKey; }
+slotmap::new_key_type! { pub struct InflowKey; }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Inflow {
-    pub rect: Rect<f64>,
-    pub velocity: Point<f64>,
+    pub center: Point<f64>,
+    /// Unit vector
+    pub direction: Point<f64>,
+    pub width: f64,
+    pub speed: f64,
     pub color: Rgba8,
+}
+
+impl Inflow {
+    pub fn polygon_corners(&self) {}
+
+    pub fn rect(&self) -> Parallelogram<f64> {
+        let dt = 1.0 / 60.0;
+        let length = (self.speed * dt).max(2.0);
+
+        let parallelogram = Parallelogram::new(
+            Point::ZERO,
+            length * self.direction,
+            self.direction.perp_ccw() * self.width,
+        );
+        parallelogram.translated(self.center - parallelogram.center())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,7 +49,7 @@ pub struct World {
     pub simulation: Simulation,
     pub blocks: Blocks,
     pub forces: SlotMap<ForceKey, PlacedForce>,
-    pub inflows: Vec<Inflow>,
+    pub inflows: SlotMap<InflowKey, Inflow>,
     pub settings: SimulationSettings,
 }
 
@@ -53,18 +75,19 @@ impl World {
         //
         // simulation.grid.assign_solid_from_walls(&walls);
 
-        let inflows = vec![
-            Inflow {
-                rect: Rect::low_size(Point(4.0, 4.0), Point(2.0, 2.0)),
-                velocity: Point(20.0, 00.0),
-                color: Rgba(255, 0, 0, 255),
-            },
-            Inflow {
-                rect: Rect::low_size(Point(72.0, 4.0), Point(2.0, 2.0)),
-                velocity: Point(-20.0, 00.0),
-                color: Rgba(0, 255, 0, 255),
-            },
-        ];
+        let mut inflows = SlotMap::with_key();
+        inflows.insert(Inflow {
+            center: Point(40.0, 40.0),
+            direction: Point(1.0, 1.0).normalized(),
+            width: 4.0,
+            speed: 10.0,
+            color: Rgba(255, 0, 0, 255),
+        });
+        // inflows.insert(Inflow {
+        //     rect: Rect::low_size(Point(72.0, 4.0), Point(2.0, 2.0)),
+        //     velocity: Point(-20.0, 00.0),
+        //     color: Rgba(0, 255, 0, 255),
+        // });
 
         let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
         let mut forces = SlotMap::with_key();
@@ -85,9 +108,10 @@ impl World {
 
     pub fn step(&mut self) {
         // Run simulation step
-        for inflow in &self.inflows {
+        for inflow in self.inflows.values() {
+            let velocity = inflow.speed * inflow.direction;
             self.simulation
-                .fill_rectangle(inflow.rect, inflow.velocity, &self.settings);
+                .fill_oriented_rect(inflow.rect(), velocity, &self.settings);
         }
         // for coord in fill_rect.iter_indices() {
         //     self.simulation.fill(coord, velocity);
@@ -95,7 +119,6 @@ impl World {
 
         let time = monotonic_time();
         for placed_force in self.forces.values() {
-            println!("{}", placed_force.position);
             placed_force.force.apply(
                 placed_force.position,
                 &mut self.simulation.particles,
@@ -186,6 +209,6 @@ pub struct SaveWorld {
     pub particles: Vec<SaveParticle>,
     pub blocks: Blocks,
     pub forces: SlotMap<ForceKey, PlacedForce>,
-    pub inflows: Vec<Inflow>,
+    pub inflows: SlotMap<InflowKey, Inflow>,
     pub settings: SimulationSettings,
 }

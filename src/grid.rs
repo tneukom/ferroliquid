@@ -22,7 +22,10 @@ pub struct Grid {
     pub cells_density: Field<f64>,
     pub cells_particle_count: Field<usize>,
     pub cells_type: Field<CellType>,
+
+    /// Index in the list of cells which are fluid
     pub cells_fluid_index: Field<usize>,
+
     pub cells_is_boundary: Field<bool>,
     pub cells_pressure: Field<f64>,
     pub sides: Sides,

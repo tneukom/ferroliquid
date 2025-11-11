@@ -1,7 +1,7 @@
 use crate::{
     grid::Grid,
     interpolator::interpolate_div_free_velocity,
-    math::{point::Point, rect::Rect},
+    math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::Side,
 };
 use serde::{Deserialize, Serialize};
@@ -228,22 +228,21 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn fill_rectangle(
+    pub fn fill_oriented_rect(
         &mut self,
-        rect: Rect<f64>,
+        parallelogram: Parallelogram<f64>,
         velocity: Point<f64>,
         settings: &SimulationSettings,
     ) {
         // Clear all current particles in the given rect
         self.particles
-            .retain(|particle| !rect.contains(particle.position));
+            .retain(|particle| !parallelogram.contains(particle.position));
 
-        let n_fill_particles = (rect.area() * settings.target_density) as i64;
+        let n_fill_particles = (parallelogram.area() * settings.target_density) as i64;
         for _ in 0..n_fill_particles {
-            let position = Point(
-                rect.left() + rect.width() * fastrand::f64(),
-                rect.top() + rect.height() * fastrand::f64(),
-            );
+            let position = parallelogram.origin
+                + fastrand::f64() * parallelogram.u
+                + fastrand::f64() * parallelogram.v;
             self.create_particle(position, velocity);
         }
     }

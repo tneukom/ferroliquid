@@ -1,16 +1,17 @@
+use crate::math::{
+    generic::{FloatNum, Num, SignedNum},
+    matrix2::Matrix2,
+    parallelogram::Parallelogram,
+    point::Point,
+    rect::Rect,
+};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     ops::{Add, Mul},
 };
 
-use crate::math::{
-    generic::{FloatNum, Num},
-    matrix2::Matrix2,
-    point::Point,
-    rect::{Rect, RectBounds},
-};
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AffineMap<T> {
     pub linear: Matrix2<T>,
     pub constant: Point<T>,
@@ -29,6 +30,10 @@ impl<T: Num> AffineMap<T> {
 
     pub const fn translation(translation: Point<T>) -> Self {
         Self::new(Matrix2::ID, translation)
+    }
+
+    pub fn scaling(scale: Point<T>) -> Self {
+        Self::linear(Matrix2::diagonal(scale.x, scale.y))
     }
 
     pub const fn similarity(scale: T, constant: Point<T>) -> Self {
@@ -92,6 +97,10 @@ impl<T: FloatNum> AffineMap<T> {
         )
     }
 
+    pub fn scaling_at(center: Point<T>, scale: Point<T>) -> Self {
+        Self::translation(center) * Self::scaling(scale) * Self::translation(-center)
+    }
+
     // pub fn is_orthogonal(&self) -> bool {
     //     self.linear.is_orthogonal()
     // }
@@ -113,21 +122,6 @@ where
     }
 }
 
-/// The result is the axis aligned bounding rectangle of the true (self * rhs)
-impl<T> Mul<Rect<T>> for AffineMap<T>
-where
-    T: Num,
-{
-    type Output = Rect<T>;
-
-    fn mul(self, rhs: Rect<T>) -> Self::Output {
-        let phi_top_left = self * rhs.top_left();
-        let phi_bottom_left = self * rhs.bottom_left();
-        let phi_top_right = self * rhs.top_right();
-        [phi_top_left, phi_bottom_left, phi_top_right].bounds()
-    }
-}
-
 impl<T> Mul for AffineMap<T>
 where
     T: Copy + Mul<Output = T> + Add<Output = T>,
@@ -139,6 +133,21 @@ where
         Self::Output {
             linear: self.linear * rhs.linear,
             constant: self.linear * rhs.constant + self.constant,
+        }
+    }
+}
+
+impl<T> Mul<Parallelogram<T>> for AffineMap<T>
+where
+    T: SignedNum,
+{
+    type Output = Parallelogram<T>;
+
+    fn mul(self, rhs: Parallelogram<T>) -> Self::Output {
+        Parallelogram {
+            origin: self * rhs.origin,
+            u: self.linear * rhs.u,
+            v: self.linear * rhs.v,
         }
     }
 }

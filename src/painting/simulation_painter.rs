@@ -1,5 +1,5 @@
 use crate::{
-    math::{rect::Rect, rgba8::Rgba8},
+    math::{parallelogram::Parallelogram, rect::Rect, rgba8::Rgba8},
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
@@ -138,7 +138,7 @@ impl SimulationPainter {
         &mut self,
         gl: &glow::Context,
         simulation: &Simulation,
-        inflows: &mut dyn Iterator<Item = (Rect<f64>, Rgba8)>,
+        inflows: impl Iterator<Item = (Parallelogram<f64>, Rgba8)>,
         settings: &SimulationPainterSettings,
     ) {
         // Fill color for inflows
@@ -198,13 +198,13 @@ impl SimulationPainter {
     unsafe fn color_rects(
         &mut self,
         gl: &glow::Context,
-        inflows: &mut dyn Iterator<Item = (Rect<f64>, Rgba8)>,
+        inflows: impl Iterator<Item = (Parallelogram<f64>, Rgba8)>,
     ) {
         self.color_framebuffer_from.bind(gl);
         self.color_framebuffer_from.viewport(gl);
         let mut padded_inflows = inflows
             .into_iter()
-            .map(|(rect, color)| (rect.padded(0.5), color));
+            .map(|(rect, color)| (rect.padded(1.0), color));
         self.rect_painter
             .draw(gl, &mut padded_inflows, self.simulation_bounds.as_f64());
         self.color_framebuffer_from.unbind(gl);

@@ -1,4 +1,6 @@
-use crate::math::{arrow::Arrow, generic::Num, interval::Interval, point::Point};
+use crate::math::{
+    affine_map::AffineMap, arrow::Arrow, generic::Num, interval::Interval, point::Point,
+};
 use itertools::Itertools;
 use num_traits::{AsPrimitive, ConstZero};
 use serde::{Deserialize, Serialize};
@@ -261,6 +263,14 @@ impl<T: Num> Rect<T> {
         iter.into_iter()
             .map(|item| item.bounds())
             .fold(Rect::EMPTY, Rect::bounds_with_rect)
+    }
+
+    /// The result is the axis aligned bounding rectangle of the true (self * rhs)
+    fn transformed_bounds(self, phi: AffineMap<T>) -> Self {
+        let phi_top_left = phi * self.top_left();
+        let phi_bottom_left = phi * self.bottom_left();
+        let phi_top_right = phi * self.top_right();
+        [phi_top_left, phi_bottom_left, phi_top_right].bounds()
     }
 }
 

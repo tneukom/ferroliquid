@@ -7,3 +7,5 @@ pub(crate) mod matrix3;
 pub(crate) mod point;
 pub(crate) mod rect;
 pub(crate) mod rgba8;
+
+pub(crate) mod parallelogram;

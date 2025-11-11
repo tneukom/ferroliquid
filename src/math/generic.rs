@@ -1,6 +1,6 @@
 use num_traits::{ConstOne, ConstZero, Euclid, Float, Inv, Signed};
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
@@ -59,13 +59,42 @@ macro_rules! impl_min_max_primitive {
 impl_min_max_primitive!(f32);
 impl_min_max_primitive!(f64);
 
+pub trait ConstTwo {
+    const TWO: Self;
+}
+
+macro_rules! impl_const_two {
+    ($t: ty, $expr: expr) => {
+        impl ConstTwo for $t {
+            const TWO: Self = $expr;
+        }
+    };
+}
+
+impl_const_two!(f64, 2.0);
+impl_const_two!(f32, 2.0);
+impl_const_two!(i128, 2);
+impl_const_two!(i64, 2);
+impl_const_two!(i32, 2);
+impl_const_two!(i16, 2);
+impl_const_two!(i8, 2);
+impl_const_two!(u128, 2);
+impl_const_two!(u64, 2);
+impl_const_two!(u32, 2);
+impl_const_two!(u16, 2);
+impl_const_two!(u8, 2);
+impl_const_two!(isize, 2);
+impl_const_two!(usize, 2);
+
 pub trait Num:
     Copy
+    + Display
     + Sized
     + Debug
     + PartialOrd
     + ConstZero
     + ConstOne
+    + ConstTwo
     + Add<Output = Self>
     + Sub<Output = Self>
     + Mul<Output = Self>
