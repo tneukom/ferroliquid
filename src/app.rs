@@ -76,7 +76,7 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
-        let bounds = Rect::low_size(Point::ZERO, Point(80, 80));
+        let bounds = Rect::low_size(Point::ZERO, Point(120, 100));
         let world = World::new(bounds);
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);

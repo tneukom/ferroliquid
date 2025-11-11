@@ -115,7 +115,12 @@ impl World {
     pub fn to_save_world(&self) -> SaveWorld {
         SaveWorld {
             bounds: self.bounds(),
-            particles: self.simulation.particles.clone(),
+            particles: self
+                .simulation
+                .particles
+                .iter()
+                .map(SaveParticle::from_particle)
+                .collect(),
             dt: self.simulation.dt,
             blocks: self.blocks.clone(),
             forces: self.forces.clone(),
@@ -126,7 +131,11 @@ impl World {
 
     pub fn from_save_world(save_world: SaveWorld) -> Self {
         let mut simulation = Simulation::new(save_world.bounds, save_world.dt);
-        simulation.particles = save_world.particles;
+        simulation.particles = save_world
+            .particles
+            .iter()
+            .map(SaveParticle::to_particle)
+            .collect();
         Self {
             simulation,
             blocks: save_world.blocks,
@@ -137,11 +146,44 @@ impl World {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct SaveParticle {
+    pub position: Point<i64>,
+    pub previous_position: Point<i64>,
+    pub velocity: Point<i64>,
+}
+
+impl SaveParticle {
+    fn f64_to_fixed_point(p: Point<f64>) -> Point<i64> {
+        Point((p.x * 128.0) as i64, (p.y * 128.0) as i64)
+    }
+
+    fn fixed_point_to_f64(p: Point<i64>) -> Point<f64> {
+        Point(p.x as f64 / 128.0, p.y as f64 / 128.0)
+    }
+
+    pub fn from_particle(particle: &Particle) -> Self {
+        Self {
+            position: Self::f64_to_fixed_point(particle.position),
+            previous_position: Self::f64_to_fixed_point(particle.previous_position),
+            velocity: Self::f64_to_fixed_point(particle.velocity),
+        }
+    }
+
+    pub fn to_particle(&self) -> Particle {
+        Particle {
+            position: Self::fixed_point_to_f64(self.position),
+            previous_position: Self::fixed_point_to_f64(self.previous_position),
+            velocity: Self::fixed_point_to_f64(self.velocity),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveWorld {
     pub bounds: Rect<i64>,
     pub dt: f64,
-    pub particles: Vec<Particle>,
+    pub particles: Vec<SaveParticle>,
     pub blocks: Blocks,
     pub forces: SlotMap<ForceKey, PlacedForce>,
     pub inflows: Vec<Inflow>,
