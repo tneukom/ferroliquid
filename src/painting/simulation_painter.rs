@@ -6,8 +6,8 @@ use crate::{
         block_painter::BlockPainter,
         gl_framebuffer::GlFramebuffer,
         gl_texture::{Filter, GlTexture, TextureFormat},
+        inflow_painter::InflowPainter,
         particle_painter::{ParticlePainter, ParticlePainterSettings},
-        rect_painter::RectPainter,
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
         step_painter::{StepPainter, StepPainterSettings},
         water_painter::{WaterPainter, WaterPainterSettings},
@@ -46,7 +46,7 @@ pub struct SimulationPainter {
     pub color_framebuffer_to: GlFramebuffer,
     pub advect_painter: AdvectPainter,
 
-    pub rect_painter: RectPainter,
+    pub inflow_painter: InflowPainter,
 
     pub water_texture: GlTexture,
     pub water_framebuffer: GlFramebuffer,
@@ -93,7 +93,7 @@ impl SimulationPainter {
         let color_framebuffer_to = GlFramebuffer::with_color_attachments(gl, &[&color_texture_to]);
         let advect_painter = AdvectPainter::new(gl);
 
-        let rect_painter = RectPainter::new(gl);
+        let rect_painter = InflowPainter::new(gl);
 
         let water_texture = new_empty_texture(TextureFormat::RGBA8);
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
@@ -128,7 +128,7 @@ impl SimulationPainter {
             color_texture_to,
             color_framebuffer_to,
             advect_painter,
-            rect_painter,
+            inflow_painter: rect_painter,
             block_painter: wall_painter,
             blit_painter,
         }
@@ -159,7 +159,7 @@ impl SimulationPainter {
 
         self.particle_dots(gl);
 
-        self.color_rects(gl, inflows);
+        self.inflows(gl, inflows);
 
         // Color advection
         self.advect(gl);
@@ -195,7 +195,7 @@ impl SimulationPainter {
         self.particle_dots_framebuffer.unbind(gl);
     }
 
-    unsafe fn color_rects(
+    unsafe fn inflows(
         &mut self,
         gl: &glow::Context,
         inflows: impl Iterator<Item = (Parallelogram<f64>, Rgba8)>,
@@ -205,7 +205,7 @@ impl SimulationPainter {
         let mut padded_inflows = inflows
             .into_iter()
             .map(|(rect, color)| (rect.padded(1.0), color));
-        self.rect_painter
+        self.inflow_painter
             .draw(gl, &mut padded_inflows, self.simulation_bounds.as_f64());
         self.color_framebuffer_from.unbind(gl);
     }

@@ -16,17 +16,17 @@ struct RectVertex {
     pub color: Rgba8,
 }
 
-pub struct RectPainter {
+pub struct InflowPainter {
     shader: Shader,
     array_buffer: GlBuffer<RectVertex>,
     element_buffer: GlBuffer<u32>,
     vertex_array: GlVertexArrayObject,
 }
 
-impl RectPainter {
+impl InflowPainter {
     pub unsafe fn new(gl: &glow::Context) -> Self {
-        let vs_source = include_str!("shaders/rect.vert");
-        let fs_source = include_str!("shaders/rect.frag");
+        let vs_source = include_str!("shaders/inflow.vert");
+        let fs_source = include_str!("shaders/inflow.frag");
         let shader = Shader::from_source(gl, &vs_source, &fs_source);
 
         // Create vertex, index buffers and assign to shader
