@@ -157,7 +157,9 @@ impl Simulation {
             .filter_map(|mut particle| {
                 particle.previous_position = particle.position;
                 let mut position = particle.position;
-                let velocity = Point::ZERO;
+                // If velocity is not defined on the grid the velocity from the previous step is
+                // used.
+                let velocity = particle.velocity;
 
                 debug_assert!(bounds.contains(particle.position));
 

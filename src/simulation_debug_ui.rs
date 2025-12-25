@@ -23,6 +23,7 @@ pub struct SimulationDebugDrawSettings {
     boundary_constant: bool,
     boundary_linear: bool,
     density: bool,
+    defined: bool,
 }
 
 impl Default for SimulationDebugDrawSettings {
@@ -41,6 +42,7 @@ impl Default for SimulationDebugDrawSettings {
             boundary_constant: false,
             boundary_linear: false,
             density: false,
+            defined: false,
         }
     }
 }
@@ -65,6 +67,7 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.boundary_constant, "Boundary Constant");
     ui.checkbox(&mut settings.boundary_linear, "Boundary Linear");
     ui.checkbox(&mut settings.density, "Density");
+    ui.checkbox(&mut settings.defined, "Defined");
 }
 
 pub fn draw_side_field(
@@ -300,6 +303,15 @@ pub fn draw_simulation(
             font.clone(),
             ui_rect,
             &simulation.grid.sides.boundary_linear,
+        );
+    }
+
+    if settings.defined {
+        draw_side_field(
+            painter,
+            font.clone(),
+            ui_rect,
+            &simulation.grid.sides.defined,
         );
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     blocks::Blocks,
-    forces::{Force, Gravity, PlacedForce},
+    forces::{Force, Gravity, PlacedForce, UniformForce},
     inflow::{Inflow, InflowPattern},
     math::{point::Point, rect::Rect, rgba8::Rgba},
     simulation::{Particle, Simulation, SimulationSettings},
@@ -29,7 +29,7 @@ impl World {
         assert_eq!(bounds.height() % 2, 0);
 
         let block_bounds = Rect::low_size(Point::ZERO, bounds.size() / 2);
-        let simulation = Simulation::new(bounds, 1.0 / 60.0);
+        let mut simulation = Simulation::new(bounds, 1.0 / 60.0);
         let blocks = Blocks::new(block_bounds);
 
         // Solid walls
@@ -55,22 +55,25 @@ impl World {
             pattern: InflowPattern::HorizontalStripes,
             pattern_scale: 0.5,
         });
-        // inflows.insert(Inflow {
-        //     rect: Rect::low_size(Point(72.0, 4.0), Point(2.0, 2.0)),
-        //     velocity: Point(-20.0, 00.0),
-        //     color: Rgba(0, 255, 0, 255),
-        // });
 
-        let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
+        // let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
+        // forces.insert(gravity);
         let mut forces = SlotMap::with_key();
-        forces.insert(gravity);
+
+        let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
+        forces.insert(uniform);
+
+        let settings = SimulationSettings::default();
+
+        // For debugging
+        // simulation.fill(Point(20, 20), Point(0.0, 120.0), &settings);
 
         Self {
             simulation,
             blocks,
             forces,
             inflows,
-            settings: SimulationSettings::default(),
+            settings,
         }
     }
 
