@@ -1,6 +1,7 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     forces::{Force, Gravity, PlacedForce, Shockwave, Swirl, UniformForce},
+    inflow::Inflow,
     line_drawing::slope_draw_thin_line,
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
     painting::{
@@ -61,6 +62,15 @@ pub enum Selected {
     Inflow(InflowKey),
 }
 
+impl Selected {
+    pub fn is_some(&self) -> bool {
+        match self {
+            Selected::None => false,
+            _ => true,
+        }
+    }
+}
+
 pub struct EguiApp {
     gl: Arc<glow::Context>,
 
@@ -105,6 +115,57 @@ impl EguiApp {
         }
     }
 
+    pub fn add_remove_widgets_ui(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Add");
+
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("Gravity").clicked() {
+                let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
+                self.world.forces.insert(gravity);
+            }
+
+            if ui.button("Swirl").clicked() {
+                let swirl = PlacedForce::new(Swirl::default(), Point(10.0, 10.0));
+                self.world.forces.insert(swirl);
+            }
+
+            if ui.button("Uniform").clicked() {
+                let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
+                self.world.forces.insert(uniform);
+            }
+
+            if ui.button("Shockwave").clicked() {
+                let shockwave = PlacedForce::new(Shockwave::default(), Point(10.0, 10.0));
+                self.world.forces.insert(shockwave);
+            }
+
+            if ui.button("Inflow").clicked() {
+                let inflow = Inflow {
+                    center: Point(10.0, 10.0),
+                    direction: Point::E_X,
+                    ..Inflow::default()
+                };
+                self.world.inflows.insert(inflow);
+            }
+        });
+
+        if ui
+            .add_enabled(self.selected.is_some(), egui::Button::new("Delete"))
+            .clicked()
+        {
+            match self.selected {
+                Selected::None => {}
+                Selected::Force(key) => {
+                    self.world.forces.remove(key);
+                }
+                Selected::Inflow(key) => {
+                    self.world.inflows.remove(key);
+                }
+            }
+            self.selected = Selected::None;
+        }
+    }
+
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
         self.simulation_debug_window
             .window_toggle(ui, &self.world.simulation);
@@ -132,34 +193,11 @@ impl EguiApp {
             }
         });
 
-        if ui.button("Add Gravity").clicked() {
-            let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
-            self.world.forces.insert(gravity);
-        }
-
-        if ui.button("Add Swirl").clicked() {
-            let swirl = PlacedForce::new(Swirl::default(), Point(10.0, 10.0));
-            self.world.forces.insert(swirl);
-        }
-
-        if ui.button("Add Uniform Force").clicked() {
-            let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
-            self.world.forces.insert(uniform);
-        }
-
-        if ui.button("Add Shockwave").clicked() {
-            let shockwave = PlacedForce::new(Shockwave::default(), Point(10.0, 10.0));
-            self.world.forces.insert(shockwave);
-        }
+        self.add_remove_widgets_ui(ui);
 
         if let Selected::Force(force_key) = self.selected {
             let force = &mut self.world.forces[force_key];
             force.force.settings_ui(ui);
-
-            if ui.button("Delete force").clicked() {
-                self.world.forces.remove(force_key);
-                self.selected = Selected::None;
-            }
         } else if let Selected::Inflow(inflow_key) = self.selected {
             self.world.inflows[inflow_key].settings_ui(ui);
         }

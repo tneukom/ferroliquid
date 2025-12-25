@@ -1,5 +1,10 @@
 use crate::{
-    math::{affine_map::AffineMap, parallelogram::Parallelogram, point::Point, rgba8::Rgba8},
+    math::{
+        affine_map::AffineMap,
+        parallelogram::Parallelogram,
+        point::Point,
+        rgba8::{Rgba, Rgba8},
+    },
     palettes::Palette,
     utils::ReflectEnum,
     widgets::{enum_combo, palette_popup},
@@ -52,6 +57,21 @@ pub struct Inflow {
     pub color_b: Rgba8,
     pub pattern: InflowPattern,
     pub pattern_scale: f64,
+}
+
+impl Default for Inflow {
+    fn default() -> Self {
+        Self {
+            center: Point::ZERO,
+            direction: Point::E_X,
+            width: 5.0,
+            speed: 20.0,
+            color_a: Rgba::RED,
+            color_b: Rgba::YELLOW,
+            pattern: InflowPattern::HorizontalStripes,
+            pattern_scale: 0.5,
+        }
+    }
 }
 
 impl Inflow {
