@@ -1,4 +1,9 @@
-use crate::{math::point::Point, simulation::Particle, utils::ReflectEnum, widgets::enum_combo};
+use crate::{
+    math::{affine_map::AffineMap, point::Point},
+    simulation::Particle,
+    utils::{ReflectEnum, monotonic_time},
+    widgets::enum_combo,
+};
 use num_traits::{Float, FloatConst};
 use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
@@ -273,6 +278,44 @@ impl PlacedForce {
         Self {
             force: force.into(),
             position,
+        }
+    }
+
+    pub fn widget(
+        &mut self,
+        ui: &mut egui::Ui,
+        sense: egui::Sense,
+        selected: &mut bool,
+        egui_from_simulation: AffineMap<f64>,
+    ) {
+        let image_source = self.force.image();
+        let image = egui::Image::new(image_source).sense(sense);
+
+        let egui_position: egui::Pos2 = (egui_from_simulation * self.position).into();
+        let response = ui.put(
+            egui::Rect::from_center_size(egui_position.into(), egui::vec2(64.0, 64.0)),
+            image,
+        );
+
+        if response.dragged() {
+            let simulation_from_egui = egui_from_simulation.inv();
+            let egui_drag_delta: Point<f64> = response.drag_delta().into();
+            let simulation_drag_delta = simulation_from_egui.linear * egui_drag_delta;
+            self.position = self.position + simulation_drag_delta;
+            *selected = true;
+        }
+
+        if response.clicked() {
+            *selected = true;
+            let now = monotonic_time();
+            self.force.trigger(now);
+        }
+
+        // Red circle around selected force
+        if *selected {
+            let stroke = egui::Stroke::new(2.0, egui::Color32::RED);
+            ui.painter()
+                .circle_stroke(response.rect.center(), 32.0, stroke);
         }
     }
 }

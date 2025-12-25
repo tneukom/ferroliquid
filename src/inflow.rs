@@ -135,6 +135,7 @@ impl Inflow {
     pub fn widget(
         &mut self,
         ui: &mut egui::Ui,
+        sense: egui::Sense,
         selected: &mut bool,
         key: impl Hash + Copy,
         egui_from_simulation: AffineMap<f64>,
@@ -151,11 +152,7 @@ impl Inflow {
         let polygon_bounds = polygon.visual_bounding_rect();
         ui.painter().add(polygon);
 
-        let response = ui.interact(
-            polygon_bounds,
-            egui::Id::new("inflow").with(key),
-            egui::Sense::click_and_drag(),
-        );
+        let response = ui.interact(polygon_bounds, egui::Id::new("inflow").with(key), sense);
 
         if response.dragged() {
             let egui_drag_delta: Point<f64> = response.drag_delta().into();

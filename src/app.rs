@@ -22,7 +22,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Tool {
+pub enum Tool {
     Pointer,
     Block(BlockKind),
 }
@@ -81,7 +81,7 @@ pub struct EguiApp {
 
 impl EguiApp {
     const ICON_SIZE: f32 = 20.0;
-    const CELL_SIZE: i64 = 16;
+    pub const CELL_SIZE: i64 = 16;
 
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
@@ -319,52 +319,25 @@ impl EguiApp {
             egui_rect.left_top().into(),
         );
 
-        let now = monotonic_time();
+        let sense = if self.tool == Tool::Pointer {
+            egui::Sense::click_and_drag()
+        } else {
+            egui::Sense::empty()
+        };
 
         // Forces
         for (key, placed_force) in &mut self.world.forces {
-            let image_source = placed_force.force.image();
-            // Only sense drag if tool is Pointer
-            let sense = if self.tool == Tool::Pointer {
-                egui::Sense::click_and_drag()
-            } else {
-                egui::Sense::empty()
-            };
-            let image = egui::Image::new(image_source).sense(sense);
-
-            // let mut egui_position =
-            //     egui_rect.left_top() + (Self::CELL_SIZE as f64 * placed_force.position).into();
-            let mut egui_position: egui::Pos2 =
-                (egui_from_simulation * placed_force.position).into();
-            let response = ui.put(
-                egui::Rect::from_center_size(egui_position.into(), egui::vec2(64.0, 64.0)),
-                image,
-            );
-
-            // Red circle around selected force
-            if Selected::Force(key) == self.selected {
-                let stroke = egui::Stroke::new(2.0, egui::Color32::RED);
-                ui.painter()
-                    .circle_stroke(response.rect.center(), 32.0, stroke);
-            }
-
-            if response.dragged() {
-                egui_position += response.drag_delta();
-                let offset: Point<f64> = (egui_position - egui_rect.left_top()).into();
-                placed_force.position = offset / Self::CELL_SIZE as f64;
+            let mut selected = self.selected == Selected::Force(key);
+            placed_force.widget(ui, sense, &mut selected, egui_from_simulation);
+            if selected {
                 self.selected = Selected::Force(key);
-            }
-
-            if response.clicked() {
-                self.selected = Selected::Force(key);
-                placed_force.force.trigger(now);
             }
         }
 
         // Inflows: A parallelogram with two handles to set the rotation and the speed
         for (key, inflow) in &mut self.world.inflows {
             let mut selected = self.selected == Selected::Inflow(key);
-            inflow.widget(ui, &mut selected, key, egui_from_simulation);
+            inflow.widget(ui, sense, &mut selected, key, egui_from_simulation);
             if selected {
                 self.selected = Selected::Inflow(key);
             }
