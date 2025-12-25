@@ -47,8 +47,34 @@ impl<T: FloatNum> Parallelogram<T> {
         self.origin + self.u * one_half + self.v * one_half
     }
 
+    /// D        C
+    ///   _______
+    ///  /      /
+    /// /______/
+    /// A      B
+    pub fn corner_a(self) -> Point<T> {
+        self.origin
+    }
+
+    pub fn corner_b(self) -> Point<T> {
+        self.origin + self.u
+    }
+
+    pub fn corner_c(self) -> Point<T> {
+        self.origin + self.u + self.v
+    }
+
+    pub fn corner_d(self) -> Point<T> {
+        self.origin + self.v
+    }
+
     pub fn corners(self) -> [Point<T>; 4] {
-        Rect::UNIT.corners().map(|corner| self.phi() * corner)
+        [
+            self.corner_a(),
+            self.corner_b(),
+            self.corner_c(),
+            self.corner_d(),
+        ]
     }
 
     pub fn contains(self, point: Point<T>) -> bool {

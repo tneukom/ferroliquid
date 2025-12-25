@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="127.99999"
+   height="127.99999"
+   viewBox="0 0 33.866664 33.866664"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   sodipodi:docname="patterns.svg"
+   inkscape:export-batch-path="C:\Users\tneuk\dev\ferro_liquid\src\painting\textures"
+   inkscape:export-batch-name=""
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="2.8284271"
+     inkscape:cx="323.85491"
+     inkscape:cy="193.57048"
+     inkscape:window-width="3840"
+     inkscape:window-height="2054"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"
+     showgrid="true">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="33.866665"
+       height="33.866665"
+       id="page2"
+       margin="0"
+       bleed="0"
+       inkscape:label="stripes_horizontal" />
+    <inkscape:page
+       x="43.866665"
+       y="0"
+       width="33.866665"
+       height="33.866665"
+       id="page1"
+       margin="0"
+       bleed="0"
+       inkscape:label="stripes_vertical" />
+    <inkscape:page
+       x="87.73333"
+       y="0"
+       width="33.866665"
+       height="33.866665"
+       id="page3"
+       margin="0"
+       bleed="0"
+       inkscape:label="stripes_diagonal" />
+    <inkscape:grid
+       id="grid3"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="2.1166666"
+       spacingy="2.1166666"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="4"
+       enabled="true"
+       visible="true" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:1.61011;stroke-dasharray:none"
+       id="rect2"
+       width="33.866665"
+       height="16.933332"
+       x="0"
+       y="0"
+       ry="0" />
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:1.61011;stroke-dasharray:none"
+       id="rect2-8"
+       width="33.866665"
+       height="16.933332"
+       x="4.7683716e-07"
+       y="-77.73333"
+       ry="0"
+       transform="rotate(90)" />
+    <path
+       style="fill:#000000;stroke-width:1.323"
+       d="M 87.733329,0 V 8.4666663 L 113.13333,33.866666 H 121.6 V 25.399999 L 96.199996,0 Z"
+       id="path3" />
+    <path
+       style="fill:#000000;stroke-width:1.323"
+       d="m 87.733329,25.399999 c 0,0 8.466667,8.466667 8.466667,8.466667 h -8.466667 z"
+       id="path4" />
+    <path
+       style="fill:#000000;stroke-width:1.323"
+       d="M 113.13333,0 121.6,8.4666663 V 0 Z"
+       id="path5" />
+  </g>
+</svg>

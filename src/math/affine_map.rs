@@ -36,6 +36,10 @@ impl<T: Num> AffineMap<T> {
         Self::linear(Matrix2::diagonal(scale.x, scale.y))
     }
 
+    pub fn uniform_scaling(scale: T) -> Self {
+        Self::linear(Matrix2::diagonal_splat(scale))
+    }
+
     pub const fn similarity(scale: T, constant: Point<T>) -> Self {
         let linear = Matrix2::diagonal(scale, scale);
         Self { linear, constant }

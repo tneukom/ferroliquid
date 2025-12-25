@@ -1,5 +1,5 @@
 use crate::{
-    math::{affine_map::AffineMap, matrix2::Matrix2, matrix3::Matrix3, point::Point},
+    math::{affine_map::AffineMap, matrix2::Matrix2, matrix3::Matrix3, point::Point, rgba8::Rgba8},
     painting::gl_garbage::{GlResource, gl_release},
 };
 use glow::{self, Context, HasContext, UniformLocation};
@@ -347,5 +347,11 @@ impl AssignUniform for i32 {
 impl AssignUniform for bool {
     unsafe fn assign_uniform(gl: &glow::Context, location: &glow::UniformLocation, value: Self) {
         gl.uniform_1_i32(Some(location), if value { 1 } else { 0 });
+    }
+}
+
+impl AssignUniform for Rgba8 {
+    unsafe fn assign_uniform(gl: &Context, location: &UniformLocation, value: Self) {
+        gl.uniform_4_f32_slice(Some(location), &value.to_f32().to_array());
     }
 }

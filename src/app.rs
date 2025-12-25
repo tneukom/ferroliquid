@@ -12,9 +12,8 @@ use crate::{
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::icon_button,
-    world::{ForceKey, SaveWorld, World},
+    world::{ForceKey, InflowKey, SaveWorld, World},
 };
-use egui::Vec2;
 use glow::HasContext;
 use std::{
     fs,
@@ -54,6 +53,14 @@ impl Tool {
     }
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub enum Selected {
+    #[default]
+    None,
+    Force(ForceKey),
+    Inflow(InflowKey),
+}
+
 pub struct EguiApp {
     gl: Arc<glow::Context>,
 
@@ -67,7 +74,7 @@ pub struct EguiApp {
     scene_rect: egui::Rect,
 
     run: bool,
-    selected_force: Option<ForceKey>,
+    selected: Selected,
 
     tool: Tool,
 }
@@ -93,7 +100,7 @@ impl EguiApp {
             run: false,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
             gl,
-            selected_force: None,
+            selected: Selected::None,
             tool: Tool::Pointer,
         }
     }
@@ -145,14 +152,16 @@ impl EguiApp {
             self.world.forces.insert(shockwave);
         }
 
-        if let Some(force_key) = self.selected_force {
+        if let Selected::Force(force_key) = self.selected {
             let force = &mut self.world.forces[force_key];
             force.force.settings_ui(ui);
 
             if ui.button("Delete force").clicked() {
                 self.world.forces.remove(force_key);
-                self.selected_force = None;
+                self.selected = Selected::None;
             }
+        } else if let Selected::Inflow(inflow_key) = self.selected {
+            self.world.inflows[inflow_key].settings_ui(ui);
         }
 
         ui.heading("Simulation Settings");
@@ -302,31 +311,6 @@ impl EguiApp {
         egui_rect
     }
 
-    pub fn handle(
-        ui: &mut egui::Ui,
-        key: egui::Id,
-        egui_position: Point<f64>,
-    ) -> Option<Point<f64>> {
-        // Draw handle
-        let circle = egui::Shape::circle_filled(egui_position.into(), 10.0, egui::Color32::BLUE);
-
-        let response = ui.interact(
-            circle.visual_bounding_rect(),
-            key,
-            egui::Sense::click_and_drag(),
-        );
-        ui.painter().add(circle);
-
-        if response.dragged()
-            && let Some(interact_pointer_pos) = response.interact_pointer_pos()
-        {
-            let egui_dragged_to: Point<f64> = interact_pointer_pos.into();
-            Some(egui_dragged_to)
-        } else {
-            None
-        }
-    }
-
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
         let egui_rect = self.simulation_ui(ui);
 
@@ -334,7 +318,6 @@ impl EguiApp {
             Matrix2::diagonal_splat(Self::CELL_SIZE as f64),
             egui_rect.left_top().into(),
         );
-        let simulation_from_egui = egui_from_simulation.inv();
 
         let now = monotonic_time();
 
@@ -359,7 +342,7 @@ impl EguiApp {
             );
 
             // Red circle around selected force
-            if Some(key) == self.selected_force {
+            if Selected::Force(key) == self.selected {
                 let stroke = egui::Stroke::new(2.0, egui::Color32::RED);
                 ui.painter()
                     .circle_stroke(response.rect.center(), 32.0, stroke);
@@ -369,66 +352,21 @@ impl EguiApp {
                 egui_position += response.drag_delta();
                 let offset: Point<f64> = (egui_position - egui_rect.left_top()).into();
                 placed_force.position = offset / Self::CELL_SIZE as f64;
-                self.selected_force = Some(key);
+                self.selected = Selected::Force(key);
             }
 
             if response.clicked() {
-                self.selected_force = Some(key);
+                self.selected = Selected::Force(key);
                 placed_force.force.trigger(now);
             }
         }
 
         // Inflows: A parallelogram with two handles to set the rotation and the speed
         for (key, inflow) in &mut self.world.inflows {
-            let egui_inflow_rect = egui_from_simulation * inflow.rect();
-
-            let rect_corners = egui_inflow_rect.corners();
-            let egui_corners: Vec<egui::Pos2> = rect_corners
-                .into_iter()
-                .map(|corner| corner.into())
-                .collect();
-            let egui_color: egui::Color32 = inflow.color.into();
-            let stroke = egui::Stroke::new(2.0, egui::Color32::BLACK);
-            let polygon = egui::Shape::convex_polygon(egui_corners, egui_color, stroke);
-            let polygon_bounds = polygon.visual_bounding_rect();
-            ui.painter().add(polygon);
-
-            let response = ui.interact(
-                polygon_bounds,
-                egui::Id::new("inflow").with(key),
-                egui::Sense::click_and_drag(),
-            );
-            if response.dragged() {
-                let egui_drag_delta: Point<f64> = response.drag_delta().into();
-                let simulation_drag_delta = simulation_from_egui.linear * egui_drag_delta;
-                inflow.center = inflow.center + simulation_drag_delta;
-            }
-
-            // Speed/direction handle
-            let speed_handle_center = inflow.center + inflow.direction * inflow.speed / 20.0;
-            if let Some(egui_dragged_to) = Self::handle(
-                ui,
-                egui::Id::new("inflow_direction_handle").with(key),
-                egui_from_simulation * speed_handle_center,
-            ) {
-                let dragged_to = simulation_from_egui * egui_dragged_to;
-                let draw_delta = dragged_to - inflow.center;
-                inflow.direction = draw_delta.normalized();
-                // At most 4 cells per step at 60 fps
-                inflow.speed = (draw_delta.norm() * 20.0).min(60.0 * 3.0);
-                println!("speed: {}", inflow.speed);
-            }
-
-            // Width handle
-            let width_handle_center =
-                inflow.center + inflow.direction.perp_ccw() * 0.5 * inflow.width;
-            if let Some(egui_dragged_to) = Self::handle(
-                ui,
-                egui::Id::new("inflow_width_handle").with(key),
-                egui_from_simulation * width_handle_center,
-            ) {
-                let dragged_to = simulation_from_egui * egui_dragged_to;
-                inflow.width = (dragged_to - inflow.center).norm();
+            let mut selected = self.selected == Selected::Inflow(key);
+            inflow.widget(ui, &mut selected, key, egui_from_simulation);
+            if selected {
+                self.selected = Selected::Inflow(key);
             }
         }
 
@@ -447,22 +385,14 @@ impl EguiApp {
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let inflows: Vec<_> = self
-            .world
-            .inflows
-            .values()
-            .map(|inflow| (inflow.rect(), inflow.color))
-            .collect();
-
-        // let dt = ctx.input(|input| input.unstable_dt) as f64;
-        // let instant = Instant::now();
-
+        let inflows: Vec<_> = self.world.inflows.values().copied().collect();
         unsafe {
             self.simulation_painter.lock().unwrap().paint(
                 &self.gl,
                 &self.world.simulation,
-                &mut inflows.iter().copied(),
+                &inflows,
                 &self.simulation_painter_settings,
+                monotonic_time(),
             );
         }
         // println!("time to render: {}", instant.elapsed().as_secs_f64());

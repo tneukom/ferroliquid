@@ -20,6 +20,13 @@ pub enum Filter {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+pub enum Wrap {
+    ClampToEdge = glow::CLAMP_TO_EDGE,
+    Repeat = glow::REPEAT,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum TextureFormat {
     SRGBA8,
     RGBA8,
@@ -67,7 +74,13 @@ impl TextureFormat {
 
 impl GlTexture {
     /// Does not call glTexImage2d!
-    pub unsafe fn new(gl: &glow::Context, width: i64, height: i64, filter: Filter) -> Self {
+    pub unsafe fn new(
+        gl: &glow::Context,
+        width: i64,
+        height: i64,
+        filter: Filter,
+        wrap: Wrap,
+    ) -> Self {
         let id = gl.create_texture().expect("Failed to create texture");
 
         gl.active_texture(glow::TEXTURE0);
@@ -75,16 +88,8 @@ impl GlTexture {
 
         gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, filter as i32);
         gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, filter as i32);
-        gl.tex_parameter_i32(
-            glow::TEXTURE_2D,
-            glow::TEXTURE_WRAP_S,
-            glow::CLAMP_TO_EDGE as i32,
-        );
-        gl.tex_parameter_i32(
-            glow::TEXTURE_2D,
-            glow::TEXTURE_WRAP_T,
-            glow::CLAMP_TO_EDGE as i32,
-        );
+        gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, wrap as i32);
+        gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, wrap as i32);
 
         GlTexture { id, width, height }
     }
@@ -96,8 +101,9 @@ impl GlTexture {
         height: i64,
         format: TextureFormat,
         filter: Filter,
+        wrap: Wrap,
     ) -> Self {
-        let mut texture = Self::new(gl, width, height, filter);
+        let mut texture = Self::new(gl, width, height, filter, wrap);
         texture.texture_image_bytes(gl, format, None);
         texture
     }
@@ -107,14 +113,20 @@ impl GlTexture {
         gl: &glow::Context,
         bitmap: &RgbaField,
         filter: Filter,
+        wrap: Wrap,
     ) -> Self {
-        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter);
+        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter, wrap);
         texture.texture_image_srgba8(gl, bitmap);
         texture
     }
 
-    pub unsafe fn from_rgba_bitmap(gl: &glow::Context, bitmap: &RgbaField, filter: Filter) -> Self {
-        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter);
+    pub unsafe fn from_rgba_bitmap(
+        gl: &glow::Context,
+        bitmap: &RgbaField,
+        filter: Filter,
+        wrap: Wrap,
+    ) -> Self {
+        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter, wrap);
         texture.texture_image_rgba8(gl, bitmap);
         texture
     }

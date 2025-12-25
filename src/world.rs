@@ -1,13 +1,8 @@
 use crate::{
     blocks::Blocks,
     forces::{Force, Gravity, PlacedForce},
-    math::{
-        affine_map::AffineMap,
-        parallelogram::Parallelogram,
-        point::Point,
-        rect::Rect,
-        rgba8::{Rgba, Rgba8},
-    },
+    inflow::{Inflow, InflowPattern},
+    math::{point::Point, rect::Rect, rgba8::Rgba},
     simulation::{Particle, Simulation, SimulationSettings},
     utils::monotonic_time,
 };
@@ -17,32 +12,6 @@ use std::time::Instant;
 
 slotmap::new_key_type! { pub struct ForceKey; }
 slotmap::new_key_type! { pub struct InflowKey; }
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Inflow {
-    pub center: Point<f64>,
-    /// Unit vector
-    pub direction: Point<f64>,
-    pub width: f64,
-    pub speed: f64,
-    pub color: Rgba8,
-}
-
-impl Inflow {
-    pub fn polygon_corners(&self) {}
-
-    pub fn rect(&self) -> Parallelogram<f64> {
-        let dt = 1.0 / 60.0;
-        let length = (self.speed * dt).max(2.0);
-
-        let parallelogram = Parallelogram::new(
-            Point::ZERO,
-            length * self.direction,
-            self.direction.perp_ccw() * self.width,
-        );
-        parallelogram.translated(self.center - parallelogram.center())
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct World {
@@ -81,7 +50,10 @@ impl World {
             direction: Point(1.0, 1.0).normalized(),
             width: 4.0,
             speed: 10.0,
-            color: Rgba(255, 0, 0, 255),
+            color_a: Rgba::RED,
+            color_b: Rgba::YELLOW,
+            pattern: InflowPattern::HorizontalStripes,
+            pattern_scale: 0.5,
         });
         // inflows.insert(Inflow {
         //     rect: Rect::low_size(Point(72.0, 4.0), Point(2.0, 2.0)),

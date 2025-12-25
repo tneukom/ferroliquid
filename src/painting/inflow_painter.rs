@@ -1,29 +1,38 @@
 use crate::{
     coordinate_frame::affine_device_from_simulation,
-    math::{parallelogram::Parallelogram, rect::Rect, rgba8::Rgba8},
+    field::RgbaField,
+    inflow::{Inflow, InflowPattern},
+    math::{affine_map::AffineMap, matrix2::Matrix2, rect::Rect},
     painting::{
         gl_buffer::{GlBuffer, GlBufferTarget, GlVertexArrayObject},
+        gl_texture::{Filter, GlTexture, Wrap},
         shader::{Shader, VertexAttribDesc},
         utils::RECT_TRIANGLE_INDICES,
     },
 };
+use ahash::HashMap;
 use glow::HasContext;
 use std::mem::offset_of;
 
 #[derive(Debug, Clone, Copy)]
-struct RectVertex {
+struct InflowVertex {
     pub position: [f32; 2],
-    pub color: Rgba8,
 }
 
 pub struct InflowPainter {
     shader: Shader,
-    array_buffer: GlBuffer<RectVertex>,
+    array_buffer: GlBuffer<InflowVertex>,
     element_buffer: GlBuffer<u32>,
     vertex_array: GlVertexArrayObject,
+    pattern_textures: HashMap<InflowPattern, GlTexture>,
 }
 
 impl InflowPainter {
+    unsafe fn pattern_texture(gl: &glow::Context, bytes: &[u8]) -> GlTexture {
+        let image = RgbaField::load_from_memory(bytes).unwrap();
+        GlTexture::from_srgba_bitmap(gl, &image, Filter::Linear, Wrap::Repeat)
+    }
+
     pub unsafe fn new(gl: &glow::Context) -> Self {
         let vs_source = include_str!("shaders/inflow.vert");
         let fs_source = include_str!("shaders/inflow.frag");
@@ -38,51 +47,57 @@ impl InflowPainter {
         array_buffer.bind(gl);
         element_buffer.bind(gl);
 
-        let size = size_of::<RectVertex>();
+        let size = size_of::<InflowVertex>();
         shader.assign_attribute_f32(
             gl,
             "in_simulation_position",
             &VertexAttribDesc::VEC2,
-            offset_of!(RectVertex, position) as i32,
+            offset_of!(InflowVertex, position) as i32,
             size as i32,
         );
-        shader.assign_attribute_f32(
-            gl,
-            "in_color",
-            &VertexAttribDesc::RGBA8,
-            offset_of!(RectVertex, color) as i32,
-            size as i32,
-        );
+
+        let pattern_textures: HashMap<_, _> = [
+            (
+                InflowPattern::Noise,
+                Self::pattern_texture(gl, include_bytes!("textures/inflow_noise.png")),
+            ),
+            (
+                InflowPattern::VerticalStripes,
+                Self::pattern_texture(gl, include_bytes!("textures/stripes_vertical.png")),
+            ),
+            (
+                InflowPattern::HorizontalStripes,
+                Self::pattern_texture(gl, include_bytes!("textures/stripes_horizontal.png")),
+            ),
+            (
+                InflowPattern::DiagonalStripes,
+                Self::pattern_texture(gl, include_bytes!("textures/stripes_diagonal.png")),
+            ),
+        ]
+        .into_iter()
+        .collect();
 
         Self {
             shader,
             array_buffer,
             element_buffer,
             vertex_array,
+            pattern_textures,
         }
     }
 
     pub unsafe fn draw(
         &mut self,
         gl: &glow::Context,
-        rects: &mut dyn Iterator<Item = (Parallelogram<f64>, Rgba8)>,
+        inflow: &Inflow,
         simulation_bounds: Rect<f64>,
+        time: f64,
     ) {
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-        for (rect, color) in rects {
-            for index in RECT_TRIANGLE_INDICES {
-                indices.push(index + vertices.len() as u32);
-            }
-
-            for corner in rect.corners() {
-                let vertex = RectVertex {
-                    position: corner.as_f32().to_array(),
-                    color,
-                };
-                vertices.push(vertex);
-            }
-        }
+        let rect = inflow.rect().padded(1.0);
+        let vertices = rect.corners().map(|corner| InflowVertex {
+            position: corner.as_f32().to_array(),
+        });
+        let indices = RECT_TRIANGLE_INDICES;
 
         gl.disable(glow::BLEND);
 
@@ -92,11 +107,38 @@ impl InflowPainter {
 
         self.shader.use_program(gl);
 
+        // Inflow moves in inflow.direction at inflow.speed
+        let simulation_from_inflow = AffineMap::new(
+            Matrix2::orthogonal(inflow.direction),
+            inflow.center + inflow.direction * inflow.speed * time,
+        );
+        let inflow_from_simulation = simulation_from_inflow.inv();
+        let mut uv_from_simulation =
+            AffineMap::uniform_scaling(inflow.pattern_scale) * inflow_from_simulation;
+
+        // Texture lookup is repeating so we can use uv mod 1. We make the translation smaller by
+        // subtracting a multiple of 1 to avoid f32 inaccuracies.
+        uv_from_simulation.constant =
+            uv_from_simulation.constant - uv_from_simulation.constant.round();
+
+        self.shader
+            .uniform(gl, "uv_from_simulation", &uv_from_simulation);
+
         self.shader.uniform(
             gl,
             "device_from_simulation",
             &affine_device_from_simulation(simulation_bounds),
         );
+
+        gl.active_texture(glow::TEXTURE0);
+        gl.bind_texture(
+            glow::TEXTURE_2D,
+            Some(self.pattern_textures[&inflow.pattern].id),
+        );
+        self.shader.uniform(gl, "noise_texture", 0i32);
+
+        self.shader.uniform(gl, "color_a", inflow.color_a);
+        self.shader.uniform(gl, "color_b", inflow.color_b);
 
         gl.draw_elements(
             glow::TRIANGLES,

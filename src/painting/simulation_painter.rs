@@ -1,11 +1,12 @@
 use crate::{
-    math::{parallelogram::Parallelogram, rect::Rect, rgba8::Rgba8},
+    inflow::Inflow,
+    math::rect::Rect,
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
         block_painter::BlockPainter,
         gl_framebuffer::GlFramebuffer,
-        gl_texture::{Filter, GlTexture, TextureFormat},
+        gl_texture::{Filter, GlTexture, TextureFormat, Wrap},
         inflow_painter::InflowPainter,
         particle_painter::{ParticlePainter, ParticlePainterSettings},
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
@@ -62,7 +63,14 @@ impl SimulationPainter {
         const CELL_SIZE: i64 = 8; // in pixels
         let texture_size = simulation_bounds.size() * CELL_SIZE;
         let new_empty_texture = |format: TextureFormat| {
-            GlTexture::empty(gl, texture_size.x, texture_size.y, format, Filter::Linear)
+            GlTexture::empty(
+                gl,
+                texture_size.x,
+                texture_size.y,
+                format,
+                Filter::Linear,
+                Wrap::ClampToEdge,
+            )
         };
 
         let density_texture = new_empty_texture(TextureFormat::R32F);
@@ -138,8 +146,9 @@ impl SimulationPainter {
         &mut self,
         gl: &glow::Context,
         simulation: &Simulation,
-        inflows: impl Iterator<Item = (Parallelogram<f64>, Rgba8)>,
+        inflows: &[Inflow],
         settings: &SimulationPainterSettings,
+        time: f64,
     ) {
         // Fill color for inflows
         if self.i_step != simulation.i_step {
@@ -159,7 +168,7 @@ impl SimulationPainter {
 
         self.particle_dots(gl);
 
-        self.inflows(gl, inflows);
+        self.inflows(gl, inflows, time);
 
         // Color advection
         self.advect(gl);
@@ -195,18 +204,14 @@ impl SimulationPainter {
         self.particle_dots_framebuffer.unbind(gl);
     }
 
-    unsafe fn inflows(
-        &mut self,
-        gl: &glow::Context,
-        inflows: impl Iterator<Item = (Parallelogram<f64>, Rgba8)>,
-    ) {
+    unsafe fn inflows(&mut self, gl: &glow::Context, inflows: &[Inflow], time: f64) {
         self.color_framebuffer_from.bind(gl);
         self.color_framebuffer_from.viewport(gl);
-        let mut padded_inflows = inflows
-            .into_iter()
-            .map(|(rect, color)| (rect.padded(1.0), color));
-        self.inflow_painter
-            .draw(gl, &mut padded_inflows, self.simulation_bounds.as_f64());
+        for inflow in inflows {
+            self.inflow_painter
+                .draw(gl, inflow, self.simulation_bounds.as_f64(), time);
+        }
+
         self.color_framebuffer_from.unbind(gl);
     }
 

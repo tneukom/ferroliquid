@@ -1,6 +1,7 @@
 use crate::{
     field::RgbaField,
     math::{point::Point, rect::Rect, rgba8::Rgba8},
+    palettes::Palette,
     utils::ReflectEnum,
 };
 use cached::proc_macro::cached;
@@ -99,4 +100,50 @@ pub fn enum_choice_buttons<T: Copy + ReflectEnum + Eq>(
         .into_iter()
         .map(|&choice| (choice, choice.as_str()));
     choice_buttons(ui, title, choices, selected)
+}
+
+fn palette_btn_style(ui: &mut egui::Ui) {
+    // 2 pixel padding and spacing
+    ui.style_mut().spacing.button_padding = egui::Vec2::splat(2.0);
+    ui.spacing_mut().item_spacing = egui::Vec2::splat(2.0);
+
+    // Set padding color to same as panel background
+    let padding_fill = ui.style_mut().visuals.panel_fill;
+    ui.style_mut().visuals.widgets.inactive.weak_bg_fill = padding_fill;
+    ui.style_mut().visuals.widgets.active.weak_bg_fill = padding_fill;
+    ui.style_mut().visuals.widgets.noninteractive.weak_bg_fill = padding_fill;
+}
+
+pub fn color_button(ui: &mut egui::Ui, rgba: Rgba8, selected: bool) -> egui::Response {
+    let button = egui::Button::new(()).fill(rgba).selected(selected);
+    ui.add_sized([28.0, 28.0], button)
+}
+
+pub fn palette_widget(ui: &mut egui::Ui, palette: &Palette, rgba: &mut Rgba8) -> bool {
+    let mut color_set = false;
+
+    ui.scope(|ui| {
+        palette_btn_style(ui);
+
+        // 8 colors per row
+        ui.horizontal_wrapped(|ui| {
+            for &choice in &palette.colors {
+                if color_button(ui, choice, choice == *rgba).clicked() {
+                    *rgba = choice;
+                    color_set = true;
+                }
+            }
+        });
+    });
+
+    color_set
+}
+
+pub fn palette_popup(ui: &mut egui::Ui, palette: &Palette, rgba: &mut Rgba8) {
+    let button = egui::Button::new(()).fill(*rgba);
+    let response = ui.add_sized([28.0, 28.0], button);
+
+    egui::Popup::menu(&response).show(|ui| {
+        palette_widget(ui, palette, rgba);
+    });
 }

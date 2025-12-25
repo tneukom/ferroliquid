@@ -104,6 +104,11 @@ impl<T: SignedNum> Matrix2<T> {
     pub fn mirror_y() -> Self {
         Self::diagonal(T::ONE, -T::ONE)
     }
+
+    /// Orthogonal matrix [col1, perp(col1)] and determinant > 0
+    pub fn orthogonal(col1: Point<T>) -> Self {
+        Self::from_cols(col1, col1.perp_ccw())
+    }
 }
 
 impl<T: FloatNum> Matrix2<T> {

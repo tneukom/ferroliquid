@@ -4,7 +4,7 @@ use crate::{
     field::RgbaField,
     math::{point::Point, rect::Rect, rgba8::Rgba8},
     painting::{
-        gl_texture::{Filter, GlTexture},
+        gl_texture::{Filter, GlTexture, Wrap},
         shader::VertexAttribDesc,
         sprite_painter::{SpritePainter, TileSheet},
     },
@@ -67,10 +67,12 @@ impl BlockPainter {
             stride as i32,
         );
 
-        let pen_texture = GlTexture::from_srgba_bitmap(gl, &pen_bitmap, Filter::Linear);
+        let pen_texture =
+            GlTexture::from_srgba_bitmap(gl, &pen_bitmap, Filter::Linear, Wrap::ClampToEdge);
         pen_texture.generate_mipmaps(gl);
 
-        let brush_texture = GlTexture::from_srgba_bitmap(gl, &brush_bitmap, Filter::Linear);
+        let brush_texture =
+            GlTexture::from_srgba_bitmap(gl, &brush_bitmap, Filter::Linear, Wrap::ClampToEdge);
         brush_texture.generate_mipmaps(gl);
 
         Self {
