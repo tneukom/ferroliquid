@@ -4,7 +4,6 @@ use crate::{
     manipulators::{Manipulator, PlacedManipulator, UniformForce},
     math::{point::Point, rect::Rect, rgba8::Rgba},
     simulation::{Particle, Simulation, SimulationSettings},
-    utils::monotonic_time,
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
@@ -29,7 +28,7 @@ impl World {
         assert_eq!(bounds.height() % 2, 0);
 
         let block_bounds = Rect::low_size(Point::ZERO, bounds.size() / 2);
-        let simulation = Simulation::new(bounds, 1.0 / 60.0);
+        let simulation = Simulation::new(bounds);
         let blocks = Blocks::new(block_bounds);
 
         // Solid walls
@@ -81,7 +80,7 @@ impl World {
         self.simulation.grid.bounds
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self, dt: f64) {
         // Run simulation step
         for inflow in self.inflows.values() {
             let velocity = inflow.speed * inflow.direction;
@@ -92,13 +91,12 @@ impl World {
         //     self.simulation.fill(coord, velocity);
         // }
 
-        let time = monotonic_time();
         for placed_manipulator in self.manipulators.values_mut() {
             placed_manipulator.manipulator.apply(
                 placed_manipulator.position,
                 &mut self.simulation.particles,
-                time,
-                self.simulation.dt,
+                self.simulation.time,
+                dt,
             );
         }
 
@@ -106,7 +104,7 @@ impl World {
         let instant = Instant::now();
         self.blocks
             .assign_simulation_grid(&mut self.simulation.grid);
-        self.simulation.step(&self.settings);
+        self.simulation.step(dt, &self.settings);
         println!("time to simulate: {}", instant.elapsed().as_secs_f64());
     }
 
@@ -119,7 +117,6 @@ impl World {
                 .iter()
                 .map(SaveParticle::from_particle)
                 .collect(),
-            dt: self.simulation.dt,
             blocks: self.blocks.clone(),
             manipulators: self.manipulators.clone(),
             inflows: self.inflows.clone(),
@@ -128,7 +125,7 @@ impl World {
     }
 
     pub fn from_save_world(save_world: SaveWorld) -> Self {
-        let mut simulation = Simulation::new(save_world.bounds, save_world.dt);
+        let mut simulation = Simulation::new(save_world.bounds);
         simulation.particles = save_world
             .particles
             .iter()
@@ -180,7 +177,6 @@ impl SaveParticle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveWorld {
     pub bounds: Rect<i64>,
-    pub dt: f64,
     pub particles: Vec<SaveParticle>,
     pub blocks: Blocks,
     pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,

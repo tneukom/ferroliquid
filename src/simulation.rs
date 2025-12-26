@@ -67,20 +67,20 @@ impl Default for SimulationSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Simulation {
     pub i_step: usize,
-    pub dt: f64,
     pub grid: Grid,
     pub particles: Vec<Particle>,
+    pub time: f64,
 }
 
 impl Simulation {
     const PADDING: usize = 1;
 
-    pub fn new(bounds: Rect<i64>, dt: f64) -> Self {
+    pub fn new(bounds: Rect<i64>) -> Self {
         Self {
             i_step: 0,
-            dt,
             grid: Grid::new(bounds),
             particles: Vec::new(),
+            time: 0.0,
         }
     }
 
@@ -126,8 +126,8 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn apply_constant_force(&mut self, force: Point<f64>) {
-        let add = self.dt * force;
+    pub fn apply_constant_force(&mut self, dt: f64, force: Point<f64>) {
+        let add = dt * force;
 
         for particle in &mut self.particles {
             particle.velocity = particle.velocity + add;
@@ -135,10 +135,10 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn integrate(&mut self, steps: usize) {
+    pub fn integrate(&mut self, dt: f64, steps: usize) {
         let _span = tracy_client::span!("integrate");
 
-        let step_dt = self.dt / steps as f64;
+        let step_dt = dt / steps as f64;
         let random_velocity_strength = 0.02;
 
         let bounds = self.grid.bounds.as_f64();
@@ -199,7 +199,7 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn step(&mut self, settings: &SimulationSettings) {
+    pub fn step(&mut self, dt: f64, settings: &SimulationSettings) {
         let _span = tracy_client::span!("step");
 
         self.grid.clear();
@@ -212,12 +212,14 @@ impl Simulation {
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(settings);
 
-        self.integrate(4);
+        self.integrate(dt, 4);
 
         if self.i_step % 32 == 0 {
             self.sort_particles();
         }
         self.i_step += 1;
+
+        self.time += dt;
     }
 
     pub fn fill(&mut self, coord: Point<i64>, velocity: Point<f64>, settings: &SimulationSettings) {

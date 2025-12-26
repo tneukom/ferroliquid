@@ -1,7 +1,7 @@
 use crate::{
     math::{affine_map::AffineMap, point::Point},
     simulation::Particle,
-    utils::{ReflectEnum, monotonic_time},
+    utils::ReflectEnum,
     widgets::enum_combo,
 };
 use num_traits::{Float, FloatConst};
@@ -10,9 +10,15 @@ use std::ops::RangeInclusive;
 
 #[enum_delegate::register]
 pub trait Manipulator {
-    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, time: f64, dt: f64);
+    fn apply(
+        &mut self,
+        center: Point<f64>,
+        particles: &mut Vec<Particle>,
+        simulation_time: f64,
+        dt: f64,
+    );
 
-    fn trigger(&mut self, _time: f64) {}
+    fn trigger(&mut self, _simulation_time: f64) {}
 
     fn image(&self) -> egui::ImageSource<'static>;
 
@@ -35,7 +41,13 @@ impl Default for Gravity {
 }
 
 impl Manipulator for Gravity {
-    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, dt: f64) {
+    fn apply(
+        &mut self,
+        center: Point<f64>,
+        particles: &mut Vec<Particle>,
+        _simulation_time: f64,
+        dt: f64,
+    ) {
         for particle in particles {
             let dir = center - particle.position;
             let r = dir.norm();
@@ -72,7 +84,13 @@ impl Default for Swirl {
 }
 
 impl Manipulator for Swirl {
-    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, dt: f64) {
+    fn apply(
+        &mut self,
+        center: Point<f64>,
+        particles: &mut Vec<Particle>,
+        _simulation_time: f64,
+        dt: f64,
+    ) {
         for particle in particles {
             let dir = center - particle.position;
 
@@ -124,7 +142,13 @@ impl Default for UniformForce {
 }
 
 impl Manipulator for UniformForce {
-    fn apply(&mut self, _center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, dt: f64) {
+    fn apply(
+        &mut self,
+        _center: Point<f64>,
+        particles: &mut Vec<Particle>,
+        _simulation_time: f64,
+        dt: f64,
+    ) {
         for particle in particles {
             let force = self.strength * Point(self.angle.cos(), self.angle.sin());
             particle.velocity += dt * force;
@@ -187,7 +211,7 @@ pub struct Shockwave {
     /// Force is active in an annulus of the given radial width
     pub width: f64,
 
-    pub start_time: f64,
+    pub start_simulation_time: f64,
 
     /// Speed in 1/s
     pub speed: f64,
@@ -201,7 +225,7 @@ impl Default for Shockwave {
     fn default() -> Self {
         Self {
             width: 5.0,
-            start_time: 1e20,
+            start_simulation_time: 1e20,
             speed: 10.0,
             strength: 100.0,
             kind: ShockwaveKind::Constant,
@@ -210,11 +234,17 @@ impl Default for Shockwave {
 }
 
 impl Manipulator for Shockwave {
-    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, time: f64, dt: f64) {
+    fn apply(
+        &mut self,
+        center: Point<f64>,
+        particles: &mut Vec<Particle>,
+        simulation_time: f64,
+        dt: f64,
+    ) {
         for particle in particles {
             let dir = particle.position - center;
             let r = dir.norm();
-            let s = r - (time - self.start_time) * self.speed;
+            let s = r - (simulation_time - self.start_simulation_time) * self.speed;
             let force = self.kind.wave(self.width, s) * self.strength * dir / r;
             particle.velocity += dt * force;
         }
@@ -222,7 +252,7 @@ impl Manipulator for Shockwave {
 
     fn trigger(&mut self, time: f64) {
         println!("Triggered at time {time}");
-        self.start_time = time;
+        self.start_simulation_time = time;
     }
 
     fn image(&self) -> egui::ImageSource<'static> {
@@ -334,6 +364,7 @@ impl PlacedManipulator {
         ui: &mut egui::Ui,
         sense: egui::Sense,
         selected: &mut bool,
+        simulation_time: f64,
         egui_from_simulation: AffineMap<f64>,
     ) {
         let image_source = self.manipulator.image();
@@ -355,8 +386,7 @@ impl PlacedManipulator {
 
         if response.clicked() {
             *selected = true;
-            let now = monotonic_time();
-            self.manipulator.trigger(now);
+            self.manipulator.trigger(simulation_time);
         }
 
         // Red circle around selected force

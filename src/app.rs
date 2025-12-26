@@ -86,6 +86,7 @@ pub struct EguiApp {
     scene_rect: egui::Rect,
 
     run: bool,
+    step_timestamp: Option<f64>,
     selected: Selected,
 
     tool: Tool,
@@ -110,6 +111,7 @@ impl EguiApp {
             simulation_painter_settings: SimulationPainterSettings::default(),
             scene_rect: egui::Rect::ZERO,
             run: false,
+            step_timestamp: None,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
             gl,
             selected: Selected::None,
@@ -173,6 +175,28 @@ impl EguiApp {
         }
     }
 
+    pub fn simulation_step(&mut self) {
+        let timestamp = monotonic_time();
+        let dt = if let Some(step_timestamp) = self.step_timestamp {
+            timestamp - step_timestamp
+        } else {
+            1.0 / 60.0
+        };
+
+        // TODO: Skipping frames doesn't work well with inflows, not clear why
+        // if dt < 1.0 / 120.0 {
+        //     // skip frame
+        //     return;
+        // }
+
+        // Max dt of 1/30s
+        let dt = dt.min(1.0 / 30.0);
+
+        self.world.step(dt);
+
+        self.step_timestamp = Some(timestamp);
+    }
+
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
         self.simulation_debug_window
             .window_toggle(ui, &self.world.simulation);
@@ -180,8 +204,13 @@ impl EguiApp {
         ui.checkbox(&mut self.run, "Run");
         let step_clicked = ui.button("Step").clicked();
 
-        if self.run || step_clicked {
-            self.world.step();
+        if self.run {
+            self.simulation_step();
+        }
+
+        if step_clicked {
+            // Single step at 1/60s dt
+            self.world.step(1.0 / 60.0);
         }
 
         ui.label(format!(
@@ -252,7 +281,6 @@ impl EguiApp {
     pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         let simulation_painter = self.simulation_painter.clone();
         let settings = self.simulation_painter_settings.clone();
-        let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
         let blocks = self.world.blocks.clone();
@@ -373,7 +401,13 @@ impl EguiApp {
         // Manipulators
         for (key, placed_manipulator) in &mut self.world.manipulators {
             let mut selected = self.selected == Selected::Manipulator(key);
-            placed_manipulator.widget(ui, sense, &mut selected, egui_from_simulation);
+            placed_manipulator.widget(
+                ui,
+                sense,
+                &mut selected,
+                self.world.simulation.time,
+                egui_from_simulation,
+            );
             if selected {
                 self.selected = Selected::Manipulator(key);
             }
@@ -410,7 +444,7 @@ impl eframe::App for EguiApp {
                 &self.world.simulation,
                 &inflows,
                 &self.simulation_painter_settings,
-                monotonic_time(),
+                self.world.simulation.time,
             );
         }
         // println!("time to render: {}", instant.elapsed().as_secs_f64());
