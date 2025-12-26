@@ -288,9 +288,9 @@ impl EguiApp {
                         &settings.water,
                     );
 
-                    simulation_painter
-                        .particle_painter
-                        .draw_particle_dots(gl, simulation_bounds);
+                    // simulation_painter
+                    //     .particle_painter
+                    //     .draw_particle_dots(gl, simulation_bounds);
 
                     simulation_painter
                         .block_painter
