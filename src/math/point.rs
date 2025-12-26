@@ -9,7 +9,7 @@ use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
     hash::{Hash, Hasher},
-    ops::{Add, Div, Mul, Neg, Rem, Sub},
+    ops::{Add, AddAssign, Div, Mul, Neg, Rem, Sub, SubAssign},
 };
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
@@ -215,6 +215,15 @@ where
     }
 }
 
+impl<T> AddAssign for Point<T>
+where
+    T: Add<Output = T> + Copy,
+{
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
 impl<T> Add<T> for Point<T>
 where
     T: Add<Output = T> + Copy,
@@ -234,6 +243,15 @@ where
 
     fn sub(self, rhs: Point<T>) -> Self::Output {
         Point::new(self.x - rhs.x, self.y - rhs.y)
+    }
+}
+
+impl<T> SubAssign for Point<T>
+where
+    T: Sub<Output = T> + Copy,
+{
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }
 

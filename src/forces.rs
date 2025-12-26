@@ -9,15 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::ops::RangeInclusive;
 
 #[enum_delegate::register]
-pub trait Force {
-    fn field(&self, center: Point<f64>, p: Point<f64>, time: f64) -> Point<f64>;
-
-    fn apply(&self, center: Point<f64>, particles: &mut [Particle], time: f64, dt: f64) {
-        for particle in particles {
-            let force = self.field(center, particle.position, time);
-            particle.velocity = particle.velocity + dt * force;
-        }
-    }
+pub trait Manipulator {
+    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, time: f64, dt: f64);
 
     fn trigger(&mut self, _time: f64) {}
 
@@ -41,14 +34,16 @@ impl Default for Gravity {
     }
 }
 
-impl Force for Gravity {
-    fn field(&self, center: Point<f64>, p: Point<f64>, _time: f64) -> Point<f64> {
-        let dir = center - p;
-        let r = dir.norm();
-        let s = r.max(self.mass_radius);
-        let f = (self.mass_radius * self.mass_radius * self.mass_radius) / (s * s * s);
-        // For r < mass_radius: f = 1 for r >= mass_radius: f = mass_radius^3 / r^3
-        self.mass_density * f * dir
+impl Manipulator for Gravity {
+    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, dt: f64) {
+        for particle in particles {
+            let dir = center - particle.position;
+            let r = dir.norm();
+            let s = r.max(self.mass_radius);
+            let f = (self.mass_radius * self.mass_radius * self.mass_radius) / (s * s * s);
+            // For r < mass_radius: f = 1 for r >= mass_radius: f = mass_radius^3 / r^3
+            particle.velocity += self.mass_density * f * dir * dt;
+        }
     }
 
     fn image(&self) -> egui::ImageSource<'static> {
@@ -76,27 +71,31 @@ impl Default for Swirl {
     }
 }
 
-impl Force for Swirl {
-    fn field(&self, center: Point<f64>, p: Point<f64>, _time: f64) -> Point<f64> {
-        let dir = center - p;
+impl Manipulator for Swirl {
+    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, dt: f64) {
+        for particle in particles {
+            let dir = center - particle.position;
 
-        // Constant speed
-        let r = dir.norm();
-        if r < 1.0 {
-            Point::ZERO
-        } else if r > self.radius {
-            Point::ZERO
-        } else {
-            self.force * dir.perp_ccw() / r
+            // Constant speed
+            let r = dir.norm();
+            let force = if r < 1.0 {
+                Point::ZERO
+            } else if r > self.radius {
+                Point::ZERO
+            } else {
+                self.force * dir.perp_ccw() / r
+            };
+
+            particle.velocity += dt * force;
+
+            // Speed proportional to r
+            // if dir.norm() > self.radius {
+            //     Point::ZERO
+            // } else {
+            //     let perp = dir.perp_ccw();
+            //     self.speed * perp
+            // }
         }
-
-        // Speed proportional to r
-        // if dir.norm() > self.radius {
-        //     Point::ZERO
-        // } else {
-        //     let perp = dir.perp_ccw();
-        //     self.speed * perp
-        // }
     }
 
     fn image(&self) -> egui::ImageSource<'static> {
@@ -124,9 +123,12 @@ impl Default for UniformForce {
     }
 }
 
-impl Force for UniformForce {
-    fn field(&self, _center: Point<f64>, _p: Point<f64>, _time: f64) -> Point<f64> {
-        self.strength * Point(self.angle.cos(), self.angle.sin())
+impl Manipulator for UniformForce {
+    fn apply(&mut self, _center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, dt: f64) {
+        for particle in particles {
+            let force = self.strength * Point(self.angle.cos(), self.angle.sin());
+            particle.velocity += dt * force;
+        }
     }
 
     fn image(&self) -> egui::ImageSource<'static> {
@@ -207,12 +209,15 @@ impl Default for Shockwave {
     }
 }
 
-impl Force for Shockwave {
-    fn field(&self, center: Point<f64>, p: Point<f64>, time: f64) -> Point<f64> {
-        let dir = p - center;
-        let r = dir.norm();
-        let s = r - (time - self.start_time) * self.speed;
-        self.kind.wave(self.width, s) * self.strength * dir / r
+impl Manipulator for Shockwave {
+    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, time: f64, dt: f64) {
+        for particle in particles {
+            let dir = particle.position - center;
+            let r = dir.norm();
+            let s = r - (time - self.start_time) * self.speed;
+            let force = self.kind.wave(self.width, s) * self.strength * dir / r;
+            particle.velocity += dt * force;
+        }
     }
 
     fn trigger(&mut self, time: f64) {
@@ -229,6 +234,48 @@ impl Force for Shockwave {
         labeled_drag_value(ui, "Width:", &mut self.width, 1.0..=20.0, 0.5);
         labeled_drag_value(ui, "Speed:", &mut self.speed, 1.0..=100.0, 1.0);
         labeled_drag_value(ui, "Strength:", &mut self.strength, 1.0..=500.0, 1.0);
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Vacuum {
+    pub radius: f64,
+    pub triggered: bool,
+    pub always_on: bool,
+}
+
+impl Default for Vacuum {
+    fn default() -> Self {
+        Self {
+            radius: 10.0,
+            triggered: false,
+            always_on: false,
+        }
+    }
+}
+
+impl Manipulator for Vacuum {
+    fn apply(&mut self, center: Point<f64>, particles: &mut Vec<Particle>, _time: f64, _dt: f64) {
+        if self.always_on || self.triggered {
+            particles.retain(|particle| {
+                let r = particle.position.distance(center);
+                r > self.radius
+            });
+        }
+        self.triggered = false;
+    }
+
+    fn trigger(&mut self, _time: f64) {
+        self.triggered = true;
+    }
+
+    fn image(&self) -> egui::ImageSource<'static> {
+        egui::include_image!("force_icons/shockwave.png")
+    }
+
+    fn settings_ui(&mut self, ui: &mut egui::Ui) {
+        labeled_drag_value(ui, "Radius:", &mut self.radius, 1.0..=20.0, 0.5);
+        ui.checkbox(&mut self.always_on, "Always On");
     }
 }
 
@@ -259,24 +306,25 @@ fn labeled_angle_drag_value(ui: &mut egui::Ui, label: &str, angle: &mut f64) {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[enum_delegate::implement(Force)]
-pub enum AnyForce {
+#[enum_delegate::implement(Manipulator)]
+pub enum AnyManipulator {
     Gravity(Gravity),
     Swirl(Swirl),
     UniformForce(UniformForce),
     Shockwave(Shockwave),
+    Vacuum(Vacuum),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlacedForce {
+pub struct PlacedManipulator {
     pub position: Point<f64>,
-    pub force: AnyForce,
+    pub manipulator: AnyManipulator,
 }
 
-impl PlacedForce {
-    pub fn new(force: impl Into<AnyForce>, position: Point<f64>) -> Self {
+impl PlacedManipulator {
+    pub fn new(force: impl Into<AnyManipulator>, position: Point<f64>) -> Self {
         Self {
-            force: force.into(),
+            manipulator: force.into(),
             position,
         }
     }
@@ -288,7 +336,7 @@ impl PlacedForce {
         selected: &mut bool,
         egui_from_simulation: AffineMap<f64>,
     ) {
-        let image_source = self.force.image();
+        let image_source = self.manipulator.image();
         let image = egui::Image::new(image_source).sense(sense);
 
         let egui_position: egui::Pos2 = (egui_from_simulation * self.position).into();
@@ -308,7 +356,7 @@ impl PlacedForce {
         if response.clicked() {
             *selected = true;
             let now = monotonic_time();
-            self.force.trigger(now);
+            self.manipulator.trigger(now);
         }
 
         // Red circle around selected force

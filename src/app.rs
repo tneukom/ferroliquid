@@ -1,6 +1,6 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
-    forces::{Force, Gravity, PlacedForce, Shockwave, Swirl, UniformForce},
+    forces::{Gravity, Manipulator, PlacedManipulator, Shockwave, Swirl, UniformForce, Vacuum},
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
@@ -13,7 +13,7 @@ use crate::{
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::icon_button,
-    world::{ForceKey, InflowKey, SaveWorld, World},
+    world::{InflowKey, ManipulatorKey, SaveWorld, World},
 };
 use glow::HasContext;
 use std::{
@@ -58,7 +58,7 @@ impl Tool {
 pub enum Selected {
     #[default]
     None,
-    Force(ForceKey),
+    Manipulator(ManipulatorKey),
     Inflow(InflowKey),
 }
 
@@ -120,23 +120,28 @@ impl EguiApp {
 
         ui.horizontal_wrapped(|ui| {
             if ui.button("Gravity").clicked() {
-                let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
-                self.world.forces.insert(gravity);
+                let gravity = PlacedManipulator::new(Gravity::default(), Point(10.0, 10.0));
+                self.world.manipulators.insert(gravity);
             }
 
             if ui.button("Swirl").clicked() {
-                let swirl = PlacedForce::new(Swirl::default(), Point(10.0, 10.0));
-                self.world.forces.insert(swirl);
+                let swirl = PlacedManipulator::new(Swirl::default(), Point(10.0, 10.0));
+                self.world.manipulators.insert(swirl);
             }
 
             if ui.button("Uniform").clicked() {
-                let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
-                self.world.forces.insert(uniform);
+                let uniform = PlacedManipulator::new(UniformForce::default(), Point(10.0, 10.0));
+                self.world.manipulators.insert(uniform);
             }
 
             if ui.button("Shockwave").clicked() {
-                let shockwave = PlacedForce::new(Shockwave::default(), Point(10.0, 10.0));
-                self.world.forces.insert(shockwave);
+                let shockwave = PlacedManipulator::new(Shockwave::default(), Point(10.0, 10.0));
+                self.world.manipulators.insert(shockwave);
+            }
+
+            if ui.button("Vacuum").clicked() {
+                let vacuum = PlacedManipulator::new(Vacuum::default(), Point(10.0, 10.0));
+                self.world.manipulators.insert(vacuum);
             }
 
             if ui.button("Inflow").clicked() {
@@ -155,8 +160,8 @@ impl EguiApp {
         {
             match self.selected {
                 Selected::None => {}
-                Selected::Force(key) => {
-                    self.world.forces.remove(key);
+                Selected::Manipulator(key) => {
+                    self.world.manipulators.remove(key);
                 }
                 Selected::Inflow(key) => {
                     self.world.inflows.remove(key);
@@ -195,9 +200,9 @@ impl EguiApp {
 
         self.add_remove_widgets_ui(ui);
 
-        if let Selected::Force(force_key) = self.selected {
-            let force = &mut self.world.forces[force_key];
-            force.force.settings_ui(ui);
+        if let Selected::Manipulator(manipulator_key) = self.selected {
+            let manipulator = &mut self.world.manipulators[manipulator_key];
+            manipulator.manipulator.settings_ui(ui);
         } else if let Selected::Inflow(inflow_key) = self.selected {
             self.world.inflows[inflow_key].settings_ui(ui);
         }
@@ -363,12 +368,12 @@ impl EguiApp {
             egui::Sense::empty()
         };
 
-        // Forces
-        for (key, placed_force) in &mut self.world.forces {
-            let mut selected = self.selected == Selected::Force(key);
-            placed_force.widget(ui, sense, &mut selected, egui_from_simulation);
+        // Manipulators
+        for (key, placed_manipulator) in &mut self.world.manipulators {
+            let mut selected = self.selected == Selected::Manipulator(key);
+            placed_manipulator.widget(ui, sense, &mut selected, egui_from_simulation);
             if selected {
-                self.selected = Selected::Force(key);
+                self.selected = Selected::Manipulator(key);
             }
         }
 

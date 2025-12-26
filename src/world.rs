@@ -1,6 +1,6 @@
 use crate::{
     blocks::Blocks,
-    forces::{Force, Gravity, PlacedForce, UniformForce},
+    forces::{Manipulator, PlacedManipulator, UniformForce},
     inflow::{Inflow, InflowPattern},
     math::{point::Point, rect::Rect, rgba8::Rgba},
     simulation::{Particle, Simulation, SimulationSettings},
@@ -10,14 +10,14 @@ use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use std::time::Instant;
 
-slotmap::new_key_type! { pub struct ForceKey; }
+slotmap::new_key_type! { pub struct ManipulatorKey; }
 slotmap::new_key_type! { pub struct InflowKey; }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct World {
     pub simulation: Simulation,
     pub blocks: Blocks,
-    pub forces: SlotMap<ForceKey, PlacedForce>,
+    pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,
     pub inflows: SlotMap<InflowKey, Inflow>,
     pub settings: SimulationSettings,
 }
@@ -29,7 +29,7 @@ impl World {
         assert_eq!(bounds.height() % 2, 0);
 
         let block_bounds = Rect::low_size(Point::ZERO, bounds.size() / 2);
-        let mut simulation = Simulation::new(bounds, 1.0 / 60.0);
+        let simulation = Simulation::new(bounds, 1.0 / 60.0);
         let blocks = Blocks::new(block_bounds);
 
         // Solid walls
@@ -58,10 +58,10 @@ impl World {
 
         // let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
         // forces.insert(gravity);
-        let mut forces = SlotMap::with_key();
+        let mut manipulators = SlotMap::with_key();
 
-        let uniform = PlacedForce::new(UniformForce::default(), Point(10.0, 10.0));
-        forces.insert(uniform);
+        let uniform = PlacedManipulator::new(UniformForce::default(), Point(10.0, 10.0));
+        manipulators.insert(uniform);
 
         let settings = SimulationSettings::default();
 
@@ -71,7 +71,7 @@ impl World {
         Self {
             simulation,
             blocks,
-            forces,
+            manipulators,
             inflows,
             settings,
         }
@@ -93,9 +93,9 @@ impl World {
         // }
 
         let time = monotonic_time();
-        for placed_force in self.forces.values() {
-            placed_force.force.apply(
-                placed_force.position,
+        for placed_manipulator in self.manipulators.values_mut() {
+            placed_manipulator.manipulator.apply(
+                placed_manipulator.position,
                 &mut self.simulation.particles,
                 time,
                 self.simulation.dt,
@@ -121,7 +121,7 @@ impl World {
                 .collect(),
             dt: self.simulation.dt,
             blocks: self.blocks.clone(),
-            forces: self.forces.clone(),
+            manipulators: self.manipulators.clone(),
             inflows: self.inflows.clone(),
             settings: self.settings.clone(),
         }
@@ -137,7 +137,7 @@ impl World {
         Self {
             simulation,
             blocks: save_world.blocks,
-            forces: save_world.forces,
+            manipulators: save_world.manipulators,
             inflows: save_world.inflows,
             settings: save_world.settings,
         }
@@ -183,7 +183,7 @@ pub struct SaveWorld {
     pub dt: f64,
     pub particles: Vec<SaveParticle>,
     pub blocks: Blocks,
-    pub forces: SlotMap<ForceKey, PlacedForce>,
+    pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,
     pub inflows: SlotMap<InflowKey, Inflow>,
     pub settings: SimulationSettings,
 }
