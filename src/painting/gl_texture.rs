@@ -33,7 +33,9 @@ pub enum TextureFormat {
     R16U,
     R8,
     RGBA32F,
+    RGBA16F,
     R32F,
+    R16F,
 }
 
 impl TextureFormat {
@@ -44,7 +46,9 @@ impl TextureFormat {
             Self::R16U => glow::R16UI,
             Self::R8 => glow::R8,
             Self::RGBA32F => glow::RGBA32F,
+            Self::RGBA16F => glow::RGBA16F,
             Self::R32F => glow::R32F,
+            Self::R16F => glow::R16F,
         }
     }
 
@@ -55,7 +59,9 @@ impl TextureFormat {
             Self::R16U => glow::RED_INTEGER,
             Self::R8 => glow::RED,
             Self::RGBA32F => glow::RGBA,
+            Self::RGBA16F => glow::RGBA,
             Self::R32F => glow::RED,
+            Self::R16F => glow::RED,
         }
     }
 
@@ -67,7 +73,9 @@ impl TextureFormat {
             Self::R16U => glow::UNSIGNED_SHORT,
             Self::R8 => glow::UNSIGNED_BYTE,
             Self::RGBA32F => glow::FLOAT,
+            Self::RGBA16F => glow::FLOAT,
             Self::R32F => glow::FLOAT,
+            Self::R16F => glow::FLOAT,
         }
     }
 }

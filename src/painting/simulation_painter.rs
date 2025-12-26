@@ -61,8 +61,8 @@ pub struct SimulationPainter {
 impl SimulationPainter {
     pub unsafe fn new(gl: &glow::Context, simulation_bounds: Rect<i64>) -> Self {
         const CELL_SIZE: i64 = 8; // in pixels
-        let texture_size = simulation_bounds.size() * CELL_SIZE;
-        let new_empty_texture = |format: TextureFormat| {
+        let new_empty_texture = |format: TextureFormat, cell_size: i64| {
+            let texture_size = simulation_bounds.size() * cell_size;
             GlTexture::empty(
                 gl,
                 texture_size.x,
@@ -73,37 +73,37 @@ impl SimulationPainter {
             )
         };
 
-        let density_texture = new_empty_texture(TextureFormat::R32F);
-        let advection_texture = new_empty_texture(TextureFormat::RGBA32F);
+        let density_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
+        let advection_texture = new_empty_texture(TextureFormat::RGBA16F, CELL_SIZE);
         let particles_framebuffer =
             GlFramebuffer::with_color_attachments(gl, &[&density_texture, &advection_texture]);
-        let particle_dots_texture = new_empty_texture(TextureFormat::RGBA8);
+        let particle_dots_texture = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE);
         let particle_dots_framebuffer =
             GlFramebuffer::with_color_attachments(gl, &[&particle_dots_texture]);
         let particle_painter = ParticlePainter::new(gl);
 
-        let step_texture = new_empty_texture(TextureFormat::R32F);
+        let step_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
         let step_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&step_texture]);
         let step_painter = StepPainter::new(gl);
 
-        let vertical_smoothed_texture = new_empty_texture(TextureFormat::R32F);
+        let vertical_smoothed_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
         let vertical_smoothed_framebuffer =
             GlFramebuffer::with_color_attachments(gl, &[&vertical_smoothed_texture]);
-        let horizontal_smoothed_texture = new_empty_texture(TextureFormat::R32F);
+        let horizontal_smoothed_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
         let horizontal_smoothed_framebuffer =
             GlFramebuffer::with_color_attachments(gl, &[&horizontal_smoothed_texture]);
         let smooth_painter = SmoothPainter::new(gl);
 
-        let color_texture_from = new_empty_texture(TextureFormat::RGBA8);
+        let color_texture_from = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE * 2);
         let color_framebuffer_from =
             GlFramebuffer::with_color_attachments(gl, &[&color_texture_from]);
-        let color_texture_to = new_empty_texture(TextureFormat::RGBA8);
+        let color_texture_to = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE * 2);
         let color_framebuffer_to = GlFramebuffer::with_color_attachments(gl, &[&color_texture_to]);
         let advect_painter = AdvectPainter::new(gl);
 
         let rect_painter = InflowPainter::new(gl);
 
-        let water_texture = new_empty_texture(TextureFormat::RGBA8);
+        let water_texture = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE * 2);
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
