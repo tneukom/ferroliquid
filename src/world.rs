@@ -1,7 +1,7 @@
 use crate::{
     blocks::Blocks,
-    forces::{Manipulator, PlacedManipulator, UniformForce},
     inflow::{Inflow, InflowPattern},
+    manipulators::{Manipulator, PlacedManipulator, UniformForce},
     math::{point::Point, rect::Rect, rgba8::Rgba},
     simulation::{Particle, Simulation, SimulationSettings},
     utils::monotonic_time,

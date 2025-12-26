@@ -1,8 +1,10 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
-    forces::{Gravity, Manipulator, PlacedManipulator, Shockwave, Swirl, UniformForce, Vacuum},
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
+    manipulators::{
+        Gravity, Manipulator, PlacedManipulator, Shockwave, Swirl, UniformForce, Vacuum,
+    },
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
     painting::{
         block_painter::BlockPaintingMode,
