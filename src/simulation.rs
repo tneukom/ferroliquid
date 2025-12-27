@@ -1,6 +1,6 @@
 use crate::{
     grid::Grid,
-    interpolator::interpolate_div_free_velocity,
+    interpolator::{interpolate_div_free_velocity, interpolate_div_free_velocity_bilinear},
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::Side,
 };
@@ -167,8 +167,13 @@ impl Simulation {
                 for _ in 0..steps {
                     debug_assert!(bounds.contains(position));
 
-                    let velocity =
-                        interpolate_div_free_velocity(&self.grid.sides, position, velocity);
+                    // let velocity =
+                    //     interpolate_div_free_velocity(&self.grid.sides, position, velocity);
+                    let velocity = interpolate_div_free_velocity_bilinear(
+                        &self.grid.sides,
+                        position,
+                        velocity,
+                    );
                     debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
 
                     position = position + step_dt * random_velocity_c * velocity;
