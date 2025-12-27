@@ -94,10 +94,13 @@ impl SimulationPainter {
             GlFramebuffer::with_color_attachments(gl, &[&horizontal_smoothed_texture]);
         let smooth_painter = SmoothPainter::new(gl);
 
-        let color_texture_from = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE * 2);
+        // Weird color banding artifacts when using RGBA8 instead of RGBA16. Would it be better
+        // to use RGBA16F? Probably not, we need precision over the [0, 1] not only for small
+        // numbers.
+        let color_texture_from = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
         let color_framebuffer_from =
             GlFramebuffer::with_color_attachments(gl, &[&color_texture_from]);
-        let color_texture_to = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE * 2);
+        let color_texture_to = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
         let color_framebuffer_to = GlFramebuffer::with_color_attachments(gl, &[&color_texture_to]);
         let advect_painter = AdvectPainter::new(gl);
 

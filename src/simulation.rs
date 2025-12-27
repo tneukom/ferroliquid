@@ -92,11 +92,6 @@ impl Simulation {
             let floored_pos = particle.position.floor();
             let coord = floored_pos.as_i64();
 
-            // let alpha_p = ALPHA
-            //     * self.dt
-            //     * 17.0
-            //     * (-0.5 * self.grid.cells_particle_count[coord] as f64).exp();
-            let alpha_p = settings.alpha;
             let fractional_pos = particle.position - floored_pos;
 
             let top_coeff = 1.0 - fractional_pos.y;
@@ -119,8 +114,8 @@ impl Simulation {
                         * bottom_coeff,
             );
 
-            particle.velocity = (1.0 - alpha_p) * particle.velocity
-                + alpha_p * velocity_interpolated
+            particle.velocity = (1.0 - settings.alpha) * particle.velocity
+                + settings.alpha * velocity_interpolated
                 + velocity_correction;
         }
     }

@@ -1,8 +1,8 @@
 #version 300 es
 precision highp float;
 
-layout(location = 0) out float out_density;
-layout(location = 1) out vec4 out_advection;
+layout (location = 0) out float out_density;
+layout (location = 1) out vec4 out_advection;
 
 in vec2 pass_simulation_delta_position;
 
@@ -16,5 +16,5 @@ void main() {
     out_advection = vec4(poly6 * pass_simulation_delta_position, poly6, 0.0);
 
     //linear kernel
-    out_density = max(0.0, 0.5 - length(u));;
+    out_density = max(0.0, 0.5 - length(u));
 }

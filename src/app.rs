@@ -94,7 +94,7 @@ pub struct EguiApp {
 
 impl EguiApp {
     const ICON_SIZE: f32 = 20.0;
-    pub const CELL_SIZE: i64 = 16;
+    pub const CELL_SIZE: i64 = 12;
 
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
@@ -281,6 +281,7 @@ impl EguiApp {
     pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         let simulation_painter = self.simulation_painter.clone();
         let settings = self.simulation_painter_settings.clone();
+        let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
         let blocks = self.world.blocks.clone();

@@ -30,6 +30,7 @@ pub enum Wrap {
 pub enum TextureFormat {
     SRGBA8,
     RGBA8,
+    RGBA16,
     R16U,
     R8,
     RGBA32F,
@@ -43,6 +44,7 @@ impl TextureFormat {
         match self {
             Self::SRGBA8 => glow::SRGB8_ALPHA8,
             Self::RGBA8 => glow::RGBA8,
+            Self::RGBA16 => glow::RGBA16,
             Self::R16U => glow::R16UI,
             Self::R8 => glow::R8,
             Self::RGBA32F => glow::RGBA32F,
@@ -56,6 +58,7 @@ impl TextureFormat {
         match self {
             Self::SRGBA8 => glow::RGBA,
             Self::RGBA8 => glow::RGBA,
+            Self::RGBA16 => glow::RGBA,
             Self::R16U => glow::RED_INTEGER,
             Self::R8 => glow::RED,
             Self::RGBA32F => glow::RGBA,
@@ -70,6 +73,7 @@ impl TextureFormat {
         match self {
             Self::SRGBA8 => glow::UNSIGNED_BYTE,
             Self::RGBA8 => glow::UNSIGNED_BYTE,
+            Self::RGBA16 => glow::UNSIGNED_SHORT,
             Self::R16U => glow::UNSIGNED_SHORT,
             Self::R8 => glow::UNSIGNED_BYTE,
             Self::RGBA32F => glow::FLOAT,

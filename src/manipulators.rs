@@ -136,7 +136,7 @@ impl Default for UniformForce {
     fn default() -> Self {
         Self {
             angle: 90.0.to_radians(),
-            strength: 80.0,
+            strength: 120.0,
         }
     }
 }
@@ -161,7 +161,7 @@ impl Manipulator for UniformForce {
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
         labeled_angle_drag_value(ui, "Angle:", &mut self.angle);
-        labeled_drag_value(ui, "Strength:", &mut self.strength, 0.0..=100.0, 0.5);
+        labeled_drag_value(ui, "Strength:", &mut self.strength, 0.0..=200.0, 1.0);
     }
 }
 
