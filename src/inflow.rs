@@ -53,8 +53,11 @@ pub struct Inflow {
     pub width: f64,
     pub speed: f64,
 
+    /// in sRGB color space
     pub color_a: Rgba8,
+    /// in sRGB color space
     pub color_b: Rgba8,
+
     pub pattern: InflowPattern,
     pub pattern_scale: f64,
 }

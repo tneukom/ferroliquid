@@ -104,13 +104,13 @@ impl SimulationPainter {
         let color_framebuffer_to = GlFramebuffer::with_color_attachments(gl, &[&color_texture_to]);
         let advect_painter = AdvectPainter::new(gl);
 
-        let rect_painter = InflowPainter::new(gl);
+        let inflow_painter = InflowPainter::new(gl);
 
-        let water_texture = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE * 2);
+        let water_texture = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
-        let wall_painter = BlockPainter::new(gl);
+        let block_painter = BlockPainter::new(gl);
 
         let blit_painter = BlitPainter::new(gl);
 
@@ -139,8 +139,8 @@ impl SimulationPainter {
             color_texture_to,
             color_framebuffer_to,
             advect_painter,
-            inflow_painter: rect_painter,
-            block_painter: wall_painter,
+            inflow_painter,
+            block_painter,
             blit_painter,
         }
     }

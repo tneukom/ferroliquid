@@ -137,8 +137,22 @@ impl InflowPainter {
         );
         self.shader.uniform(gl, "noise_texture", 0i32);
 
-        self.shader.uniform(gl, "color_a", inflow.color_a);
-        self.shader.uniform(gl, "color_b", inflow.color_b);
+        self.shader.uniform(
+            gl,
+            "color_a",
+            // pass linear RGB
+            inflow.color_a.to_f32().srgb_to_linear().to_array(),
+            // pass sRGB
+            // inflow.color_a.to_f32().to_array(),
+        );
+        self.shader.uniform(
+            gl,
+            "color_b",
+            // pass linear RGB
+            inflow.color_b.to_f32().srgb_to_linear().to_array(),
+            // pass sRGB
+            // inflow.color_b.to_f32().to_array(),
+        );
 
         gl.draw_elements(
             glow::TRIANGLES,

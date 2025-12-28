@@ -350,8 +350,9 @@ impl AssignUniform for bool {
     }
 }
 
-impl AssignUniform for Rgba8 {
-    unsafe fn assign_uniform(gl: &Context, location: &UniformLocation, value: Self) {
-        gl.uniform_4_f32_slice(Some(location), &value.to_f32().to_array());
-    }
-}
+// This is a bad idea, it's not clear if the passed color is linear RGB or sRGB.
+// impl AssignUniform for Rgba8 {
+//     unsafe fn assign_uniform(gl: &Context, location: &UniformLocation, value: Self) {
+//         gl.uniform_4_f32_slice(Some(location), &value.to_f32().to_array());
+//     }
+// }
