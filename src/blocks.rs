@@ -115,8 +115,8 @@ impl Blocks {
     }
 
     /// Panics if coord is not contained in bounds.
-    pub fn set(&mut self, coord: Point<i64>, block: Block) {
-        self.blocks[coord] = Some(block);
+    pub fn set(&mut self, coord: Point<i64>, block: Option<Block>) {
+        self.blocks[coord] = block;
     }
 
     pub fn is_solid(&self, coord: Point<i64>) -> bool {

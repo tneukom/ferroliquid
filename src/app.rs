@@ -27,24 +27,29 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
     Pointer,
-    Block(BlockKind),
+    Block(Option<BlockKind>),
 }
 
 impl Tool {
-    pub fn iter() -> impl Iterator<Item = Self> {
-        [Self::Pointer]
-            .into_iter()
-            .chain(BlockKind::ALL.into_iter().map(Tool::Block))
-    }
+    pub const ALL: [Self; 7] = [
+        Self::Pointer,
+        Self::Block(Some(BlockKind::Square)),
+        Self::Block(Some(BlockKind::L)),
+        Self::Block(Some(BlockKind::L90)),
+        Self::Block(Some(BlockKind::L180)),
+        Self::Block(Some(BlockKind::L270)),
+        Self::Block(None),
+    ];
 
     pub fn egui_icon(self) -> egui::ImageSource<'static> {
         match self {
             Self::Pointer => egui::include_image!("icons/pointer.png"),
-            Self::Block(BlockKind::Square) => egui::include_image!("icons/block_square.png"),
-            Self::Block(BlockKind::L) => egui::include_image!("icons/block_l.png"),
-            Self::Block(BlockKind::L90) => egui::include_image!("icons/block_l90.png"),
-            Self::Block(BlockKind::L180) => egui::include_image!("icons/block_l180.png"),
-            Self::Block(BlockKind::L270) => egui::include_image!("icons/block_l270.png"),
+            Self::Block(Some(BlockKind::Square)) => egui::include_image!("icons/block_square.png"),
+            Self::Block(Some(BlockKind::L)) => egui::include_image!("icons/block_l.png"),
+            Self::Block(Some(BlockKind::L90)) => egui::include_image!("icons/block_l90.png"),
+            Self::Block(Some(BlockKind::L180)) => egui::include_image!("icons/block_l180.png"),
+            Self::Block(Some(BlockKind::L270)) => egui::include_image!("icons/block_l270.png"),
+            Self::Block(None) => egui::include_image!("icons/eraser.png"),
         }
     }
 
@@ -220,7 +225,7 @@ impl EguiApp {
 
         // Tool buttons
         ui.horizontal(|ui| {
-            for tool_choice in Tool::iter() {
+            for tool_choice in Tool::ALL {
                 let button =
                     icon_button(tool_choice.egui_icon(), 24.0).selected(self.tool == tool_choice);
                 if ui.add(button).clicked() {
@@ -281,7 +286,7 @@ impl EguiApp {
     pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         let simulation_painter = self.simulation_painter.clone();
         let settings = self.simulation_painter_settings.clone();
-        let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
+        // let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
 
         // TODO: Don't clone
         let blocks = self.world.blocks.clone();
@@ -367,9 +372,9 @@ impl EguiApp {
 
             for coord in slope_draw_thin_line(arrow) {
                 if self.world.blocks.bounds().contains_index(coord) {
-                    self.world
-                        .blocks
-                        .set(coord, Block::new(block_kind, BlockPalette::BlueGreen));
+                    let block = block_kind
+                        .map(|block_kind| Block::new(block_kind, BlockPalette::BlueGreen));
+                    self.world.blocks.set(coord, block);
                 }
             }
         }

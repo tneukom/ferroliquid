@@ -1,5 +1,5 @@
 use crate::{
-    math::{affine_map::AffineMap, matrix2::Matrix2, matrix3::Matrix3, point::Point, rgba8::Rgba8},
+    math::{affine_map::AffineMap, matrix2::Matrix2, matrix3::Matrix3, point::Point},
     painting::gl_garbage::{GlResource, gl_release},
 };
 use glow::{self, Context, HasContext, UniformLocation};

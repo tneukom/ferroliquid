@@ -1,6 +1,6 @@
 use crate::{
     grid::Grid,
-    interpolator::{interpolate_div_free_velocity, interpolate_div_free_velocity_bilinear},
+    interpolator::interpolate_div_free_velocity_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::Side,
 };
