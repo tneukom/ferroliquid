@@ -161,7 +161,7 @@ impl Manipulator for UniformForce {
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
         labeled_angle_drag_value(ui, "Angle:", &mut self.angle);
-        labeled_drag_value(ui, "Strength:", &mut self.strength, 0.0..=200.0, 1.0);
+        labeled_drag_value(ui, "Strength:", &mut self.strength, 0.0..=500.0, 1.0);
     }
 }
 
