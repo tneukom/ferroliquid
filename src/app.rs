@@ -309,6 +309,12 @@ impl EguiApp {
                         pixel_viewport.height(),
                     );
 
+                    simulation_painter.blit_painter.draw(
+                        gl,
+                        &simulation_painter.background_texture,
+                        true,
+                    );
+
                     simulation_painter.block_painter.draw(
                         gl,
                         &blocks,

@@ -24,6 +24,7 @@ pub enum Filter {
 pub enum Wrap {
     ClampToEdge = glow::CLAMP_TO_EDGE,
     Repeat = glow::REPEAT,
+    MirroredRepeat = glow::MIRRORED_REPEAT,
 }
 
 #[derive(Debug, Clone, Copy)]

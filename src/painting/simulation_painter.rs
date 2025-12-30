@@ -1,4 +1,5 @@
 use crate::{
+    field::RgbaField,
     inflow::Inflow,
     math::rect::Rect,
     painting::{
@@ -56,6 +57,8 @@ pub struct SimulationPainter {
     pub block_painter: BlockPainter,
 
     pub blit_painter: BlitPainter,
+
+    pub background_texture: GlTexture,
 }
 
 impl SimulationPainter {
@@ -114,6 +117,18 @@ impl SimulationPainter {
 
         let blit_painter = BlitPainter::new(gl);
 
+        let background_texture = {
+            let background_bitmap =
+                RgbaField::load_from_memory(include_bytes!("textures/grid_bg.png")).unwrap();
+            // Since the blitter doesn't to conversion to sRGB the texture is linear RGB
+            GlTexture::from_rgba_bitmap(
+                gl,
+                &background_bitmap,
+                Filter::Linear,
+                Wrap::MirroredRepeat,
+            )
+        };
+
         Self {
             i_step: 0,
             simulation_bounds,
@@ -142,6 +157,7 @@ impl SimulationPainter {
             inflow_painter,
             block_painter,
             blit_painter,
+            background_texture,
         }
     }
 

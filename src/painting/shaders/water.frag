@@ -36,7 +36,7 @@ void main() {
     vec3 linear_rgb = darken * color.rgb;
 
     // output sRGB
-    gl_FragColor = vec4(linear_to_srgb(linear_rgb), alpha);
+    gl_FragColor = vec4(linear_to_srgb(linear_rgb), 0.8 * alpha);
 
     // output linear RGB
     // gl_FragColor = vec4(linear_rgb, alpha);
