@@ -349,7 +349,14 @@ impl SimulationDebugWindow {
     }
 
     pub fn window_toggle(&mut self, ui: &mut egui::Ui, simulation: &Simulation) {
-        ui.toggle_value(&mut self.show_window, "Debug Window");
+        // ui.toggle_value(&mut self.show_window, "Debug Window");
+
+        if ui
+            .add(egui::Button::new("Debug Window").selected(self.show_window))
+            .clicked()
+        {
+            self.show_window = !self.show_window;
+        }
 
         egui::Window::new("Debug Window")
             .open(&mut self.show_window)

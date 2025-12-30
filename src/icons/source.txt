@@ -3,5 +3,8 @@ https://github.com/tabler/tabler-icons
 MIT license
 
 https://fonts.google.com/icons
-Use rounded, weight 200
+Use rounded, weight 100
 Apache license
+
+https://lucide.dev/icons
+ISC License

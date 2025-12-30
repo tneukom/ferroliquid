@@ -45,7 +45,7 @@ pub fn icon_button<'a>(icon: egui::ImageSource<'a>, size: f32) -> egui::Button<'
 }
 
 pub fn styled_space(ui: &mut egui::Ui) {
-    ui.add_space(6.0);
+    ui.add_space(12.0);
 }
 
 pub fn enum_combo<T: ReflectEnum + PartialEq + 'static>(

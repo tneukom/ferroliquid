@@ -21,36 +21,41 @@ pub struct SimulationSettings {
 }
 
 impl SimulationSettings {
-    pub fn ui(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new("simulation_settings_grid")
-            .num_columns(2)
-            // .spacing([40.0, 4.0])
-            .striped(true)
-            .show(ui, |ui| {
-                ui.label("Density correction");
-                ui.add(
-                    egui::DragValue::new(&mut self.density_correction_strength)
-                        .range(0.0..=2.0)
-                        .speed(0.01),
-                );
-                ui.end_row();
+    pub fn basic_ui(&mut self, ui: &mut egui::Ui) {
+        ui.scope(|ui| {
+            ui.style_mut().spacing.slider_width = 150.0;
 
-                ui.label("Target density");
-                ui.add(
-                    egui::DragValue::new(&mut self.target_density)
-                        .range(1.0..=16.0)
-                        .speed(0.1),
-                );
-                ui.end_row();
-
+            ui.horizontal(|ui| {
                 ui.label("Viscosity");
-                ui.add(
-                    egui::DragValue::new(&mut self.alpha)
-                        .range(0.0..=1.0)
-                        .speed(0.01),
-                );
-                ui.end_row();
+                ui.add(egui::Slider::new(&mut self.alpha, 0.01..=1.0));
             });
+        });
+
+        // ui.add(
+        //     egui::DragValue::new(&mut self.alpha)
+        //         .range(0.0..=1.0)
+        //         .speed(0.01),
+        // );
+    }
+
+    pub fn advanced_ui(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Density correction");
+            ui.add(
+                egui::DragValue::new(&mut self.density_correction_strength)
+                    .range(0.0..=2.0)
+                    .speed(0.01),
+            );
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Target density");
+            ui.add(
+                egui::DragValue::new(&mut self.target_density)
+                    .range(1.0..=16.0)
+                    .speed(0.1),
+            );
+        });
     }
 }
 

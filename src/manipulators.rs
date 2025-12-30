@@ -261,6 +261,7 @@ impl Manipulator for Shockwave {
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
         enum_combo(ui, "Kind:", &mut self.kind);
+
         labeled_drag_value(ui, "Width:", &mut self.width, 1.0..=20.0, 0.5);
         labeled_drag_value(ui, "Speed:", &mut self.speed, 1.0..=100.0, 1.0);
         labeled_drag_value(ui, "Strength:", &mut self.strength, 1.0..=500.0, 1.0);
@@ -318,7 +319,7 @@ fn labeled_drag_value(
 ) {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(value).range(range).speed(speed));
+        ui.add(egui::Slider::new(value, range).drag_value_speed(speed));
     });
 }
 
