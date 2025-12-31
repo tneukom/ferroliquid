@@ -17,7 +17,7 @@ use crate::{
     widgets::{icon_button, styled_space},
     world::{InflowKey, ManipulatorKey, SaveWorld, World},
 };
-use egui::AtomExt;
+use egui::{AtomExt, Stroke};
 use glow::HasContext;
 use std::{
     fs,
@@ -127,6 +127,48 @@ impl EguiApp {
         }
     }
 
+    pub fn selected_manipulator_ui(&mut self, ui: &mut egui::Ui) {
+        if !self.selected.is_some() {
+            return;
+        }
+
+        // pub const LIGHT_BLUE: Self = Self::from_rgb(0xAD, 0xD8, 0xE6);
+        let frame = egui::Frame::new()
+            // .stroke(Stroke::new(2.0, egui::Color32::BLUE))
+            .fill(egui::Color32::LIGHT_BLUE)
+            .corner_radius(4.0)
+            .inner_margin(4);
+
+        frame.show(ui, |ui| {
+            if let Selected::Manipulator(manipulator_key) = self.selected {
+                let manipulator = &mut self.world.manipulators[manipulator_key];
+                manipulator.manipulator.settings_ui(ui);
+            } else if let Selected::Inflow(inflow_key) = self.selected {
+                self.world.inflows[inflow_key].settings_ui(ui);
+            }
+
+            let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
+            if ui
+                .add_enabled(
+                    self.selected.is_some(),
+                    egui::Button::new((trash_icon, "Delete")),
+                )
+                .clicked()
+            {
+                match self.selected {
+                    Selected::None => {}
+                    Selected::Manipulator(key) => {
+                        self.world.manipulators.remove(key);
+                    }
+                    Selected::Inflow(key) => {
+                        self.world.inflows.remove(key);
+                    }
+                }
+                self.selected = Selected::None;
+            }
+        });
+    }
+
     pub fn manipulators_ui(&mut self, ui: &mut egui::Ui) {
         fn icon_button<T: Manipulator + Default>(ui: &mut egui::Ui, label: &str) -> egui::Response {
             let icon = <T as Default>::default()
@@ -174,32 +216,7 @@ impl EguiApp {
             }
         });
 
-        let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
-        if ui
-            .add_enabled(
-                self.selected.is_some(),
-                egui::Button::new((trash_icon, "Delete")),
-            )
-            .clicked()
-        {
-            match self.selected {
-                Selected::None => {}
-                Selected::Manipulator(key) => {
-                    self.world.manipulators.remove(key);
-                }
-                Selected::Inflow(key) => {
-                    self.world.inflows.remove(key);
-                }
-            }
-            self.selected = Selected::None;
-        }
-
-        if let Selected::Manipulator(manipulator_key) = self.selected {
-            let manipulator = &mut self.world.manipulators[manipulator_key];
-            manipulator.manipulator.settings_ui(ui);
-        } else if let Selected::Inflow(inflow_key) = self.selected {
-            self.world.inflows[inflow_key].settings_ui(ui);
-        }
+        self.selected_manipulator_ui(ui);
     }
 
     pub fn simulation_step(&mut self) {
