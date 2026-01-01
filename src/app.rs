@@ -17,7 +17,7 @@ use crate::{
     widgets::{icon_button, styled_space},
     world::{InflowKey, ManipulatorKey, SaveWorld, World},
 };
-use egui::{AtomExt, Stroke};
+use egui::AtomExt;
 use glow::HasContext;
 use std::{
     fs,
@@ -132,10 +132,11 @@ impl EguiApp {
             return;
         }
 
-        // pub const LIGHT_BLUE: Self = Self::from_rgb(0xAD, 0xD8, 0xE6);
+        // DAE3E6 dae3e6
+        let light_blue = egui::Color32::from_rgb(0xDA, 0xE3, 0xE6);
         let frame = egui::Frame::new()
             // .stroke(Stroke::new(2.0, egui::Color32::BLUE))
-            .fill(egui::Color32::LIGHT_BLUE)
+            .fill(light_blue)
             .corner_radius(4.0)
             .inner_margin(4);
 
@@ -148,11 +149,9 @@ impl EguiApp {
             }
 
             let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
+            let trash_button = egui::Button::new((trash_icon, "Delete"));
             if ui
-                .add_enabled(
-                    self.selected.is_some(),
-                    egui::Button::new((trash_icon, "Delete")),
-                )
+                .add_enabled(self.selected.is_some(), trash_button)
                 .clicked()
             {
                 match self.selected {

@@ -1,4 +1,5 @@
 use crate::{
+    app::EguiApp,
     math::{
         affine_map::AffineMap,
         parallelogram::Parallelogram,
@@ -7,27 +8,39 @@ use crate::{
     },
     palettes::Palette,
     utils::ReflectEnum,
-    widgets::{enum_combo, palette_popup},
+    widgets::palette_popup,
 };
-use egui::epaint;
+use egui::{AtomExt, epaint};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum InflowPattern {
-    Noise,
+    Uniform,
     VerticalStripes,
     HorizontalStripes,
     DiagonalStripes,
+    Noise,
 }
 
 impl InflowPattern {
-    pub const ALL: [Self; 4] = [
-        Self::Noise,
+    pub const ALL: [Self; 5] = [
+        Self::Uniform,
         Self::VerticalStripes,
         Self::HorizontalStripes,
         Self::DiagonalStripes,
+        Self::Noise,
     ];
+
+    pub fn icon(self) -> egui::ImageSource<'static> {
+        match self {
+            Self::Uniform => egui::include_image!("icons/pattern_uniform.png"),
+            Self::Noise => egui::include_image!("icons/pattern_noise.png"),
+            Self::VerticalStripes => egui::include_image!("icons/pattern_stripes_vertical.png"),
+            Self::HorizontalStripes => egui::include_image!("icons/pattern_stripes_horizontal.png"),
+            Self::DiagonalStripes => egui::include_image!("icons/pattern_stripes_diagonal.png"),
+        }
+    }
 }
 
 impl ReflectEnum for InflowPattern {
@@ -37,6 +50,7 @@ impl ReflectEnum for InflowPattern {
 
     fn as_str(self) -> &'static str {
         match self {
+            Self::Uniform => "Uniform",
             Self::Noise => "Noise",
             Self::VerticalStripes => "Vertical Stripes",
             Self::HorizontalStripes => "Horizontal Stripes",
@@ -98,16 +112,30 @@ impl Inflow {
 
     pub fn settings_ui(&mut self, ui: &mut egui::Ui) {
         let palette = &Palette::palettes()[0];
-        palette_popup(ui, palette, &mut self.color_a);
-        palette_popup(ui, palette, &mut self.color_b);
+        ui.horizontal(|ui| {
+            ui.label("Color A:");
+            palette_popup(ui, palette, &mut self.color_a);
+        });
+        ui.horizontal(|ui| {
+            ui.label("Color B:");
+            palette_popup(ui, palette, &mut self.color_b);
+        });
 
-        enum_combo(ui, "Pattern", &mut self.pattern);
+        ui.horizontal(|ui| {
+            ui.label("Pattern:");
 
-        ui.add(
-            egui::DragValue::new(&mut self.pattern_scale)
-                .range(0.1..=2.0)
-                .speed(0.01),
-        );
+            for choice in InflowPattern::ALL {
+                let icon = choice.icon().atom_size(EguiApp::ICON_SIZE);
+                let button = egui::Button::new(icon).selected(choice == self.pattern);
+                if ui.add(button).clicked() {
+                    self.pattern = choice;
+                }
+            }
+        });
+
+        let scale_slider =
+            egui::Slider::new(&mut self.pattern_scale, 0.02..=0.5).drag_value_speed(0.02);
+        ui.add(scale_slider);
     }
 
     pub fn handle(

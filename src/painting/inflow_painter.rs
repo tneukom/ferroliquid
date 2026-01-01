@@ -28,9 +28,20 @@ pub struct InflowPainter {
 }
 
 impl InflowPainter {
-    unsafe fn pattern_texture(gl: &glow::Context, bytes: &[u8]) -> GlTexture {
-        let image = RgbaField::load_from_memory(bytes).unwrap();
-        GlTexture::from_srgba_bitmap(gl, &image, Filter::Linear, Wrap::Repeat)
+    fn pattern_bitmap_bytes(pattern: InflowPattern) -> &'static [u8] {
+        match pattern {
+            InflowPattern::Uniform => include_bytes!("textures/pattern_uniform.png"),
+            InflowPattern::VerticalStripes => {
+                include_bytes!("textures/pattern_stripes_vertical.png")
+            }
+            InflowPattern::HorizontalStripes => {
+                include_bytes!("textures/pattern_stripes_horizontal.png")
+            }
+            InflowPattern::DiagonalStripes => {
+                include_bytes!("textures/pattern_stripes_diagonal.png")
+            }
+            InflowPattern::Noise => include_bytes!("textures/pattern_noise.png"),
+        }
     }
 
     pub unsafe fn new(gl: &glow::Context) -> Self {
@@ -56,26 +67,16 @@ impl InflowPainter {
             size as i32,
         );
 
-        let pattern_textures: HashMap<_, _> = [
-            (
-                InflowPattern::Noise,
-                Self::pattern_texture(gl, include_bytes!("textures/inflow_noise.png")),
-            ),
-            (
-                InflowPattern::VerticalStripes,
-                Self::pattern_texture(gl, include_bytes!("textures/stripes_vertical.png")),
-            ),
-            (
-                InflowPattern::HorizontalStripes,
-                Self::pattern_texture(gl, include_bytes!("textures/stripes_horizontal.png")),
-            ),
-            (
-                InflowPattern::DiagonalStripes,
-                Self::pattern_texture(gl, include_bytes!("textures/stripes_diagonal.png")),
-            ),
-        ]
-        .into_iter()
-        .collect();
+        let pattern_textures = InflowPattern::ALL
+            .into_iter()
+            .map(|pattern| {
+                let bytes = Self::pattern_bitmap_bytes(pattern);
+                let image = RgbaField::load_from_memory(bytes).unwrap();
+                let texture =
+                    GlTexture::from_srgba_bitmap(gl, &image, Filter::Linear, Wrap::Repeat);
+                (pattern, texture)
+            })
+            .collect();
 
         Self {
             shader,
