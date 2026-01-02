@@ -23,6 +23,7 @@ use glow::HasContext;
 use std::{
     fs,
     io::{BufReader, BufWriter},
+    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -133,7 +134,6 @@ impl EguiApp {
             return;
         }
 
-        // DAE3E6 dae3e6
         let light_blue = egui::Color32::from_rgb(0xDA, 0xE3, 0xE6);
         let frame = egui::Frame::new()
             // .stroke(Stroke::new(2.0, egui::Color32::BLUE))
@@ -245,21 +245,20 @@ impl EguiApp {
         self.step_timestamp = Some(timestamp);
     }
 
-    pub fn save(&self) {
+    pub fn save(&self, path: impl AsRef<Path>) {
         // Get color image
         let simulation_painter = self.simulation_painter.lock().unwrap();
         let color_image = unsafe { simulation_painter.read_water_color(&self.gl) };
         let color_jpeg = color_image.encode_jpeg(95).unwrap();
-
-        // Save as json
         let mut save_world = self.world.to_save_world();
         save_world.color_jpeg = Some(color_jpeg);
 
-        let world_json = serde_json::to_string_pretty(&save_world).unwrap();
-        fs::write("world.json", world_json).expect("Failed to save");
+        // Save as json
+        // let world_json = serde_json::to_string_pretty(&save_world).unwrap();
+        // fs::write("world.json", world_json).expect("Failed to save");
 
         // Save a bincode
-        let file = fs::File::create("world.bin").unwrap();
+        let file = fs::File::create(path).unwrap();
         let mut writer = BufWriter::new(file);
         bincode::serde::encode_into_std_write(
             &save_world,
@@ -269,8 +268,8 @@ impl EguiApp {
         .unwrap();
     }
 
-    pub fn load(&mut self) {
-        let file = fs::File::open("world.bin").unwrap();
+    pub fn load(&mut self, path: impl AsRef<Path>) {
+        let file = fs::File::open(path).unwrap();
         let mut reader = BufReader::new(file);
         let mut save_world: SaveWorld =
             bincode::serde::decode_from_std_read(&mut reader, bincode::config::standard()).unwrap();
@@ -285,18 +284,29 @@ impl EguiApp {
         }
 
         self.world = World::from_save_world(save_world);
+        self.selected = Selected::None;
     }
 
     pub fn save_load_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let save_icon = egui::include_image!("icons/file_save.png").atom_size(Self::ICON_SIZE);
             if ui.button((save_icon, "Save")).clicked() {
-                self.save();
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("bin", &["bin"])
+                    .save_file()
+                {
+                    self.save(path);
+                }
             }
 
             let load_icon = egui::include_image!("icons/file_load.png").atom_size(Self::ICON_SIZE);
             if ui.button((load_icon, "Load")).clicked() {
-                self.load();
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("bin", &["bin"])
+                    .pick_file()
+                {
+                    self.load(path);
+                }
             }
         });
     }
