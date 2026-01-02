@@ -34,10 +34,10 @@ impl Textures {
                 |painter| &painter.horizontal_smoothed_texture,
             ),
             water_texture: TextureWindowOptions::new("Water", |painter| &painter.water_texture),
-            color_texture_to: TextureWindowOptions::new("Color To", |painter| {
+            color_texture_to: TextureWindowOptions::new("Color Scratch", |painter| {
                 &painter.color_texture_scratch
             }),
-            color_texture_from: TextureWindowOptions::new("Color From", |painter| {
+            color_texture_from: TextureWindowOptions::new("Color", |painter| {
                 &painter.color_texture
             }),
         }

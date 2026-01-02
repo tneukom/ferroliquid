@@ -181,6 +181,12 @@ impl SimulationPainter {
 
         self.particle_dots(gl);
 
+        self.step(gl, &settings.step);
+
+        self.smooth_vertical(gl, &settings.smooth);
+
+        self.smooth_horizontal(gl, &settings.smooth);
+
         self.inflows(gl, inflows, time);
 
         // Color advection
@@ -195,12 +201,6 @@ impl SimulationPainter {
                 &mut self.color_framebuffer_scratch,
             );
         }
-
-        self.step(gl, &settings.step);
-
-        self.smooth_vertical(gl, &settings.smooth);
-
-        self.smooth_horizontal(gl, &settings.smooth);
 
         self.water(gl, &settings.water);
 
@@ -291,7 +291,7 @@ impl SimulationPainter {
         self.water_painter.draw(
             gl,
             &self.horizontal_smoothed_texture,
-            &self.color_texture_scratch,
+            &self.color_texture,
             settings,
         );
         self.water_framebuffer.unbind(gl);

@@ -422,7 +422,7 @@ impl EguiApp {
                     simulation_painter.water_painter.draw(
                         gl,
                         &simulation_painter.horizontal_smoothed_texture,
-                        &simulation_painter.color_texture_scratch,
+                        &simulation_painter.color_texture,
                         &settings.water,
                     );
 
