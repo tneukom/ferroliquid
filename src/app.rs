@@ -1,5 +1,6 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
+    field::RgbaField,
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
     manipulators::{
@@ -220,7 +221,7 @@ impl EguiApp {
 
     pub fn simulation_step(&mut self) {
         let timestamp = monotonic_time();
-        let dt = if let Some(step_timestamp) = self.step_timestamp {
+        let mut dt = if let Some(step_timestamp) = self.step_timestamp {
             timestamp - step_timestamp
         } else {
             1.0 / 60.0
@@ -233,41 +234,69 @@ impl EguiApp {
         // }
 
         // Max dt of 1/30s
-        let dt = dt.min(1.0 / 30.0);
+        if dt > 1.0 / 30.0 {
+            // println!("dt: {dt}");
+            dt = 1.0 / 60.0;
+        }
+        // let dt = dt.min(1.0 / 30.0);
 
         self.world.step(dt);
 
         self.step_timestamp = Some(timestamp);
     }
 
+    pub fn save(&self) {
+        // Get color image
+        let simulation_painter = self.simulation_painter.lock().unwrap();
+        let color_image = unsafe { simulation_painter.read_water_color(&self.gl) };
+        let color_jpeg = color_image.encode_jpeg(95).unwrap();
+
+        // Save as json
+        let mut save_world = self.world.to_save_world();
+        save_world.color_jpeg = Some(color_jpeg);
+
+        let world_json = serde_json::to_string_pretty(&save_world).unwrap();
+        fs::write("world.json", world_json).expect("Failed to save");
+
+        // Save a bincode
+        let file = fs::File::create("world.bin").unwrap();
+        let mut writer = BufWriter::new(file);
+        bincode::serde::encode_into_std_write(
+            &save_world,
+            &mut writer,
+            bincode::config::standard(),
+        )
+        .unwrap();
+    }
+
+    pub fn load(&mut self) {
+        let file = fs::File::open("world.bin").unwrap();
+        let mut reader = BufReader::new(file);
+        let mut save_world: SaveWorld =
+            bincode::serde::decode_from_std_read(&mut reader, bincode::config::standard()).unwrap();
+        let mut simulation_painter = self.simulation_painter.lock().unwrap();
+        simulation_painter.reset();
+
+        if let Some(color_jpeg) = save_world.color_jpeg.take() {
+            let color_image = RgbaField::load_from_memory(&color_jpeg).unwrap();
+            unsafe {
+                simulation_painter.write_water_color(&self.gl, &color_image);
+            }
+        }
+
+        self.world = World::from_save_world(save_world);
+    }
+
     pub fn save_load_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let save_icon = egui::include_image!("icons/file_save.png").atom_size(Self::ICON_SIZE);
             if ui.button((save_icon, "Save")).clicked() {
-                // Save as json
-                let save_world = self.world.to_save_world();
-                let world_json = serde_json::to_string_pretty(&save_world).unwrap();
-                fs::write("world.json", world_json).expect("Failed to save");
-
-                // Save a bincode
-                let file = fs::File::create("world.bin").unwrap();
-                let mut writer = BufWriter::new(file);
-                bincode::serde::encode_into_std_write(
-                    &save_world,
-                    &mut writer,
-                    bincode::config::standard(),
-                )
-                .unwrap();
+                self.save();
             }
 
             let load_icon = egui::include_image!("icons/file_load.png").atom_size(Self::ICON_SIZE);
             if ui.button((load_icon, "Load")).clicked() {
-                let file = fs::File::open("world.bin").unwrap();
-                let mut reader = BufReader::new(file);
-                let save_world: SaveWorld =
-                    bincode::serde::decode_from_std_read(&mut reader, bincode::config::standard())
-                        .unwrap();
-                self.world = World::from_save_world(save_world);
+                self.load();
             }
         });
     }
@@ -393,7 +422,7 @@ impl EguiApp {
                     simulation_painter.water_painter.draw(
                         gl,
                         &simulation_painter.horizontal_smoothed_texture,
-                        &simulation_painter.color_texture_to,
+                        &simulation_painter.color_texture_scratch,
                         &settings.water,
                     );
 
@@ -566,7 +595,7 @@ impl eframe::App for EguiApp {
 pub struct TextureWindowOptions {
     pub title: String,
     pub show: bool,
-    pub scale: usize,
+    pub scale: f64,
     pub paint_dots: bool,
     pub get_texture: Arc<dyn Fn(&SimulationPainter) -> &GlTexture + 'static + Send + Sync>,
 }
@@ -579,7 +608,7 @@ impl TextureWindowOptions {
         Self {
             title: title.into(),
             show: false,
-            scale: 1,
+            scale: 1.0,
             paint_dots: false,
             get_texture: Arc::new(get_texture),
         }

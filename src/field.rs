@@ -136,7 +136,7 @@ impl<T> Field<T> {
         self.elems.as_slice()
     }
 
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
+    pub fn as_slice_mut(&mut self) -> &mut [T] {
         self.elems.as_mut_slice()
     }
 
@@ -335,7 +335,7 @@ impl RgbaField {
             PngEncoder::new_with_quality(writer, CompressionType::Best, FilterType::Adaptive);
 
         // Encode the image buffer
-        let bytes = self.as_raw();
+        let bytes = self.as_u8_slice();
         encoder.write_image(
             bytes,
             self.width() as u32,
@@ -346,10 +346,19 @@ impl RgbaField {
         Ok(())
     }
 
-    pub fn to_png(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn encode_png(&self) -> anyhow::Result<Vec<u8>> {
         let mut cursor = Cursor::new(Vec::new());
         self.to_imageio()
             .write_to(&mut cursor, image::ImageFormat::Png)?;
+        Ok(cursor.into_inner())
+    }
+
+    /// Ignores alpha channel
+    pub fn encode_jpeg(&self, quality: u8) -> anyhow::Result<Vec<u8>> {
+        let mut cursor = Cursor::new(Vec::new());
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut cursor, quality);
+        let image = image::DynamicImage::ImageRgba8(self.to_imageio()).to_rgb8();
+        image.write_with_encoder(encoder)?;
         Ok(cursor.into_inner())
     }
 
@@ -361,8 +370,12 @@ impl RgbaField {
         self.is_plain(Rgba8::TRANSPARENT)
     }
 
-    pub fn as_raw(&self) -> &[u8] {
+    pub fn as_u8_slice(&self) -> &[u8] {
         bytemuck::cast_slice(self.as_slice())
+    }
+
+    pub fn as_u8_slice_mut(&mut self) -> &mut [u8] {
+        bytemuck::cast_slice_mut(self.as_slice_mut())
     }
 
     pub fn decode_base64_png(encoded: &str) -> anyhow::Result<Self> {
@@ -377,7 +390,7 @@ impl RgbaField {
     }
 
     pub fn encode_base64_png(&self) -> String {
-        let png = self.to_png().unwrap();
+        let png = self.encode_png().unwrap();
         let base64_png = BASE64.encode(&png);
         format!("{}{}", Self::PNG_URL_HEADER, base64_png)
     }

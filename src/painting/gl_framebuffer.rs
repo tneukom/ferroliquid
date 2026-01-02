@@ -1,4 +1,8 @@
-use crate::{math::point::Point, painting::gl_texture::GlTexture};
+use crate::{
+    field::RgbaField,
+    math::{point::Point, rect::Rect, rgba8::Rgba8},
+    painting::gl_texture::GlTexture,
+};
 use glow::HasContext;
 
 pub struct GlFramebuffer {
@@ -89,5 +93,27 @@ impl GlFramebuffer {
             glow::FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS => "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS",
             _ => "Unknown framebuffer status",
         }
+    }
+
+    pub unsafe fn read_color_attachment0(&self, gl: &glow::Context) -> RgbaField {
+        let bounds = Rect::low_size(Point::ZERO, Point(self.width, self.height));
+        let mut image = RgbaField::filled(bounds, Rgba8::ZERO);
+
+        gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(self.id));
+        gl.read_buffer(glow::COLOR_ATTACHMENT0);
+
+        gl.read_pixels(
+            0,
+            0,
+            self.width as i32,
+            self.height as i32,
+            glow::RGBA,
+            glow::UNSIGNED_BYTE,
+            glow::PixelPackData::Slice(Some(image.as_u8_slice_mut())),
+        );
+
+        gl.bind_framebuffer(glow::READ_FRAMEBUFFER, None);
+
+        image
     }
 }

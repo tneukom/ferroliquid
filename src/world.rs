@@ -121,6 +121,7 @@ impl World {
             manipulators: self.manipulators.clone(),
             inflows: self.inflows.clone(),
             settings: self.settings.clone(),
+            color_jpeg: None,
         }
     }
 
@@ -182,4 +183,5 @@ pub struct SaveWorld {
     pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,
     pub inflows: SlotMap<InflowKey, Inflow>,
     pub settings: SimulationSettings,
+    pub color_jpeg: Option<Vec<u8>>,
 }

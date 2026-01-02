@@ -35,10 +35,10 @@ impl Textures {
             ),
             water_texture: TextureWindowOptions::new("Water", |painter| &painter.water_texture),
             color_texture_to: TextureWindowOptions::new("Color To", |painter| {
-                &painter.color_texture_to
+                &painter.color_texture_scratch
             }),
             color_texture_from: TextureWindowOptions::new("Color From", |painter| {
-                &painter.color_texture_from
+                &painter.color_texture
             }),
         }
     }
@@ -68,7 +68,8 @@ impl RenderDebugUi {
         let size = {
             let simulation_painter = simulation_painter.lock().unwrap();
             let texture = (options.get_texture)(&simulation_painter);
-            options.scale as i64 * texture.size()
+            let pixels_per_point = ui.pixels_per_point() as f64;
+            options.scale as f64 / pixels_per_point * texture.size().as_f64()
         };
 
         let cb = {
@@ -89,7 +90,7 @@ impl RenderDebugUi {
         };
 
         let (egui_rect, _response) =
-            ui.allocate_exact_size(size.as_f64().into(), egui::Sense::click_and_drag());
+            ui.allocate_exact_size(size.into(), egui::Sense::click_and_drag());
 
         let callback = egui::PaintCallback {
             rect: egui_rect,
@@ -114,7 +115,7 @@ impl RenderDebugUi {
                     choice_buttons(
                         ui,
                         Some("Scale:"),
-                        [(1, "1x"), (2, "2x"), (3, "3x")],
+                        [(0.5, "0.5x"), (1.0, "1x"), (2.0, "2x"), (3.0, "3x")],
                         &mut options.scale,
                     );
                 });

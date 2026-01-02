@@ -1,6 +1,6 @@
 use crate::{
     field::{Field, RgbaField},
-    math::{affine_map::AffineMap, point::Point, rect::Rect, rgba8::Rgba8},
+    math::{affine_map::AffineMap, point::Point, rect::Rect},
     painting::gl_garbage::{GlResource, gl_release},
 };
 use bytemuck::{Pod, cast_slice};
@@ -68,21 +68,6 @@ impl TextureFormat {
             Self::R16F => glow::RED,
         }
     }
-
-    /// type
-    pub fn ty(self) -> u32 {
-        match self {
-            Self::SRGBA8 => glow::UNSIGNED_BYTE,
-            Self::RGBA8 => glow::UNSIGNED_BYTE,
-            Self::RGBA16 => glow::UNSIGNED_SHORT,
-            Self::R16U => glow::UNSIGNED_SHORT,
-            Self::R8 => glow::UNSIGNED_BYTE,
-            Self::RGBA32F => glow::FLOAT,
-            Self::RGBA16F => glow::FLOAT,
-            Self::R32F => glow::FLOAT,
-            Self::R16F => glow::FLOAT,
-        }
-    }
 }
 
 impl GlTexture {
@@ -121,26 +106,15 @@ impl GlTexture {
         texture
     }
 
-    /// Bitmap colorspace is assumed to be SRGB
-    pub unsafe fn from_srgba_bitmap(
+    pub unsafe fn from_bitmap(
         gl: &glow::Context,
         bitmap: &RgbaField,
+        format: TextureFormat,
         filter: Filter,
         wrap: Wrap,
     ) -> Self {
         let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter, wrap);
-        texture.texture_image_srgba8(gl, bitmap);
-        texture
-    }
-
-    pub unsafe fn from_rgba_bitmap(
-        gl: &glow::Context,
-        bitmap: &RgbaField,
-        filter: Filter,
-        wrap: Wrap,
-    ) -> Self {
-        let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter, wrap);
-        texture.texture_image_rgba8(gl, bitmap);
+        texture.texture_image_as_bytes(gl, format, bitmap);
         texture
     }
 
@@ -160,12 +134,12 @@ impl GlTexture {
             self.height as i32,
             0,
             format.format(),
-            format.ty(),
+            glow::UNSIGNED_BYTE,
             PixelUnpackData::Slice(bytes),
         );
     }
 
-    pub unsafe fn texture_image_raw<T: Pod>(
+    pub unsafe fn texture_image_as_bytes<T: Pod>(
         &mut self,
         gl: &glow::Context,
         format: TextureFormat,
@@ -178,29 +152,13 @@ impl GlTexture {
         self.texture_image_bytes(gl, format, Some(bitmap_bytes));
     }
 
-    pub unsafe fn texture_image_rgba8(&mut self, gl: &glow::Context, bitmap: &Field<Rgba8>) {
-        self.texture_image_raw(gl, TextureFormat::RGBA8, bitmap);
-    }
-
-    pub unsafe fn texture_image_srgba8(&mut self, gl: &glow::Context, bitmap: &Field<Rgba8>) {
-        self.texture_image_raw(gl, TextureFormat::SRGBA8, bitmap);
-    }
-
-    pub unsafe fn texture_image_red_u16(&mut self, gl: &glow::Context, gray: &Field<u16>) {
-        self.texture_image_raw(gl, TextureFormat::R16U, gray)
-    }
-
-    pub unsafe fn texture_image_red8(&mut self, gl: &glow::Context, gray: &Field<u8>) {
-        self.texture_image_raw(gl, TextureFormat::R8, gray)
-    }
-
     pub unsafe fn generate_mipmaps(&self, gl: &glow::Context) {
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
         gl.generate_mipmap(glow::TEXTURE_2D);
     }
 
-    pub unsafe fn texture_sub_image_raw<T: Pod>(
+    pub unsafe fn texture_sub_image_as_bytes<T: Pod>(
         &mut self,
         gl: &glow::Context,
         format: TextureFormat,
@@ -228,20 +186,10 @@ impl GlTexture {
             texture_rect.width() as i32,
             texture_rect.height() as i32,
             format.format(),
-            format.ty(),
+            glow::UNSIGNED_BYTE,
             PixelUnpackData::Slice(Some(bitmap_bytes)),
         );
         gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, 0);
-    }
-
-    pub unsafe fn texture_sub_image_srgba8(
-        &mut self,
-        gl: &glow::Context,
-        bitmap_rect: Rect<i64>,
-        texture_rect: Rect<i64>,
-        field: &Field<Rgba8>,
-    ) {
-        self.texture_sub_image_raw(gl, TextureFormat::SRGBA8, bitmap_rect, texture_rect, field);
     }
 
     /// Affine map from bitmap coordinates (0,0 at top left) to Gltexture coordinates.

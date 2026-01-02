@@ -5,7 +5,7 @@ use crate::{
     math::{affine_map::AffineMap, matrix2::Matrix2, rect::Rect},
     painting::{
         gl_buffer::{GlBuffer, GlBufferTarget, GlVertexArrayObject},
-        gl_texture::{Filter, GlTexture, Wrap},
+        gl_texture::{Filter, GlTexture, TextureFormat, Wrap},
         shader::{Shader, VertexAttribDesc},
         utils::RECT_TRIANGLE_INDICES,
     },
@@ -72,8 +72,13 @@ impl InflowPainter {
             .map(|pattern| {
                 let bytes = Self::pattern_bitmap_bytes(pattern);
                 let image = RgbaField::load_from_memory(bytes).unwrap();
-                let texture =
-                    GlTexture::from_srgba_bitmap(gl, &image, Filter::Linear, Wrap::Repeat);
+                let texture = GlTexture::from_bitmap(
+                    gl,
+                    &image,
+                    TextureFormat::SRGBA8,
+                    Filter::Linear,
+                    Wrap::Repeat,
+                );
                 (pattern, texture)
             })
             .collect();

@@ -42,10 +42,10 @@ pub struct SimulationPainter {
     pub horizontal_smoothed_framebuffer: GlFramebuffer,
     pub smooth_painter: SmoothPainter,
 
-    pub color_texture_from: GlTexture,
-    pub color_framebuffer_from: GlFramebuffer,
-    pub color_texture_to: GlTexture,
-    pub color_framebuffer_to: GlFramebuffer,
+    pub color_texture: GlTexture,
+    pub color_framebuffer: GlFramebuffer,
+    pub color_texture_scratch: GlTexture,
+    pub color_framebuffer_scratch: GlFramebuffer,
     pub advect_painter: AdvectPainter,
 
     pub inflow_painter: InflowPainter,
@@ -100,11 +100,11 @@ impl SimulationPainter {
         // Weird color banding artifacts when using RGBA8 instead of RGBA16. Would it be better
         // to use RGBA16F? Probably not, we need precision over the [0, 1] not only for small
         // numbers.
-        let color_texture_from = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
-        let color_framebuffer_from =
-            GlFramebuffer::with_color_attachments(gl, &[&color_texture_from]);
-        let color_texture_to = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
-        let color_framebuffer_to = GlFramebuffer::with_color_attachments(gl, &[&color_texture_to]);
+        let color_texture = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
+        let color_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&color_texture]);
+        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
+        let color_framebuffer_scratch =
+            GlFramebuffer::with_color_attachments(gl, &[&color_texture_scratch]);
         let advect_painter = AdvectPainter::new(gl);
 
         let inflow_painter = InflowPainter::new(gl);
@@ -121,9 +121,10 @@ impl SimulationPainter {
             let background_bitmap =
                 RgbaField::load_from_memory(include_bytes!("textures/grid_bg.png")).unwrap();
             // Since the blitter doesn't to conversion to sRGB the texture is linear RGB
-            GlTexture::from_rgba_bitmap(
+            GlTexture::from_bitmap(
                 gl,
                 &background_bitmap,
+                TextureFormat::RGBA8,
                 Filter::Linear,
                 Wrap::MirroredRepeat,
             )
@@ -149,16 +150,20 @@ impl SimulationPainter {
             water_texture,
             water_framebuffer,
             water_painter,
-            color_texture_from,
-            color_framebuffer_from,
-            color_texture_to,
-            color_framebuffer_to,
+            color_texture,
+            color_framebuffer,
+            color_texture_scratch,
+            color_framebuffer_scratch,
             advect_painter,
             inflow_painter,
             block_painter,
             blit_painter,
             background_texture,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.i_step = 0;
     }
 
     pub unsafe fn paint(
@@ -169,17 +174,6 @@ impl SimulationPainter {
         settings: &SimulationPainterSettings,
         time: f64,
     ) {
-        // Fill color for inflows
-        if self.i_step != simulation.i_step {
-            // Swap to and from color framebuffers and textures
-            swap(&mut self.color_texture_from, &mut self.color_texture_to);
-            swap(
-                &mut self.color_framebuffer_from,
-                &mut self.color_framebuffer_to,
-            );
-        }
-        self.i_step = simulation.i_step;
-
         self.particle_painter
             .update_particles(gl, &simulation.particles);
 
@@ -192,6 +186,16 @@ impl SimulationPainter {
         // Color advection
         self.advect(gl);
 
+        if self.i_step != simulation.i_step {
+            println!("swapping color texture & fbo");
+            // Swap to and from color framebuffers and textures
+            swap(&mut self.color_texture, &mut self.color_texture_scratch);
+            swap(
+                &mut self.color_framebuffer,
+                &mut self.color_framebuffer_scratch,
+            );
+        }
+
         self.step(gl, &settings.step);
 
         self.smooth_vertical(gl, &settings.smooth);
@@ -199,6 +203,8 @@ impl SimulationPainter {
         self.smooth_horizontal(gl, &settings.smooth);
 
         self.water(gl, &settings.water);
+
+        self.i_step = simulation.i_step;
     }
 
     unsafe fn particles(&mut self, gl: &glow::Context, settings: &ParticlePainterSettings) {
@@ -224,28 +230,28 @@ impl SimulationPainter {
     }
 
     unsafe fn inflows(&mut self, gl: &glow::Context, inflows: &[Inflow], time: f64) {
-        self.color_framebuffer_from.bind(gl);
-        self.color_framebuffer_from.viewport(gl);
+        self.color_framebuffer.bind(gl);
+        self.color_framebuffer.viewport(gl);
         for inflow in inflows {
             self.inflow_painter
                 .draw(gl, inflow, self.simulation_bounds.as_f64(), time);
         }
 
-        self.color_framebuffer_from.unbind(gl);
+        self.color_framebuffer.unbind(gl);
     }
 
     unsafe fn advect(&mut self, gl: &glow::Context) {
-        self.color_framebuffer_to.bind(gl);
-        self.color_framebuffer_to.viewport(gl);
+        self.color_framebuffer_scratch.bind(gl);
+        self.color_framebuffer_scratch.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
         gl.clear(glow::COLOR_BUFFER_BIT);
         self.advect_painter.draw(
             gl,
-            &self.color_texture_from,
+            &self.color_texture,
             &self.advection_texture,
             self.simulation_bounds.as_f64(),
         );
-        self.color_framebuffer_to.unbind(gl);
+        self.color_framebuffer_scratch.unbind(gl);
     }
 
     unsafe fn step(&mut self, gl: &glow::Context, settings: &StepPainterSettings) {
@@ -285,10 +291,20 @@ impl SimulationPainter {
         self.water_painter.draw(
             gl,
             &self.horizontal_smoothed_texture,
-            &self.color_texture_to,
+            &self.color_texture_scratch,
             settings,
         );
         self.water_framebuffer.unbind(gl);
+    }
+
+    pub unsafe fn read_water_color(&self, gl: &glow::Context) -> RgbaField {
+        self.color_framebuffer.read_color_attachment0(gl)
+    }
+
+    pub unsafe fn write_water_color(&mut self, gl: &glow::Context, color: &RgbaField) {
+        // TODO: We need to write Rgba8 data as ushort data
+        self.color_texture
+            .texture_image_as_bytes(gl, TextureFormat::RGBA16, color);
     }
 }
 
