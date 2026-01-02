@@ -64,7 +64,13 @@ impl Manipulator for Gravity {
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
         labeled_drag_value(ui, "Mass Radius:", &mut self.mass_radius, 1.0..=20.0, 0.1);
-        labeled_drag_value(ui, "Mass Density:", &mut self.mass_density, 1.0..=40.0, 0.1);
+        labeled_drag_value(
+            ui,
+            "Mass Density:",
+            &mut self.mass_density,
+            1.0..=500.0,
+            0.5,
+        );
     }
 }
 
@@ -301,7 +307,7 @@ impl Manipulator for Vacuum {
     }
 
     fn image(&self) -> egui::ImageSource<'static> {
-        egui::include_image!("force_icons/shockwave.png")
+        egui::include_image!("force_icons/vacuum.png")
     }
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
