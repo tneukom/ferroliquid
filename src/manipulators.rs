@@ -27,14 +27,20 @@ pub trait Manipulator {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Gravity {
-    pub mass_radius: f64,
+    #[serde(alias = "mass_radius")]
+    pub shell_outer_radius: f64,
+
+    #[serde(default)]
+    pub shell_inner_radius: f64,
+
     pub mass_density: f64,
 }
 
 impl Default for Gravity {
     fn default() -> Self {
         Self {
-            mass_radius: 5.0,
+            shell_outer_radius: 5.0,
+            shell_inner_radius: 0.0,
             mass_density: 80.0,
         }
     }
@@ -48,12 +54,20 @@ impl Manipulator for Gravity {
         _simulation_time: f64,
         dt: f64,
     ) {
+        fn disk_force(disk_radius: f64, r: f64) -> f64 {
+            // For r < mass_radius: f = 1 for r >= mass_radius: f = mass_radius^3 / r^3
+            let s = r.max(disk_radius);
+            (disk_radius * disk_radius * disk_radius) / (s * s * s)
+        }
+
         for particle in particles {
             let dir = center - particle.position;
             let r = dir.norm();
-            let s = r.max(self.mass_radius);
-            let f = (self.mass_radius * self.mass_radius * self.mass_radius) / (s * s * s);
-            // For r < mass_radius: f = 1 for r >= mass_radius: f = mass_radius^3 / r^3
+
+            let f_outer = disk_force(self.shell_outer_radius, r);
+            let f_inner = disk_force(self.shell_inner_radius, r);
+            let f = f_outer - f_inner;
+
             particle.velocity += self.mass_density * f * dir * dt;
         }
     }
@@ -63,7 +77,20 @@ impl Manipulator for Gravity {
     }
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
-        labeled_drag_value(ui, "Mass Radius:", &mut self.mass_radius, 1.0..=20.0, 0.1);
+        labeled_drag_value(
+            ui,
+            "Shell inner Radius:",
+            &mut self.shell_inner_radius,
+            0.0..=40.0,
+            0.1,
+        );
+        labeled_drag_value(
+            ui,
+            "Shell inner Radius:",
+            &mut self.shell_outer_radius,
+            0.0..=40.0,
+            0.1,
+        );
         labeled_drag_value(
             ui,
             "Mass Density:",
