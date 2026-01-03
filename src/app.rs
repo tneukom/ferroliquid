@@ -249,35 +249,47 @@ impl EguiApp {
         // Get color image
         let simulation_painter = self.simulation_painter.lock().unwrap();
         let color_image = unsafe { simulation_painter.read_water_color(&self.gl) };
-        let color_jpeg = color_image.encode_jpeg(95).unwrap();
+        let color_jpeg_base64_url = color_image.encode_base64_url_jpeg(95);
         let mut save_world = self.world.to_save_world();
-        save_world.color_jpeg = Some(color_jpeg);
+        save_world.color_jpeg_base64_url = Some(color_jpeg_base64_url);
 
-        // Save as json
-        // let world_json = serde_json::to_string_pretty(&save_world).unwrap();
-        // fs::write("world.json", world_json).expect("Failed to save");
+        let path = path.as_ref();
+        let extension = path.extension().unwrap().to_ascii_lowercase();
+        let file = fs::File::create(path).expect("Failed to open file");
 
-        // Save a bincode
-        let file = fs::File::create(path).unwrap();
-        let mut writer = BufWriter::new(file);
-        bincode::serde::encode_into_std_write(
-            &save_world,
-            &mut writer,
-            bincode::config::standard(),
-        )
-        .unwrap();
+        if extension == "json" {
+            let buf_writer = BufWriter::new(file);
+            serde_json::to_writer(buf_writer, &save_world).expect("Failed to write json");
+        } else if extension == "json_snap" {
+            let buf_writer = BufWriter::new(file);
+            let snap_writer = snap::write::FrameEncoder::new(buf_writer);
+            serde_json::to_writer(snap_writer, &save_world).expect("Failed to write json");
+        } else {
+            panic!("Unsupported extension");
+        };
     }
 
     pub fn load(&mut self, path: impl AsRef<Path>) {
+        let path = path.as_ref();
+        let extension = path.extension().unwrap().to_ascii_lowercase();
         let file = fs::File::open(path).unwrap();
-        let mut reader = BufReader::new(file);
-        let mut save_world: SaveWorld =
-            bincode::serde::decode_from_std_read(&mut reader, bincode::config::standard()).unwrap();
+
+        let mut save_world: SaveWorld = if extension == "json" {
+            let buf_reader = BufReader::new(file);
+            serde_json::from_reader(buf_reader).unwrap()
+        } else if extension == "json_snap" {
+            let buf_reader = BufReader::new(file);
+            let snap_reader = snap::read::FrameDecoder::new(buf_reader);
+            serde_json::from_reader(snap_reader).unwrap()
+        } else {
+            panic!("Unsupported extension");
+        };
+
         let mut simulation_painter = self.simulation_painter.lock().unwrap();
         simulation_painter.reset();
 
-        if let Some(color_jpeg) = save_world.color_jpeg.take() {
-            let color_image = RgbaField::load_from_memory(&color_jpeg).unwrap();
+        if let Some(color_jpeg_base64_url) = save_world.color_jpeg_base64_url.take() {
+            let color_image = RgbaField::decode_base64_url_jpeg(&color_jpeg_base64_url).unwrap();
             unsafe {
                 simulation_painter.write_water_color(&self.gl, &color_image);
             }
@@ -292,7 +304,8 @@ impl EguiApp {
             let save_icon = egui::include_image!("icons/file_save.png").atom_size(Self::ICON_SIZE);
             if ui.button((save_icon, "Save")).clicked() {
                 if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("bin", &["bin"])
+                    .add_filter("json_snap", &["json_snap"])
+                    .add_filter("json", &["json"])
                     .save_file()
                 {
                     self.save(path);
@@ -302,7 +315,8 @@ impl EguiApp {
             let load_icon = egui::include_image!("icons/file_load.png").atom_size(Self::ICON_SIZE);
             if ui.button((load_icon, "Load")).clicked() {
                 if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("bin", &["bin"])
+                    .add_filter("json_snap", &["json_snap"])
+                    .add_filter("json", &["json"])
                     .pick_file()
                 {
                     self.load(path);

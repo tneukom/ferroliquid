@@ -111,27 +111,19 @@ impl World {
     pub fn to_save_world(&self) -> SaveWorld {
         SaveWorld {
             bounds: self.bounds(),
-            particles: self
-                .simulation
-                .particles
-                .iter()
-                .map(SaveParticle::from_particle)
-                .collect(),
+            save_particles: SaveParticles::from_particles(&self.simulation.particles),
             blocks: self.blocks.clone(),
             manipulators: self.manipulators.clone(),
             inflows: self.inflows.clone(),
             settings: self.settings.clone(),
             color_jpeg: None,
+            color_jpeg_base64_url: None,
         }
     }
 
     pub fn from_save_world(save_world: SaveWorld) -> Self {
         let mut simulation = Simulation::new(save_world.bounds);
-        simulation.particles = save_world
-            .particles
-            .iter()
-            .map(SaveParticle::to_particle)
-            .collect();
+        simulation.particles = save_world.save_particles.to_particles();
         Self {
             simulation,
             blocks: save_world.blocks,
@@ -169,19 +161,64 @@ impl SaveParticle {
     pub fn to_particle(&self) -> Particle {
         Particle {
             position: Self::fixed_point_to_f64(self.position),
-            previous_position: Self::fixed_point_to_f64(self.previous_position),
+            // previous_position: Self::fixed_point_to_f64(self.previous_position),
+            previous_position: Point::ZERO,
             velocity: Self::fixed_point_to_f64(self.velocity),
         }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SaveParticles {
+    pub positions: Vec<[f64; 2]>,
+    pub velocities: Vec<[f64; 2]>,
+}
+
+impl SaveParticles {
+    fn round(x: f64) -> f64 {
+        (x * 100.0).round() / 100.0
+    }
+
+    fn point_to_array(point: Point<f64>) -> [f64; 2] {
+        [Self::round(point.x), Self::round(point.y)]
+    }
+
+    pub fn from_particles(particles: &[Particle]) -> Self {
+        let positions = particles
+            .iter()
+            .map(|particle| Self::point_to_array(particle.position))
+            .collect();
+        let velocities = particles
+            .iter()
+            .map(|particle| Self::point_to_array(particle.velocity))
+            .collect();
+        Self {
+            positions,
+            velocities,
+        }
+    }
+
+    pub fn to_particles(&self) -> Vec<Particle> {
+        self.positions
+            .iter()
+            .zip(&self.velocities)
+            .map(|(position, velocity)| Particle {
+                position: Point(position[0], position[1]),
+                velocity: Point(velocity[0], velocity[1]),
+                previous_position: Point::ZERO,
+            })
+            .collect()
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveWorld {
     pub bounds: Rect<i64>,
-    pub particles: Vec<SaveParticle>,
+    pub save_particles: SaveParticles,
     pub blocks: Blocks,
     pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,
     pub inflows: SlotMap<InflowKey, Inflow>,
     pub settings: SimulationSettings,
     pub color_jpeg: Option<Vec<u8>>,
+    pub color_jpeg_base64_url: Option<String>,
 }

@@ -270,6 +270,7 @@ impl<T: Default> Field<T> {
 
 impl RgbaField {
     const PNG_URL_HEADER: &'static str = "data:image/png;base64,";
+    const JPEG_URL_HEADER: &'static str = "data:image/jpeg;base64,";
 
     fn from_imageio_bitmap(imageio_bitmap: &image::RgbaImage) -> Self {
         let mut bitmap = Self::filled(
@@ -378,21 +379,40 @@ impl RgbaField {
         bytemuck::cast_slice_mut(self.as_slice_mut())
     }
 
-    pub fn decode_base64_png(encoded: &str) -> anyhow::Result<Self> {
-        // Strip DATA_URL_HEADER
-        if encoded.len() <= Self::PNG_URL_HEADER.len() {
+    fn strip_header<'a>(string: &'a str, header: &str) -> anyhow::Result<&'a str> {
+        if string.len() <= header.len() {
             anyhow::bail!("Encoded string too short");
         }
-        let payload = &encoded[Self::PNG_URL_HEADER.len()..];
+        if &string[..header.len()] != header {
+            anyhow::bail!("Invalid header");
+        }
+        Ok(&string[header.len()..])
+    }
+
+    pub fn decode_base64_url_png(encoded: &str) -> anyhow::Result<Self> {
+        let payload = Self::strip_header(encoded, Self::PNG_URL_HEADER)?;
         let png = BASE64.decode(payload.as_bytes())?;
         let rgba_field = RgbaField::load_from_memory(&png)?;
         Ok(rgba_field)
     }
 
-    pub fn encode_base64_png(&self) -> String {
+    pub fn encode_base64_url_png(&self) -> String {
         let png = self.encode_png().unwrap();
         let base64_png = BASE64.encode(&png);
         format!("{}{}", Self::PNG_URL_HEADER, base64_png)
+    }
+
+    pub fn decode_base64_url_jpeg(encoded: &str) -> anyhow::Result<Self> {
+        let payload = Self::strip_header(encoded, Self::JPEG_URL_HEADER)?;
+        let jpeg = BASE64.decode(payload.as_bytes())?;
+        let rgba_field = RgbaField::load_from_memory(&jpeg)?;
+        Ok(rgba_field)
+    }
+
+    pub fn encode_base64_url_jpeg(&self, quality: u8) -> String {
+        let jpeg = self.encode_jpeg(quality).unwrap();
+        let base64_png = BASE64.encode(&jpeg);
+        format!("{}{}", Self::JPEG_URL_HEADER, base64_png)
     }
 }
 
