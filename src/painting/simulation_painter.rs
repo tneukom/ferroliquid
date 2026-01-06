@@ -166,11 +166,11 @@ impl SimulationPainter {
         self.i_step = 0;
     }
 
-    pub unsafe fn paint(
+    pub unsafe fn paint<'a>(
         &mut self,
         gl: &glow::Context,
         simulation: &Simulation,
-        inflows: &[Inflow],
+        inflows: impl IntoIterator<Item = &'a Inflow>,
         settings: &SimulationPainterSettings,
         time: f64,
     ) {
@@ -229,7 +229,12 @@ impl SimulationPainter {
         self.particle_dots_framebuffer.unbind(gl);
     }
 
-    unsafe fn inflows(&mut self, gl: &glow::Context, inflows: &[Inflow], time: f64) {
+    unsafe fn inflows<'a>(
+        &mut self,
+        gl: &glow::Context,
+        inflows: impl IntoIterator<Item = &'a Inflow>,
+        time: f64,
+    ) {
         self.color_framebuffer.bind(gl);
         self.color_framebuffer.viewport(gl);
         for inflow in inflows {

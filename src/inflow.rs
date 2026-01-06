@@ -12,7 +12,7 @@ use crate::{
 };
 use egui::{AtomExt, epaint};
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
+use std::{collections::VecDeque, hash::Hash};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum InflowPattern {
@@ -59,8 +59,52 @@ impl ReflectEnum for InflowPattern {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default)]
+pub struct InflowStats {
+    /// Number of particles added - removed at time points
+    added_history: VecDeque<(f64, isize)>,
+}
+
+impl InflowStats {
+    const WINDOW_DURATION: f64 = 1.0;
+
+    pub fn added(&mut self, simulation_time: f64, count: isize) {
+        if let Some(&(last, _)) = self.added_history.back() {
+            assert!(simulation_time > last);
+        }
+
+        self.added_history.push_back((simulation_time, count));
+        self.clear_outdated(simulation_time);
+    }
+
+    /// Remove history older than 60s
+    fn clear_outdated(&mut self, simulation_time: f64) {
+        let cutoff = simulation_time - Self::WINDOW_DURATION;
+        while let Some(&(front, _)) = self.added_history.front()
+            && front < cutoff
+        {
+            self.added_history.pop_front();
+        }
+    }
+
+    /// Added particles per second
+    fn added_rate(&self) -> Option<f64> {
+        if self.added_history.len() <= 2 {
+            return None;
+        }
+
+        let duration = self.added_history.back().unwrap().0 - self.added_history.front().unwrap().0;
+        let sum: isize = self.added_history.iter().map(|&(_, count)| count).sum();
+
+        Some(sum as f64 / duration)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inflow {
+    #[serde(skip, default)]
+    pub stats: InflowStats,
+
     pub center: Point<f64>,
     /// Unit vector
     pub direction: Point<f64>,
@@ -79,6 +123,7 @@ pub struct Inflow {
 impl Default for Inflow {
     fn default() -> Self {
         Self {
+            stats: InflowStats::default(),
             center: Point::ZERO,
             direction: Point::E_X,
             width: 5.0,
@@ -136,6 +181,13 @@ impl Inflow {
         let scale_slider =
             egui::Slider::new(&mut self.pattern_scale, 0.02..=0.5).drag_value_speed(0.02);
         ui.add(scale_slider);
+
+        // Stats
+        ui.label(format!(
+            "Rate over {}s: {:.0} particles/s",
+            InflowStats::WINDOW_DURATION,
+            self.stats.added_rate().unwrap_or(0.0)
+        ));
     }
 
     pub fn handle(

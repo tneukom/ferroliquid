@@ -338,7 +338,7 @@ impl Manipulator for Vacuum {
     }
 
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
-        labeled_drag_value(ui, "Radius:", &mut self.radius, 1.0..=20.0, 0.5);
+        labeled_drag_value(ui, "Radius:", &mut self.radius, 1.0..=50.0, 0.5);
         ui.checkbox(&mut self.always_on, "Always On");
     }
 }

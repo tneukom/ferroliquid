@@ -571,12 +571,12 @@ impl EguiApp {
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let inflows: Vec<_> = self.world.inflows.values().copied().collect();
+        // TODO: Avoid cloning
         unsafe {
             self.simulation_painter.lock().unwrap().paint(
                 &self.gl,
                 &self.world.simulation,
-                &inflows,
+                self.world.inflows.values(),
                 &self.simulation_painter_settings,
                 self.world.simulation.time,
             );

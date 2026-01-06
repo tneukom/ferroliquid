@@ -1,6 +1,6 @@
 use crate::{
     blocks::Blocks,
-    inflow::{Inflow, InflowPattern},
+    inflow::{Inflow, InflowPattern, InflowStats},
     manipulators::{Manipulator, PlacedManipulator, UniformForce},
     math::{point::Point, rect::Rect, rgba8::Rgba},
     simulation::{Particle, Simulation, SimulationSettings},
@@ -45,6 +45,7 @@ impl World {
 
         let mut inflows = SlotMap::with_key();
         inflows.insert(Inflow {
+            stats: InflowStats::default(),
             center: Point(40.0, 40.0),
             direction: Point(1.0, 1.0).normalized(),
             width: 4.0,
@@ -82,14 +83,13 @@ impl World {
 
     pub fn step(&mut self, dt: f64) {
         // Run simulation step
-        for inflow in self.inflows.values() {
+        for inflow in self.inflows.values_mut() {
             let velocity = inflow.speed * inflow.direction;
-            self.simulation
-                .fill_oriented_rect(inflow.rect(), velocity, &self.settings);
+            let added_count =
+                self.simulation
+                    .fill_oriented_rect(inflow.rect(), velocity, &self.settings);
+            inflow.stats.added(self.simulation.time, added_count);
         }
-        // for coord in fill_rect.iter_indices() {
-        //     self.simulation.fill(coord, velocity);
-        // }
 
         for placed_manipulator in self.manipulators.values_mut() {
             placed_manipulator.manipulator.apply(

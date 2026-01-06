@@ -217,9 +217,9 @@ impl Simulation {
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(settings);
 
-        self.integrate(dt, 4);
+        self.integrate(dt, 8);
 
-        if self.i_step % 32 == 0 {
+        if self.i_step % 120 == 0 {
             self.sort_particles();
         }
         self.i_step += 1;
@@ -236,14 +236,17 @@ impl Simulation {
         }
     }
 
+    /// Returns increase in number of particles
     #[inline(never)]
     pub fn fill_oriented_rect(
         &mut self,
         parallelogram: Parallelogram<f64>,
         velocity: Point<f64>,
         settings: &SimulationSettings,
-    ) {
+    ) -> isize {
         // Clear all current particles in the given rect
+        let len_before = self.particles.len();
+
         self.particles
             .retain(|particle| !parallelogram.contains(particle.position));
 
@@ -254,5 +257,7 @@ impl Simulation {
                 + fastrand::f64() * parallelogram.v;
             self.create_particle(position, velocity);
         }
+
+        self.particles.len() as isize - len_before as isize
     }
 }
