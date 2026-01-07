@@ -159,10 +159,11 @@ impl SaveParticle {
     }
 
     pub fn to_particle(&self) -> Particle {
+        let position = Self::fixed_point_to_f64(self.position);
         Particle {
-            position: Self::fixed_point_to_f64(self.position),
+            position,
             // previous_position: Self::fixed_point_to_f64(self.previous_position),
-            previous_position: Point::ZERO,
+            previous_position: position,
             velocity: Self::fixed_point_to_f64(self.velocity),
         }
     }

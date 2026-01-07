@@ -2,7 +2,7 @@ use crate::{
     grid::Grid,
     interpolator::interpolate_div_free_velocity_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
-    sides::Side,
+    sides::{Side, Sides},
 };
 use serde::{Deserialize, Serialize};
 
@@ -134,19 +134,108 @@ impl Simulation {
         }
     }
 
+    #[inline(always)]
+    pub fn integration_step_runge_kutta_4(
+        mut position: Point<f64>,
+        velocity: Point<f64>,
+        sides: &Sides,
+        dt: f64,
+        random_velocity_c: f64,
+        bounds: Rect<f64>,
+    ) -> Option<Point<f64>> {
+        let pos1 = position;
+        let k1 = interpolate_div_free_velocity_bilinear(sides, pos1, velocity);
+
+        let pos2 = pos1 + 0.5 * dt * k1;
+        if !bounds.contains(pos2) {
+            return None;
+        }
+
+        let k2 = interpolate_div_free_velocity_bilinear(sides, pos2, velocity);
+        let pos3 = pos1 + 0.5 * dt * k2;
+        if !bounds.contains(pos3) {
+            return None;
+        }
+
+        let k3 = interpolate_div_free_velocity_bilinear(sides, pos3, velocity);
+        let pos4 = pos1 + dt * k3;
+        if !bounds.contains(pos4) {
+            return None;
+        }
+
+        let k4 = interpolate_div_free_velocity_bilinear(sides, pos4, velocity);
+
+        position =
+            position + random_velocity_c * (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+
+        if !bounds.contains(position) {
+            return None;
+        }
+        Some(position)
+    }
+
+    #[inline(always)]
+    pub fn integration_step_euler(
+        mut position: Point<f64>,
+        velocity: Point<f64>,
+        sides: &Sides,
+        dt: f64,
+        random_velocity_c: f64,
+        bounds: Rect<f64>,
+    ) -> Option<Point<f64>> {
+        // let velocity =
+        //     interpolate_div_free_velocity(&self.grid.sides, position, velocity);
+        let velocity = interpolate_div_free_velocity_bilinear(sides, position, velocity);
+        debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
+
+        position = position + dt * random_velocity_c * velocity;
+
+        if !bounds.contains(position) {
+            return None;
+        }
+        Some(position)
+    }
+
+    // #[inline(always)]
+    // pub fn integrate_particle_euler(
+    //     &self,
+    //     dt: f64,
+    //     steps: usize,
+    //     mut particle: Particle,
+    // ) -> Option<Particle> {
+    //     let bounds = self.grid.bounds.as_f64();
+    //     let inset_bounds = bounds.padded(-1.0);
+    //     let step_dt = dt / steps as f64;
+    //
+    //     // Perturb the velocity a tiny amount to dissolve clumps.
+    //     // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
+    //     let random_velocity_strength = 0.02;
+    //     let random_velocity_c = 1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
+    //
+    //     particle.previous_position = particle.position;
+    //     let mut position = particle.position;
+    //     // If velocity is not defined on the grid the velocity from the previous step is
+    //     // used.
+    //     let velocity = particle.velocity;
+    //
+    //     debug_assert!(bounds.contains(particle.position));
+    //
+    //     //Euler integration
+    //     for _ in 0..steps {
+    //         debug_assert!(bounds.contains(position));
+    //     }
+    //
+    //     particle.position = position;
+    //     Some(particle)
+    // }
+
     #[inline(never)]
     pub fn integrate(&mut self, dt: f64, steps: usize) {
         let _span = tracy_client::span!("integrate");
 
-        let step_dt = dt / steps as f64;
-        let random_velocity_strength = 0.02;
-
         let bounds = self.grid.bounds.as_f64();
         let inset_bounds = bounds.padded(-1.0);
-
-        // Perturb the velocity a tiny amount to dissolve clumps.
-        // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
-        let random_velocity_c = 1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
+        let step_dt = dt / steps as f64;
 
         // Quite a bit faster than retain_mut for some reason
         // See https://github.com/rust-lang/rust/issues/91497
@@ -155,6 +244,12 @@ impl Simulation {
         self.particles = std::mem::take(&mut self.particles)
             .into_iter()
             .filter_map(|mut particle| {
+                // Perturb the velocity a tiny amount to dissolve clumps.
+                // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
+                let random_velocity_strength = 0.02;
+                let random_velocity_c =
+                    1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
+
                 particle.previous_position = particle.position;
                 let mut position = particle.position;
                 // If velocity is not defined on the grid the velocity from the previous step is
@@ -163,24 +258,16 @@ impl Simulation {
 
                 debug_assert!(bounds.contains(particle.position));
 
-                //Euler integration
                 for _ in 0..steps {
                     debug_assert!(bounds.contains(position));
-
-                    // let velocity =
-                    //     interpolate_div_free_velocity(&self.grid.sides, position, velocity);
-                    let velocity = interpolate_div_free_velocity_bilinear(
-                        &self.grid.sides,
+                    position = Self::integration_step_runge_kutta_4(
                         position,
                         velocity,
-                    );
-                    debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
-
-                    position = position + step_dt * random_velocity_c * velocity;
-
-                    if !inset_bounds.contains(position) {
-                        return None;
-                    }
+                        &self.grid.sides,
+                        step_dt,
+                        random_velocity_c,
+                        inset_bounds,
+                    )?;
                 }
 
                 particle.position = position;
@@ -217,7 +304,7 @@ impl Simulation {
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(settings);
 
-        self.integrate(dt, 8);
+        self.integrate(dt, 2);
 
         if self.i_step % 120 == 0 {
             self.sort_particles();
