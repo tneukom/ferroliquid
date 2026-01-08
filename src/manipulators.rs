@@ -61,7 +61,8 @@ impl Manipulator for Gravity {
         }
 
         for particle in particles {
-            let dir = center - particle.position;
+            let mid_position = 0.5 * (particle.position + particle.previous_position);
+            let dir = center - mid_position;
             let r = dir.norm();
 
             let f_outer = disk_force(self.shell_outer_radius, r);
