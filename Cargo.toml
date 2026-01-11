@@ -49,12 +49,10 @@ tracy-client = { version = "0.18.4", default-features = false, features = ["enab
     "context-switch-tracing", "code-transfer", "callstack-inlines", "only-localhost"] }
 fastrand = { version = "2.3.0" }
 slotmap = { version = "1.0.7", features = ["serde"] }
-# enum_dispatch doesn't work well with RustRover
-#enum_dispatch = "0.3.13"
-enum_delegate = "0.2.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 snap = "1.1.1"
+derive_more = { version = "2.1.1", features = ["from"] }
 
 [profile.release]
 debug = true

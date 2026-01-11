@@ -1,23 +1,33 @@
 use crate::{
     blocks::Blocks,
     inflow::{Inflow, InflowPattern, InflowStats},
-    manipulators::{Manipulator, PlacedManipulator, UniformForce},
+    manipulators::{AnyForce, UniformForce},
     math::{point::Point, rect::Rect, rgba8::Rgba},
+    outflow::Outflow,
     simulation::{Particle, Simulation, SimulationSettings},
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
 use std::time::Instant;
 
-slotmap::new_key_type! { pub struct ManipulatorKey; }
+slotmap::new_key_type! { pub struct ForceKey; }
 slotmap::new_key_type! { pub struct InflowKey; }
+slotmap::new_key_type! { pub struct OutflowKey; }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct World {
     pub simulation: Simulation,
     pub blocks: Blocks,
-    pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,
+
+    #[serde(default)]
+    pub forces: SlotMap<ForceKey, AnyForce>,
+
+    #[serde(default)]
     pub inflows: SlotMap<InflowKey, Inflow>,
+
+    #[serde(default)]
+    pub outflows: SlotMap<OutflowKey, Outflow>,
+
     pub settings: SimulationSettings,
 }
 
@@ -58,10 +68,13 @@ impl World {
 
         // let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
         // forces.insert(gravity);
-        let mut manipulators = SlotMap::with_key();
+        let mut forces: SlotMap<ForceKey, AnyForce> = SlotMap::with_key();
 
-        let uniform = PlacedManipulator::new(UniformForce::default(), Point(10.0, 10.0));
-        manipulators.insert(uniform);
+        let uniform = UniformForce {
+            center: Point(10.0, 10.0),
+            ..UniformForce::default()
+        };
+        forces.insert(uniform.into());
 
         let settings = SimulationSettings::default();
 
@@ -71,8 +84,9 @@ impl World {
         Self {
             simulation,
             blocks,
-            manipulators,
             inflows,
+            outflows: SlotMap::with_key(),
+            forces,
             settings,
         }
     }
@@ -91,13 +105,14 @@ impl World {
             inflow.stats.added(self.simulation.time, added_count);
         }
 
-        for placed_manipulator in self.manipulators.values_mut() {
-            placed_manipulator.manipulator.apply(
-                placed_manipulator.position,
-                &mut self.simulation.particles,
-                self.simulation.time,
-                dt,
-            );
+        for outflow in self.outflows.values_mut() {
+            outflow.apply(&mut self.simulation.particles);
+        }
+
+        for force in self.forces.values_mut() {
+            force
+                .as_force()
+                .apply(&mut self.simulation.particles, self.simulation.time, dt);
         }
 
         // self.simulation.apply_constant_force(Point(0.0, 60.0));
@@ -113,8 +128,9 @@ impl World {
             bounds: self.bounds(),
             save_particles: SaveParticles::from_particles(&self.simulation.particles),
             blocks: self.blocks.clone(),
-            manipulators: self.manipulators.clone(),
+            forces: self.forces.clone(),
             inflows: self.inflows.clone(),
+            outflows: self.outflows.clone(),
             settings: self.settings.clone(),
             color_jpeg: None,
             color_jpeg_base64_url: None,
@@ -127,8 +143,9 @@ impl World {
         Self {
             simulation,
             blocks: save_world.blocks,
-            manipulators: save_world.manipulators,
+            forces: save_world.forces,
             inflows: save_world.inflows,
+            outflows: save_world.outflows,
             settings: save_world.settings,
         }
     }
@@ -217,8 +234,16 @@ pub struct SaveWorld {
     pub bounds: Rect<i64>,
     pub save_particles: SaveParticles,
     pub blocks: Blocks,
-    pub manipulators: SlotMap<ManipulatorKey, PlacedManipulator>,
+
+    #[serde(default)]
+    pub forces: SlotMap<ForceKey, AnyForce>,
+
+    #[serde(default)]
     pub inflows: SlotMap<InflowKey, Inflow>,
+
+    #[serde(default)]
+    pub outflows: SlotMap<OutflowKey, Outflow>,
+
     pub settings: SimulationSettings,
     pub color_jpeg: Option<Vec<u8>>,
     pub color_jpeg_base64_url: Option<String>,

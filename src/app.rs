@@ -3,10 +3,9 @@ use crate::{
     field::RgbaField,
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
-    manipulators::{
-        Gravity, Manipulator, PlacedManipulator, Shockwave, Swirl, UniformForce, Vacuum,
-    },
+    manipulators::{Gravity, Shockwave, Swirl, UniformForce},
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
+    outflow::Outflow,
     painting::{
         block_painter::BlockPaintingMode,
         gl_texture::GlTexture,
@@ -16,7 +15,7 @@ use crate::{
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::{icon_button, styled_space},
-    world::{InflowKey, ManipulatorKey, SaveWorld, World},
+    world::{ForceKey, InflowKey, OutflowKey, SaveWorld, World},
 };
 use egui::AtomExt;
 use glow::HasContext;
@@ -68,8 +67,9 @@ impl Tool {
 pub enum Selected {
     #[default]
     None,
-    Manipulator(ManipulatorKey),
+    Force(ForceKey),
     Inflow(InflowKey),
+    Outflow(OutflowKey),
 }
 
 impl Selected {
@@ -142,11 +142,20 @@ impl EguiApp {
             .inner_margin(4);
 
         frame.show(ui, |ui| {
-            if let Selected::Manipulator(manipulator_key) = self.selected {
-                let manipulator = &mut self.world.manipulators[manipulator_key];
-                manipulator.manipulator.settings_ui(ui);
-            } else if let Selected::Inflow(inflow_key) = self.selected {
-                self.world.inflows[inflow_key].settings_ui(ui);
+            match self.selected {
+                Selected::None => {}
+                Selected::Force(force_key) => {
+                    let force = &mut self.world.forces[force_key];
+                    force.as_force_mut().settings_ui(ui);
+                }
+                Selected::Inflow(inflow_key) => {
+                    let inflow = &mut self.world.inflows[inflow_key];
+                    inflow.settings_ui(ui);
+                }
+                Selected::Outflow(outflow_key) => {
+                    let outflow = &mut self.world.outflows[outflow_key];
+                    outflow.settings_ui(ui);
+                }
             }
 
             let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
@@ -155,13 +164,17 @@ impl EguiApp {
                 .add_enabled(self.selected.is_some(), trash_button)
                 .clicked()
             {
+                // Remove selected
                 match self.selected {
                     Selected::None => {}
-                    Selected::Manipulator(key) => {
-                        self.world.manipulators.remove(key);
+                    Selected::Force(force_key) => {
+                        self.world.forces.remove(force_key);
                     }
-                    Selected::Inflow(key) => {
-                        self.world.inflows.remove(key);
+                    Selected::Inflow(inflow_key) => {
+                        self.world.inflows.remove(inflow_key);
+                    }
+                    Selected::Outflow(outflow_key) => {
+                        self.world.outflows.remove(outflow_key);
                     }
                 }
                 self.selected = Selected::None;
@@ -170,39 +183,56 @@ impl EguiApp {
     }
 
     pub fn manipulators_ui(&mut self, ui: &mut egui::Ui) {
-        fn icon_button<T: Manipulator + Default>(ui: &mut egui::Ui, label: &str) -> egui::Response {
-            let icon = <T as Default>::default()
-                .image()
-                .atom_size(EguiApp::ICON_SIZE);
+        fn icon_button(
+            ui: &mut egui::Ui,
+            icon: egui::ImageSource<'static>,
+            label: &str,
+        ) -> egui::Response {
+            let icon = icon.atom_size(EguiApp::ICON_SIZE);
 
             let button = egui::Button::new((icon, label));
             ui.add(button)
         }
 
         ui.horizontal_wrapped(|ui| {
-            if icon_button::<Gravity>(ui, "Gravity").clicked() {
-                let gravity = PlacedManipulator::new(Gravity::default(), Point(10.0, 10.0));
-                self.world.manipulators.insert(gravity);
+            if icon_button(ui, Gravity::ICON, "Gravity").clicked() {
+                let gravity = Gravity {
+                    center: Point(10.0, 10.0),
+                    ..Gravity::default()
+                };
+                self.world.forces.insert(gravity.into());
             }
 
-            if icon_button::<Swirl>(ui, "Swirl").clicked() {
-                let swirl = PlacedManipulator::new(Swirl::default(), Point(10.0, 10.0));
-                self.world.manipulators.insert(swirl);
+            if icon_button(ui, Swirl::ICON, "Swirl").clicked() {
+                let swirl = Swirl {
+                    center: Point(10.0, 10.0),
+                    ..Swirl::default()
+                };
+                self.world.forces.insert(swirl.into());
             }
 
-            if icon_button::<UniformForce>(ui, "Uniform").clicked() {
-                let uniform = PlacedManipulator::new(UniformForce::default(), Point(10.0, 10.0));
-                self.world.manipulators.insert(uniform);
+            if icon_button(ui, UniformForce::ICON, "Uniform").clicked() {
+                let uniform = UniformForce {
+                    center: Point(10.0, 10.0),
+                    ..UniformForce::default()
+                };
+                self.world.forces.insert(uniform.into());
             }
 
-            if icon_button::<Shockwave>(ui, "Shockwave").clicked() {
-                let shockwave = PlacedManipulator::new(Shockwave::default(), Point(10.0, 10.0));
-                self.world.manipulators.insert(shockwave);
+            if icon_button(ui, Shockwave::ICON, "Shockwave").clicked() {
+                let shockwave = Shockwave {
+                    center: Point(10.0, 10.0),
+                    ..Shockwave::default()
+                };
+                self.world.forces.insert(shockwave.into());
             }
 
-            if icon_button::<Vacuum>(ui, "Vacuum").clicked() {
-                let vacuum = PlacedManipulator::new(Vacuum::default(), Point(10.0, 10.0));
-                self.world.manipulators.insert(vacuum);
+            if icon_button(ui, Outflow::ICON, "Vacuum").clicked() {
+                let outflow = Outflow {
+                    center: Point(10.0, 10.0),
+                    ..Outflow::default()
+                };
+                self.world.outflows.insert(outflow);
             }
 
             let inflow_icon = egui::include_image!("icons/droplet.png").atom_size(Self::ICON_SIZE);
@@ -532,10 +562,10 @@ impl EguiApp {
             egui::Sense::empty()
         };
 
-        // Manipulators
-        for (key, placed_manipulator) in &mut self.world.manipulators {
-            let mut selected = self.selected == Selected::Manipulator(key);
-            placed_manipulator.widget(
+        // Forces
+        for (force_key, force) in &mut self.world.forces {
+            let mut selected = self.selected == Selected::Force(force_key);
+            force.as_force_mut().widget(
                 ui,
                 sense,
                 &mut selected,
@@ -543,16 +573,25 @@ impl EguiApp {
                 egui_from_simulation,
             );
             if selected {
-                self.selected = Selected::Manipulator(key);
+                self.selected = Selected::Force(force_key);
             }
         }
 
         // Inflows: A parallelogram with two handles to set the rotation and the speed
-        for (key, inflow) in &mut self.world.inflows {
-            let mut selected = self.selected == Selected::Inflow(key);
-            inflow.widget(ui, sense, &mut selected, key, egui_from_simulation);
+        for (inflow_key, inflow) in &mut self.world.inflows {
+            let mut selected = self.selected == Selected::Inflow(inflow_key);
+            inflow.widget(ui, sense, &mut selected, inflow_key, egui_from_simulation);
             if selected {
-                self.selected = Selected::Inflow(key);
+                self.selected = Selected::Inflow(inflow_key);
+            }
+        }
+
+        // Outflows
+        for (outflow_key, outflow) in &mut self.world.outflows {
+            let mut selected = self.selected == Selected::Outflow(outflow_key);
+            outflow.widget(ui, sense, &mut selected, egui_from_simulation);
+            if selected {
+                self.selected = Selected::Outflow(outflow_key);
             }
         }
 
