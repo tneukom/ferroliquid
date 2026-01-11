@@ -614,7 +614,7 @@ impl EguiApp {
     }
 
     fn screen_is_narrow(ctx: &egui::Context) -> bool {
-        ctx.input(|input| input.screen_rect.width() < 800.0)
+        ctx.input(|input| input.content_rect().width() < 800.0)
     }
 
     // fn egui_texture_handle()
