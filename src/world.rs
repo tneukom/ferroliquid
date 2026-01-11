@@ -31,6 +31,17 @@ pub struct World {
     pub settings: SimulationSettings,
 }
 
+pub struct Energy {
+    pub potential: f64,
+    pub kinetic: f64,
+}
+
+impl Energy {
+    pub fn total(&self) -> f64 {
+        self.potential + self.kinetic
+    }
+}
+
 impl World {
     pub fn new(bounds: Rect<i64>) -> Self {
         // Blocks use 4 cells
@@ -148,6 +159,23 @@ impl World {
             outflows: save_world.outflows,
             settings: save_world.settings,
         }
+    }
+
+    pub fn energy(&self) -> Energy {
+        let mut kinetic = 0.0;
+        for particle in &self.simulation.particles {
+            kinetic += 0.5 * particle.velocity.norm_squared();
+        }
+
+        let mut potential = 0.0;
+        for force in self.forces.values() {
+            if let Some(conservative_force) = force.as_conservative_force() {
+                potential +=
+                    conservative_force.sum(self.simulation.time, &self.simulation.particles);
+            }
+        }
+
+        Energy { kinetic, potential }
     }
 }
 

@@ -247,6 +247,10 @@ impl EguiApp {
         });
 
         self.selected_manipulator_ui(ui);
+
+        if ui.button("Clear particles").clicked() {
+            self.world.simulation.particles.clear();
+        }
     }
 
     pub fn simulation_step(&mut self) {
@@ -426,6 +430,14 @@ impl EguiApp {
 
         self.simulation_debug_window
             .window_toggle(ui, &self.world.simulation);
+
+        let energy = self.world.energy();
+        ui.label(format!(
+            "Kinetic: {:.0}k, potential: {:.0}k, total: {:.0}k",
+            energy.kinetic / 1e3,
+            energy.potential / 1e3,
+            energy.total() / 1e3
+        ));
 
         // Put debug ui at the bottom of the left side panel
         // let bottom_panel =

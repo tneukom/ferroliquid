@@ -20,8 +20,19 @@ pub trait Force {
     fn apply(&self, particles: &mut [Particle], simulation_time: f64, dt: f64) {
         for particle in particles {
             // Force evaluation at midpoint
-            let position = 0.5 * (particle.position + particle.previous_position);
-            let f = self.force(simulation_time, position);
+            let f = self.force(
+                simulation_time,
+                0.5 * (particle.position + particle.previous_position),
+            );
+
+            // Force evaluation at current position
+            // let f = self.force(simulation_time, particle.position);
+
+            // Force evaluation at current and previous position
+            // let f = 0.5
+            //     * (self.force(simulation_time, particle.position)
+            //         + self.force(simulation_time, particle.previous_position));
+
             particle.velocity += f * dt;
         }
     }
@@ -37,7 +48,15 @@ pub trait Force {
 }
 
 pub trait ConservativeForce: Force {
-    fn potential(&self, center: Point<f64>, simulation_time: f64, p: Point<f64>) -> f64;
+    fn potential(&self, simulation_time: f64, position: Point<f64>) -> f64;
+
+    fn sum(&self, simulation_time: f64, particles: &[Particle]) -> f64 {
+        let mut total = 0.0;
+        for particle in particles {
+            total += self.potential(simulation_time, particle.position);
+        }
+        total
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -94,20 +113,29 @@ impl Force for Gravity {
     }
 
     fn force(&self, _simulation_time: f64, position: Point<f64>) -> Point<f64> {
-        fn disk_force(disk_radius: f64, r: f64) -> f64 {
-            // For r < mass_radius: f = 1 for r >= mass_radius: f = mass_radius^3 / r^3
-            let s = r.max(disk_radius);
-            (disk_radius * disk_radius * disk_radius) / (s * s * s)
+        /// acceleration/(r*density) for a point mass at distance r from a ball mass of radius
+        /// ball_radius.
+        fn normalized_ball_acceleration(ball_radius: f64, r: f64) -> f64 {
+            // For r < ball_radius: a = density * r so
+            // a/(r*density) = 1
+            // For r >= ball_radius: a = density * ball_radius^3 / r^2 so
+            // a/(r*density) = ball_radius^3 / r^3
+
+            if r < ball_radius {
+                1.0
+            } else {
+                (ball_radius * ball_radius * ball_radius) / (r * r * r)
+            }
         }
 
         let dir = self.center - position;
         let r = dir.norm();
 
-        let f_outer = disk_force(self.shell_outer_radius, r);
-        let f_inner = disk_force(self.shell_inner_radius, r);
-        let f = f_outer - f_inner;
+        let normalized_a_outer = normalized_ball_acceleration(self.shell_outer_radius, r);
+        let normalized_a_inner = normalized_ball_acceleration(self.shell_inner_radius, r);
+        let normalized_a = normalized_a_outer - normalized_a_inner;
 
-        self.mass_density * f * dir
+        self.mass_density * normalized_a * dir
     }
 
     fn widget(
@@ -126,6 +154,30 @@ impl Force for Gravity {
             selected,
             egui_from_simulation,
         );
+    }
+}
+
+impl ConservativeForce for Gravity {
+    fn potential(&self, _simulation_time: f64, position: Point<f64>) -> f64 {
+        /// potential/(density for a point mass at distance r from a ball mass of radius
+        /// ball_radius.
+        fn ball_potential(ball_radius: f64, density: f64, r: f64) -> f64 {
+            // For r < ball_radius: p = -1/2 * density * (3*ball_radius^2 - r^2)
+            // For r >= ball_radius: p = -density * ball_radius^3 / r
+
+            if r < ball_radius {
+                -0.5 * density * (3.0 * ball_radius * ball_radius - r * r)
+            } else {
+                -density * ball_radius * ball_radius * ball_radius / (r * r * r)
+            }
+        }
+        let dir = self.center - position;
+        let r = dir.norm();
+
+        let p_outer = ball_potential(self.shell_outer_radius, self.mass_density, r);
+        let p_inner = ball_potential(self.shell_inner_radius, self.mass_density, r);
+
+        p_outer - p_inner
     }
 }
 
@@ -369,6 +421,13 @@ impl AnyForce {
             Self::Swirl(this) => this,
             Self::UniformForce(this) => this,
             Self::Shockwave(this) => this,
+        }
+    }
+
+    pub fn as_conservative_force(&self) -> Option<&dyn ConservativeForce> {
+        match self {
+            Self::Gravity(this) => Some(this),
+            _ => None,
         }
     }
 
