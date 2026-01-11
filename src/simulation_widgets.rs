@@ -51,12 +51,9 @@ pub fn draggable_icon_widget(
         *selected = true;
     }
 
-    // if response.clicked() {
-    //     *selected = true;
-    //     self.manipulator
-    //         .as_manipulator_mut()
-    //         .trigger(simulation_time);
-    // }
+    if response.clicked() {
+        *selected = true;
+    }
 
     // Red circle around selected force
     if *selected {

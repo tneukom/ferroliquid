@@ -11,8 +11,6 @@ use num_traits::{Float, FloatConst};
 use serde::{Deserialize, Serialize};
 
 pub trait Force {
-    fn trigger(&mut self, _simulation_time: f64) {}
-
     fn settings_ui(&mut self, ui: &mut egui::Ui);
 
     fn force(&self, simulation_time: f64, position: Point<f64>) -> Point<f64>;
@@ -351,6 +349,11 @@ pub struct Shockwave {
 
 impl Shockwave {
     pub const ICON: ImageSource<'static> = egui::include_image!("force_icons/shockwave.png");
+
+    fn trigger(&mut self, time: f64) {
+        println!("Triggered at time {time}");
+        self.start_simulation_time = time;
+    }
 }
 
 impl Default for Shockwave {
@@ -367,11 +370,6 @@ impl Default for Shockwave {
 }
 
 impl Force for Shockwave {
-    fn trigger(&mut self, time: f64) {
-        println!("Triggered at time {time}");
-        self.start_simulation_time = time;
-    }
-
     fn settings_ui(&mut self, ui: &mut egui::Ui) {
         enum_combo(ui, "Kind:", &mut self.kind);
 
@@ -392,17 +390,21 @@ impl Force for Shockwave {
         ui: &mut egui::Ui,
         sense: egui::Sense,
         selected: &mut bool,
-        _simulation_time: f64,
+        simulation_time: f64,
         egui_from_simulation: AffineMap<f64>,
     ) {
-        draggable_icon_widget(
+        if draggable_icon_widget(
             ui,
             sense,
             Self::ICON,
             &mut self.center,
             selected,
             egui_from_simulation,
-        );
+        )
+        .clicked()
+        {
+            self.trigger(simulation_time);
+        };
     }
 }
 

@@ -99,6 +99,10 @@ impl InflowPainter {
         simulation_bounds: Rect<f64>,
         time: f64,
     ) {
+        if !inflow.on {
+            return;
+        }
+
         let rect = inflow.rect().padded(1.0);
         let vertices = rect.corners().map(|corner| InflowVertex {
             position: corner.as_f32().to_array(),

@@ -75,6 +75,7 @@ impl World {
             color_b: Rgba::YELLOW,
             pattern: InflowPattern::HorizontalStripes,
             pattern_scale: 0.5,
+            on: true,
         });
 
         // let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
@@ -109,6 +110,10 @@ impl World {
     pub fn step(&mut self, dt: f64) {
         // Run simulation step
         for inflow in self.inflows.values_mut() {
+            if !inflow.on {
+                continue;
+            }
+
             let velocity = inflow.speed * inflow.direction;
             let added_count =
                 self.simulation

@@ -118,6 +118,9 @@ pub struct Inflow {
 
     pub pattern: InflowPattern,
     pub pattern_scale: f64,
+
+    #[serde(default)]
+    pub on: bool,
 }
 
 impl Default for Inflow {
@@ -132,6 +135,7 @@ impl Default for Inflow {
             color_b: Rgba::YELLOW,
             pattern: InflowPattern::HorizontalStripes,
             pattern_scale: 0.5,
+            on: true,
         }
     }
 }
@@ -181,6 +185,12 @@ impl Inflow {
         let scale_slider =
             egui::Slider::new(&mut self.pattern_scale, 0.02..=0.5).drag_value_speed(0.02);
         ui.add(scale_slider);
+
+        // On / off toggle
+        let on_button = egui::Button::new("On").selected(self.on);
+        if ui.add(on_button).clicked() {
+            self.on = !self.on;
+        }
 
         // Stats
         ui.label(format!(
