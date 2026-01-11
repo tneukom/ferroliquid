@@ -1,9 +1,9 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     field::RgbaField,
+    forces::{Gravity, Shockwave, Swirl, UniformForce},
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
-    manipulators::{Gravity, Shockwave, Swirl, UniformForce},
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
     outflow::Outflow,
     painting::{
