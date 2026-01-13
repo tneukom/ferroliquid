@@ -18,13 +18,13 @@ pub trait Force {
     fn apply(&self, particles: &mut [Particle], simulation_time: f64, dt: f64) {
         for particle in particles {
             // Force evaluation at midpoint
-            let f = self.force(
-                simulation_time,
-                0.5 * (particle.position + particle.previous_position),
-            );
+            // let f = self.force(
+            //     simulation_time,
+            //     0.5 * (particle.position + particle.previous_position),
+            // );
 
             // Force evaluation at current position
-            // let f = self.force(simulation_time, particle.position);
+            let f = self.force(simulation_time, particle.position);
 
             // Force evaluation at current and previous position
             // let f = 0.5
@@ -166,7 +166,7 @@ impl ConservativeForce for Gravity {
             if r < ball_radius {
                 -0.5 * density * (3.0 * ball_radius * ball_radius - r * r)
             } else {
-                -density * ball_radius * ball_radius * ball_radius / (r * r * r)
+                -density * ball_radius * ball_radius * ball_radius / r
             }
         }
         let dir = self.center - position;
