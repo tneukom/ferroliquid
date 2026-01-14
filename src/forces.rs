@@ -86,99 +86,29 @@ impl Default for Gravity {
     }
 }
 
-impl Force for Gravity {
-    fn settings_ui(&mut self, ui: &mut egui::Ui) {
-        labeled_drag_value(
-            ui,
-            "Shell inner Radius:",
-            &mut self.shell_inner_radius,
-            0.0..=40.0,
-            0.1,
-        );
-        labeled_drag_value(
-            ui,
-            "Shell inner Radius:",
-            &mut self.shell_outer_radius,
-            0.0..=40.0,
-            0.1,
-        );
-        labeled_drag_value(
-            ui,
-            "Mass Density:",
-            &mut self.mass_density,
-            1.0..=500.0,
-            0.5,
-        );
-    }
-
-    fn force(&self, _simulation_time: f64, position: Point<f64>) -> Point<f64> {
-        /// acceleration/(r*density) for a point mass at distance r from a ball mass of radius
-        /// ball_radius.
-        fn normalized_ball_acceleration(ball_radius: f64, r: f64) -> f64 {
-            // For r < ball_radius: a = density * r so
-            // a/(r*density) = 1
-            // For r >= ball_radius: a = density * ball_radius^3 / r^2 so
-            // a/(r*density) = ball_radius^3 / r^3
-
-            if r < ball_radius {
-                1.0
-            } else {
-                (ball_radius * ball_radius * ball_radius) / (r * r * r)
-            }
-        }
-
-        let dir = self.center - position;
-        let r = dir.norm();
-
-        let normalized_a_outer = normalized_ball_acceleration(self.shell_outer_radius, r);
-        let normalized_a_inner = normalized_ball_acceleration(self.shell_inner_radius, r);
-        let normalized_a = normalized_a_outer - normalized_a_inner;
-
-        self.mass_density * normalized_a * dir
-    }
-
-    fn widget(
-        &mut self,
-        ui: &mut egui::Ui,
-        sense: egui::Sense,
-        selected: &mut bool,
-        _simulation_time: f64,
-        egui_from_simulation: AffineMap<f64>,
-    ) {
-        draggable_icon_widget(
-            ui,
-            sense,
-            Self::ICON,
-            &mut self.center,
-            selected,
-            egui_from_simulation,
-        );
-    }
-}
-
-impl ConservativeForce for Gravity {
-    fn potential(&self, _simulation_time: f64, position: Point<f64>) -> f64 {
-        /// potential/(density for a point mass at distance r from a ball mass of radius
-        /// ball_radius.
-        fn ball_potential(ball_radius: f64, density: f64, r: f64) -> f64 {
-            // For r < ball_radius: p = -1/2 * density * (3*ball_radius^2 - r^2)
-            // For r >= ball_radius: p = -density * ball_radius^3 / r
-
-            if r < ball_radius {
-                -0.5 * density * (3.0 * ball_radius * ball_radius - r * r)
-            } else {
-                -density * ball_radius * ball_radius * ball_radius / r
-            }
-        }
-        let dir = self.center - position;
-        let r = dir.norm();
-
-        let p_outer = ball_potential(self.shell_outer_radius, self.mass_density, r);
-        let p_inner = ball_potential(self.shell_inner_radius, self.mass_density, r);
-
-        p_outer - p_inner
-    }
-}
+// impl ConservativeForce for Gravity {
+//     fn potential(&self, _simulation_time: f64, position: Point<f64>) -> f64 {
+//         /// potential/(density for a point mass at distance r from a ball mass of radius
+//         /// ball_radius.
+//         fn ball_potential(ball_radius: f64, density: f64, r: f64) -> f64 {
+//             // For r < ball_radius: p = -1/2 * density * (3*ball_radius^2 - r^2)
+//             // For r >= ball_radius: p = -density * ball_radius^3 / r
+//
+//             if r < ball_radius {
+//                 -0.5 * density * (3.0 * ball_radius * ball_radius - r * r)
+//             } else {
+//                 -density * ball_radius * ball_radius * ball_radius / r
+//             }
+//         }
+//         let dir = self.center - position;
+//         let r = dir.norm();
+//
+//         let p_outer = ball_potential(self.shell_outer_radius, self.mass_density, r);
+//         let p_inner = ball_potential(self.shell_inner_radius, self.mass_density, r);
+//
+//         p_outer - p_inner
+//     }
+// }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Swirl {
@@ -411,7 +341,6 @@ impl Force for Shockwave {
 
 #[derive(Debug, Clone, From, Serialize, Deserialize)]
 pub enum AnyForce {
-    Gravity(Gravity),
     Swirl(Swirl),
     UniformForce(UniformForce),
     Shockwave(Shockwave),
@@ -421,7 +350,6 @@ pub enum AnyForce {
 impl AnyForce {
     pub fn as_force(&self) -> &dyn Force {
         match self {
-            Self::Gravity(this) => this,
             Self::Swirl(this) => this,
             Self::UniformForce(this) => this,
             Self::Shockwave(this) => this,
@@ -431,14 +359,12 @@ impl AnyForce {
 
     pub fn as_conservative_force(&self) -> Option<&dyn ConservativeForce> {
         match self {
-            Self::Gravity(this) => Some(this),
             _ => None,
         }
     }
 
     pub fn as_force_mut(&mut self) -> &mut dyn Force {
         match self {
-            Self::Gravity(this) => this,
             Self::Swirl(this) => this,
             Self::UniformForce(this) => this,
             Self::Shockwave(this) => this,

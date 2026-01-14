@@ -197,14 +197,6 @@ impl EguiApp {
         }
 
         ui.horizontal_wrapped(|ui| {
-            if icon_button(ui, Gravity::ICON, "Gravity").clicked() {
-                let gravity = Gravity {
-                    center: Point(10.0, 10.0),
-                    ..Gravity::default()
-                };
-                self.world.forces.insert(gravity.into());
-            }
-
             if icon_button(ui, Swirl::ICON, "Swirl").clicked() {
                 let swirl = Swirl {
                     center: Point(10.0, 10.0),
