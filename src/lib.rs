@@ -24,6 +24,7 @@ pub(crate) mod outflow;
 pub(crate) mod painting;
 pub(crate) mod palettes;
 pub(crate) mod piecewise_linear;
+pub(crate) mod radial_force;
 pub(crate) mod render_debug_ui;
 pub(crate) mod sides;
 pub(crate) mod simulation;

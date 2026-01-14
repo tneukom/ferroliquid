@@ -34,6 +34,14 @@ impl PiecewiseLinear {
     }
 }
 
+impl Default for PiecewiseLinear {
+    fn default() -> Self {
+        Self {
+            knots: vec![Point(0.0, 0.0)],
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,13 +1,13 @@
 use crate::{
     math::{affine_map::AffineMap, point::Point},
-    piecewise_linear::PiecewiseLinear,
+    radial_force::RadialForce,
     simulation::Particle,
     simulation_widgets::{draggable_icon_widget, labeled_angle_drag_value, labeled_drag_value},
     utils::ReflectEnum,
     widgets::enum_combo,
 };
 use derive_more::From;
-use egui::{ImageSource, Sense, Ui};
+use egui::ImageSource;
 use num_traits::{Float, FloatConst};
 use serde::{Deserialize, Serialize};
 
@@ -406,52 +406,6 @@ impl Force for Shockwave {
         {
             self.trigger(simulation_time);
         };
-    }
-}
-
-/// Force in radial direction, force in angular direction is zero
-/// TODO: Compute potential from radial_force
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RadialForce {
-    pub center: Point<f64>,
-    /// TODO: function(0) should be 0
-    pub function: PiecewiseLinear,
-}
-
-impl RadialForce {
-    pub const ICON: ImageSource<'static> = egui::include_image!("force_icons/shockwave.png");
-}
-
-impl Force for RadialForce {
-    fn settings_ui(&mut self, ui: &mut Ui) {}
-
-    fn force(&self, _simulation_time: f64, position: Point<f64>) -> Point<f64> {
-        let dir = self.center - position;
-        let r = dir.norm();
-        if r < 1e-3 {
-            // TODO: Hack, in the future us derivative at 0 to avoid division by 0
-            return Point::ZERO;
-        }
-        let f = self.function.eval(r);
-        dir * f / r
-    }
-
-    fn widget(
-        &mut self,
-        ui: &mut Ui,
-        sense: Sense,
-        selected: &mut bool,
-        simulation_time: f64,
-        egui_from_simulation: AffineMap<f64>,
-    ) {
-        draggable_icon_widget(
-            ui,
-            sense,
-            Self::ICON,
-            &mut self.center,
-            selected,
-            egui_from_simulation,
-        );
     }
 }
 
