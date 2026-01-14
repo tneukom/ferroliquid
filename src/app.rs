@@ -1,7 +1,7 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     field::RgbaField,
-    forces::{Gravity, Shockwave, Swirl, UniformForce},
+    forces::{Gravity, RadialForce, Shockwave, Swirl, UniformForce},
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
@@ -11,6 +11,7 @@ use crate::{
         gl_texture::GlTexture,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
+    piecewise_linear::PiecewiseLinear,
     render_debug_ui::RenderDebugUi,
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
@@ -225,6 +226,22 @@ impl EguiApp {
                     ..Shockwave::default()
                 };
                 self.world.forces.insert(shockwave.into());
+            }
+
+            if icon_button(ui, Shockwave::ICON, "Shockwave").clicked() {
+                let strength = 500.0;
+                let knots = vec![
+                    Point(20.0, 0.0),
+                    Point(25.0, -strength),
+                    Point(35.0, strength),
+                    Point(40.0, 0.0),
+                ];
+                let function = PiecewiseLinear::new(knots);
+                let radial = RadialForce {
+                    center: Point(10.0, 10.0),
+                    function,
+                };
+                self.world.forces.insert(radial.into());
             }
 
             if icon_button(ui, Outflow::ICON, "Vacuum").clicked() {
