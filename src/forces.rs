@@ -19,13 +19,13 @@ pub trait Force {
     fn apply(&self, particles: &mut [Particle], simulation_time: f64, dt: f64) {
         for particle in particles {
             // Force evaluation at midpoint
-            // let f = self.force(
-            //     simulation_time,
-            //     0.5 * (particle.position + particle.previous_position),
-            // );
+            let f = self.force(
+                simulation_time,
+                0.5 * (particle.position + particle.previous_position),
+            );
 
             // Force evaluation at current position
-            let f = self.force(simulation_time, particle.position);
+            // let f = self.force(simulation_time, particle.position);
 
             // Force evaluation at current and previous position
             // let f = 0.5
@@ -85,30 +85,6 @@ impl Default for Gravity {
         }
     }
 }
-
-// impl ConservativeForce for Gravity {
-//     fn potential(&self, _simulation_time: f64, position: Point<f64>) -> f64 {
-//         /// potential/(density for a point mass at distance r from a ball mass of radius
-//         /// ball_radius.
-//         fn ball_potential(ball_radius: f64, density: f64, r: f64) -> f64 {
-//             // For r < ball_radius: p = -1/2 * density * (3*ball_radius^2 - r^2)
-//             // For r >= ball_radius: p = -density * ball_radius^3 / r
-//
-//             if r < ball_radius {
-//                 -0.5 * density * (3.0 * ball_radius * ball_radius - r * r)
-//             } else {
-//                 -density * ball_radius * ball_radius * ball_radius / r
-//             }
-//         }
-//         let dir = self.center - position;
-//         let r = dir.norm();
-//
-//         let p_outer = ball_potential(self.shell_outer_radius, self.mass_density, r);
-//         let p_inner = ball_potential(self.shell_inner_radius, self.mass_density, r);
-//
-//         p_outer - p_inner
-//     }
-// }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Swirl {
@@ -359,6 +335,7 @@ impl AnyForce {
 
     pub fn as_conservative_force(&self) -> Option<&dyn ConservativeForce> {
         match self {
+            Self::RadialForce(this) => Some(this),
             _ => None,
         }
     }
