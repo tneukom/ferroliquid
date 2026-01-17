@@ -180,7 +180,7 @@ pub struct RadialForce {
 }
 
 impl RadialForce {
-    pub const ICON: ImageSource<'static> = egui::include_image!("force_icons/shockwave.png");
+    pub const ICON: ImageSource<'static> = egui::include_image!("force_icons/gravity.png");
 }
 
 impl RadialForce {

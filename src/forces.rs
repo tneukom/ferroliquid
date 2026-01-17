@@ -59,34 +59,6 @@ pub trait ConservativeForce: Force {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Gravity {
-    pub center: Point<f64>,
-
-    #[serde(alias = "mass_radius")]
-    pub shell_outer_radius: f64,
-
-    #[serde(default)]
-    pub shell_inner_radius: f64,
-
-    pub mass_density: f64,
-}
-
-impl Gravity {
-    pub const ICON: egui::ImageSource<'static> = egui::include_image!("force_icons/gravity.png");
-}
-
-impl Default for Gravity {
-    fn default() -> Self {
-        Self {
-            center: Point::ZERO,
-            shell_outer_radius: 5.0,
-            shell_inner_radius: 0.0,
-            mass_density: 80.0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Swirl {
     pub center: Point<f64>,
     pub force: f64,

@@ -1,7 +1,7 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     field::RgbaField,
-    forces::{Gravity, Shockwave, Swirl, UniformForce},
+    forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
     math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
@@ -12,7 +12,7 @@ use crate::{
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
     piecewise_linear::PiecewiseLinear,
-    radial_force::{PiecewiseLinearRadialFunction, RadialForce},
+    radial_force::{GravityFunction, PiecewiseLinearRadialFunction, RadialForce},
     render_debug_ui::RenderDebugUi,
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
@@ -213,6 +213,14 @@ impl EguiApp {
                 self.world.forces.insert(uniform.into());
             }
 
+            if icon_button(ui, RadialForce::ICON, "Gravity").clicked() {
+                let radial = RadialForce {
+                    center: Point(10.0, 10.0),
+                    function: GravityFunction::default().into(),
+                };
+                self.world.forces.insert(radial.into());
+            }
+
             if icon_button(ui, Shockwave::ICON, "Shockwave").clicked() {
                 let shockwave = Shockwave {
                     center: Point(10.0, 10.0),
@@ -221,7 +229,7 @@ impl EguiApp {
                 self.world.forces.insert(shockwave.into());
             }
 
-            if icon_button(ui, Gravity::ICON, "Radial").clicked() {
+            if icon_button(ui, RadialForce::ICON, "Radial").clicked() {
                 let strength = 500.0;
                 let knots = vec![
                     Point(20.0, 0.0),
