@@ -230,7 +230,7 @@ impl EguiApp {
             }
 
             if icon_button(ui, RadialForce::ICON, "Radial").clicked() {
-                let strength = 500.0;
+                let strength = 20.0;
                 let knots = vec![
                     Point(20.0, 0.0),
                     Point(25.0, -strength),

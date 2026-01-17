@@ -15,6 +15,10 @@ impl PiecewiseLinear {
         Self { knots }
     }
 
+    pub fn knots(&self) -> &[Point<f64>] {
+        &self.knots
+    }
+
     // Linear interpolation between left and right knot
     fn linear_interpolation(left_knot: Point<f64>, right_knot: Point<f64>, x: f64) -> f64 {
         // alpha is 0 if x = left_knot.x and 1 if x = right_knot.x
