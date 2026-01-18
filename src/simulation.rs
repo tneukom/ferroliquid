@@ -14,10 +14,12 @@ pub struct Particle {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SimulationSettings {
     pub density_correction_strength: f64,
     pub target_density: f64,
     pub alpha: f64,
+    pub speed: f64,
 }
 
 impl SimulationSettings {
@@ -29,6 +31,11 @@ impl SimulationSettings {
                 ui.label("Viscosity");
                 ui.add(egui::Slider::new(&mut self.alpha, 0.01..=1.0));
             });
+
+            ui.horizontal(|ui| {
+                ui.label("Speed");
+                ui.add(egui::Slider::new(&mut self.speed, 0.1..=3.0));
+            })
         });
 
         // ui.add(
@@ -65,6 +72,7 @@ impl Default for SimulationSettings {
             density_correction_strength: 2.0,
             target_density: 8.0,
             alpha: 0.02,
+            speed: 1.0,
         }
     }
 }

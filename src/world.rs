@@ -108,6 +108,8 @@ impl World {
     }
 
     pub fn step(&mut self, dt: f64) {
+        let dt = self.settings.speed * dt;
+
         // Run simulation step
         for inflow in self.inflows.values_mut() {
             if !inflow.on {
