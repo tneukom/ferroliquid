@@ -45,7 +45,7 @@ ahash = { version = "0.8.12", default-features = false, features = ["std"] }
 web-sys = { version = "0.3.83", features = ["UrlSearchParams"] }
 cached = "0.56.0"
 # Add "enable" flag to enable tracy-client, causes issues with stacktrace on Windows, see trace_stacktrace_missing.md
-tracy-client = { version = "0.18.4", default-features = false, features = ["enable", "system-tracing",
+tracy-client = { version = "0.18.4", default-features = false, features = ["system-tracing",
     "context-switch-tracing", "code-transfer", "callstack-inlines", "only-localhost"] }
 fastrand = { version = "2.3.0" }
 slotmap = { version = "1.1.1", features = ["serde"] }

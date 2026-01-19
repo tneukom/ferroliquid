@@ -6,6 +6,7 @@ use crate::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
         block_painter::BlockPainter,
+        debug_painter::DebugPainter,
         gl_framebuffer::GlFramebuffer,
         gl_texture::{Filter, GlTexture, TextureFormat, Wrap},
         inflow_painter::InflowPainter,
@@ -59,11 +60,15 @@ pub struct SimulationPainter {
     pub blit_painter: BlitPainter,
 
     pub background_texture: GlTexture,
+
+    pub debug_painter: DebugPainter,
 }
 
 impl SimulationPainter {
     pub unsafe fn new(gl: &glow::Context, simulation_bounds: Rect<i64>) -> Self {
         const CELL_SIZE: i64 = 8; // in pixels
+        const COLOR_CELL_SIZE: i64 = CELL_SIZE * 2;
+
         let new_empty_texture = |format: TextureFormat, cell_size: i64| {
             let texture_size = simulation_bounds.size() * cell_size;
             GlTexture::empty(
@@ -100,16 +105,16 @@ impl SimulationPainter {
         // Weird color banding artifacts when using RGBA8 instead of RGBA16. Would it be better
         // to use RGBA16F? Probably not, we need precision over the [0, 1] not only for small
         // numbers.
-        let color_texture = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
+        let color_texture = new_empty_texture(TextureFormat::RGBA16, COLOR_CELL_SIZE);
         let color_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&color_texture]);
-        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
+        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA16, COLOR_CELL_SIZE);
         let color_framebuffer_scratch =
             GlFramebuffer::with_color_attachments(gl, &[&color_texture_scratch]);
         let advect_painter = AdvectPainter::new(gl);
 
         let inflow_painter = InflowPainter::new(gl);
 
-        let water_texture = new_empty_texture(TextureFormat::RGBA16, CELL_SIZE * 2);
+        let water_texture = new_empty_texture(TextureFormat::RGBA16, COLOR_CELL_SIZE);
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
@@ -129,6 +134,8 @@ impl SimulationPainter {
                 Wrap::MirroredRepeat,
             )
         };
+
+        let debug_painter = DebugPainter::new(gl);
 
         Self {
             i_step: 0,
@@ -159,6 +166,7 @@ impl SimulationPainter {
             block_painter,
             blit_painter,
             background_texture,
+            debug_painter,
         }
     }
 
@@ -331,7 +339,7 @@ impl SimulationPainterSettings {
                 ui.label("Particle point size");
                 ui.add(
                     egui::DragValue::new(&mut self.particles.point_size)
-                        .range(1.0..=40.0)
+                        .range(1.0..=60.0)
                         .speed(0.1),
                 );
                 ui.end_row();

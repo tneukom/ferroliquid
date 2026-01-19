@@ -1,6 +1,9 @@
 use crate::{
     app::TextureWindowOptions,
-    painting::{blit_painter::BlitPainter, simulation_painter::SimulationPainter},
+    painting::{
+        blit_painter::BlitPainter, debug_painter::DebugPainterStyle,
+        simulation_painter::SimulationPainter,
+    },
     widgets::choice_buttons,
 };
 use std::sync::{Arc, Mutex};
@@ -19,27 +22,46 @@ pub struct Textures {
 impl Textures {
     pub fn new() -> Self {
         Self {
-            density_texture: TextureWindowOptions::new("Density", |painter| {
-                &painter.density_texture
-            }),
-            advection_texture: TextureWindowOptions::new("Advection", |painter| {
-                &painter.advection_texture
-            }),
-            step_texture: TextureWindowOptions::new("Step", |painter| &painter.step_texture),
-            vertical_smoothed_texture: TextureWindowOptions::new("Vertical Smoothed", |painter| {
-                &painter.vertical_smoothed_texture
-            }),
+            density_texture: TextureWindowOptions::new(
+                "Density",
+                DebugPainterStyle::Default,
+                |painter| &painter.density_texture,
+            ),
+            advection_texture: TextureWindowOptions::new(
+                "Advection",
+                DebugPainterStyle::Advection,
+                |painter| &painter.advection_texture,
+            ),
+            step_texture: TextureWindowOptions::new(
+                "Step",
+                DebugPainterStyle::Default,
+                |painter| &painter.step_texture,
+            ),
+            vertical_smoothed_texture: TextureWindowOptions::new(
+                "Vertical Smoothed",
+                DebugPainterStyle::Default,
+                |painter| &painter.vertical_smoothed_texture,
+            ),
             horizontal_smoothed_texture: TextureWindowOptions::new(
                 "Horizontal Smoothed",
+                DebugPainterStyle::Default,
                 |painter| &painter.horizontal_smoothed_texture,
             ),
-            water_texture: TextureWindowOptions::new("Water", |painter| &painter.water_texture),
-            color_texture_to: TextureWindowOptions::new("Color Scratch", |painter| {
-                &painter.color_texture_scratch
-            }),
-            color_texture_from: TextureWindowOptions::new("Color", |painter| {
-                &painter.color_texture
-            }),
+            water_texture: TextureWindowOptions::new(
+                "Water",
+                DebugPainterStyle::Default,
+                |painter| &painter.water_texture,
+            ),
+            color_texture_to: TextureWindowOptions::new(
+                "Color Scratch",
+                DebugPainterStyle::Default,
+                |painter| &painter.color_texture_scratch,
+            ),
+            color_texture_from: TextureWindowOptions::new(
+                "Color",
+                DebugPainterStyle::Default,
+                |painter| &painter.color_texture,
+            ),
         }
     }
 }
@@ -81,7 +103,9 @@ impl RenderDebugUi {
                 let dots = &simulation_painter.particle_dots_texture;
 
                 unsafe {
-                    simulation_painter.blit_painter.draw(gl, &texture, false);
+                    simulation_painter
+                        .debug_painter
+                        .draw(gl, &texture, options.style);
                     if paint_dots {
                         simulation_painter.blit_painter.draw(gl, &dots, true);
                     }

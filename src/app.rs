@@ -8,6 +8,7 @@ use crate::{
     outflow::Outflow,
     painting::{
         block_painter::BlockPaintingMode,
+        debug_painter::DebugPainterStyle,
         gl_texture::GlTexture,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
     },
@@ -21,6 +22,7 @@ use crate::{
 };
 use egui::AtomExt;
 use glow::HasContext;
+use log::warn;
 use std::{
     fs,
     io::{BufReader, BufWriter},
@@ -342,8 +344,12 @@ impl EguiApp {
 
         if let Some(color_jpeg_base64_url) = save_world.color_jpeg_base64_url.take() {
             let color_image = RgbaField::decode_base64_url_jpeg(&color_jpeg_base64_url).unwrap();
-            unsafe {
-                simulation_painter.write_water_color(&self.gl, &color_image);
+            if color_image.size() == simulation_painter.color_texture.size() {
+                unsafe {
+                    simulation_painter.write_water_color(&self.gl, &color_image);
+                }
+            } else {
+                warn!("Ignoring water color texture because size doesn't match!")
             }
         }
 
@@ -690,12 +696,14 @@ pub struct TextureWindowOptions {
     pub show: bool,
     pub scale: f64,
     pub paint_dots: bool,
+    pub style: DebugPainterStyle,
     pub get_texture: Arc<dyn Fn(&SimulationPainter) -> &GlTexture + 'static + Send + Sync>,
 }
 
 impl TextureWindowOptions {
     pub fn new(
         title: impl Into<String>,
+        style: DebugPainterStyle,
         get_texture: impl Fn(&SimulationPainter) -> &GlTexture + 'static + Send + Sync,
     ) -> Self {
         Self {
@@ -703,6 +711,7 @@ impl TextureWindowOptions {
             show: false,
             scale: 1.0,
             paint_dots: false,
+            style,
             get_texture: Arc::new(get_texture),
         }
     }
