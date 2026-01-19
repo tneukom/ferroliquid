@@ -8,7 +8,6 @@ use crate::{
 };
 use derive_more::From;
 use egui::{ImageSource, Sense, Ui};
-use itertools::Itertools;
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 

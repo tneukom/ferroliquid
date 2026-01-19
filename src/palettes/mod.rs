@@ -54,10 +54,20 @@ impl Palette {
         )
     }
 
+    pub fn liquidsketch() -> Palette {
+        let bitmap = RgbaField::load_from_memory(include_bytes!("liquidsketch.png")).unwrap();
+        Self::from_bitmap(
+            &bitmap,
+            "LIQUIDSKETCH",
+            "https://apps.apple.com/us/app/liquidsketch/id544717096",
+        )
+    }
+
     pub fn palettes() -> &'static [Palette] {
         static PALETTES: OnceLock<Vec<Palette>> = OnceLock::new();
         let palettes = PALETTES.get_or_init(|| {
             vec![
+                Palette::liquidsketch(),
                 Palette::palette_r_place(),
                 Palette::palette_pico8(),
                 // Palette::palette_na16(),
