@@ -66,7 +66,7 @@ pub struct SimulationPainter {
 
 impl SimulationPainter {
     pub unsafe fn new(gl: &glow::Context, simulation_bounds: Rect<i64>) -> Self {
-        const CELL_SIZE: i64 = 8; // in pixels
+        const CELL_SIZE: i64 = 6; // in pixels
         const COLOR_CELL_SIZE: i64 = CELL_SIZE * 2;
 
         let new_empty_texture = |format: TextureFormat, cell_size: i64| {

@@ -10,7 +10,11 @@ use crate::{
         block_painter::BlockPaintingMode,
         debug_painter::DebugPainterStyle,
         gl_texture::GlTexture,
+        particle_painter::ParticlePainterSettings,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
+        smoothing_painter::SmoothPainterSettings,
+        step_painter::StepPainterSettings,
+        water_painter::WaterPainterSettings,
     },
     piecewise_linear::PiecewiseLinear,
     radial_force::{GravityFunction, PiecewiseLinearRadialFunction, RadialForce},
@@ -118,11 +122,26 @@ impl EguiApp {
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 
+        let simulation_painter_settings = SimulationPainterSettings {
+            particles: ParticlePainterSettings { point_size: 20.0 },
+            smooth: SmoothPainterSettings {
+                sigma: 0.370,
+                radius: 8,
+            },
+            step: StepPainterSettings { edge: 0.2 },
+            water: WaterPainterSettings {
+                edge_low: 0.9,
+                edge_high: 0.95,
+                darken_edge_low: 0.925,
+                darken_edge_high: 1.0,
+            },
+        };
+
         Self {
             world,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
-            simulation_painter_settings: SimulationPainterSettings::default(),
+            simulation_painter_settings,
             scene_rect: egui::Rect::ZERO,
             run: false,
             step_timestamp: None,
