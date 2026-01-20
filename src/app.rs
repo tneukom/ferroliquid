@@ -125,14 +125,14 @@ impl EguiApp {
         let simulation_painter_settings = SimulationPainterSettings {
             particles: ParticlePainterSettings { point_size: 20.0 },
             smooth: SmoothPainterSettings {
-                sigma: 0.370,
+                sigma: 0.4,
                 radius: 8,
             },
-            step: StepPainterSettings { edge: 0.2 },
+            step: StepPainterSettings { edge: 0.3 },
             water: WaterPainterSettings {
-                edge_low: 0.9,
-                edge_high: 0.95,
-                darken_edge_low: 0.925,
+                edge_low: 0.86,
+                edge_high: 0.9,
+                darken_edge_low: 0.86,
                 darken_edge_high: 1.0,
             },
         };
