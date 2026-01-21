@@ -1,5 +1,6 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
+    demos::Demo,
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
@@ -29,7 +30,7 @@ use glow::HasContext;
 use log::warn;
 use std::{
     fs,
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Cursor, Read},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -342,21 +343,13 @@ impl EguiApp {
         };
     }
 
-    pub fn load(&mut self, path: impl AsRef<Path>) {
-        let path = path.as_ref();
-        let extension = path.extension().unwrap().to_ascii_lowercase();
-        let file = fs::File::open(path).unwrap();
+    pub fn load_from_snap_json(&mut self, reader: impl Read) {
+        let snap_reader = snap::read::FrameDecoder::new(reader);
+        self.load_from_json(snap_reader);
+    }
 
-        let mut save_world: SaveWorld = if extension == "json" {
-            let buf_reader = BufReader::new(file);
-            serde_json::from_reader(buf_reader).unwrap()
-        } else if extension == "json_snap" {
-            let buf_reader = BufReader::new(file);
-            let snap_reader = snap::read::FrameDecoder::new(buf_reader);
-            serde_json::from_reader(snap_reader).unwrap()
-        } else {
-            panic!("Unsupported extension");
-        };
+    pub fn load_from_json(&mut self, reader: impl Read) {
+        let mut save_world: SaveWorld = serde_json::from_reader(reader).unwrap();
 
         let mut simulation_painter = self.simulation_painter.lock().unwrap();
         simulation_painter.reset();
@@ -374,6 +367,22 @@ impl EguiApp {
 
         self.world = World::from_save_world(save_world);
         self.selected = Selected::None;
+    }
+
+    pub fn load(&mut self, path: impl AsRef<Path>) {
+        let path = path.as_ref();
+        let extension = path.extension().unwrap().to_ascii_lowercase();
+        let file = fs::File::open(path).unwrap();
+
+        let buf_reader = BufReader::new(file);
+        if extension == "json" {
+            self.load_from_json(buf_reader);
+        } else if extension == "json_snap" {
+            let snap_reader = snap::read::FrameDecoder::new(buf_reader);
+            self.load_from_snap_json(snap_reader);
+        } else {
+            panic!("Unsupported extension");
+        };
     }
 
     pub fn save_load_ui(&mut self, ui: &mut egui::Ui) {
@@ -403,6 +412,8 @@ impl EguiApp {
     }
 
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
+        self.demo_menu_button_ui(ui);
+
         ui.horizontal(|ui| {
             let run_icon = egui::include_image!("icons/play.png").atom_size(Self::ICON_SIZE);
             let run_button = egui::Button::new((run_icon, "Run")).selected(self.run);
@@ -660,7 +671,27 @@ impl EguiApp {
         ctx.input(|input| input.content_rect().width() < 800.0)
     }
 
-    // fn egui_texture_handle()
+    pub fn demo_menu_button_ui(&mut self, ui: &mut egui::Ui) {
+        let mut demos_button = egui::containers::menu::MenuButton::new("Demos");
+        demos_button.button = demos_button.button.fill(egui::Color32::ORANGE);
+        demos_button.ui(ui, |ui| {
+            self.demo_menu_ui(ui);
+        });
+    }
+
+    pub fn demo_menu_ui(&mut self, ui: &mut egui::Ui) {
+        for demo in Demo::ALL {
+            ui.horizontal(|ui| {
+                ui.add_space(10.0);
+
+                if ui.button(demo.name).clicked() {
+                    let reader = Cursor::new(demo.bytes);
+                    self.load_from_snap_json(reader);
+                    self.run = true;
+                }
+            });
+        }
+    }
 }
 
 impl eframe::App for EguiApp {
