@@ -51,13 +51,13 @@ impl WaterPainter {
         gl.bind_texture(glow::TEXTURE_2D, Some(density_texture.id));
         self.effect_painter
             .shader
-            .uniform(gl, "density_texture", 0i32);
+            .uniform(gl, "density_sampler", 0i32);
 
         gl.active_texture(glow::TEXTURE1);
         gl.bind_texture(glow::TEXTURE_2D, Some(color_texture.id));
         self.effect_painter
             .shader
-            .uniform(gl, "color_texture", 1i32);
+            .uniform(gl, "color_sampler", 1i32);
 
         self.effect_painter
             .shader

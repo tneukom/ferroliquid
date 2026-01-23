@@ -8,7 +8,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
-use std::time::Instant;
+use web_time::Instant;
 
 slotmap::new_key_type! { pub struct ForceKey; }
 slotmap::new_key_type! { pub struct InflowKey; }

@@ -27,7 +27,7 @@ impl BlitPainter {
 
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(texture.id));
-        self.effect_painter.shader.uniform(gl, "texture", 0i32);
+        self.effect_painter.shader.uniform(gl, "sampler", 0i32);
 
         self.effect_painter.draw(gl);
     }

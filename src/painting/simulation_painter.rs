@@ -1,7 +1,10 @@
 use crate::{
     field::RgbaField,
     inflow::Inflow,
-    math::rect::Rect,
+    math::{
+        rect::Rect,
+        rgba8::{Rgba, Rgba8},
+    },
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
@@ -13,6 +16,7 @@ use crate::{
         particle_painter::{ParticlePainter, ParticlePainterSettings},
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
         step_painter::{StepPainter, StepPainterSettings},
+        utils::check_gl_error,
         water_painter::{WaterPainter, WaterPainterSettings},
     },
     sides::Orientation,
@@ -105,16 +109,16 @@ impl SimulationPainter {
         // Weird color banding artifacts when using RGBA8 instead of RGBA16. Would it be better
         // to use RGBA16F? Probably not, we need precision over the [0, 1] not only for small
         // numbers.
-        let color_texture = new_empty_texture(TextureFormat::RGBA16, COLOR_CELL_SIZE);
+        let color_texture = new_empty_texture(TextureFormat::RGBA16F, COLOR_CELL_SIZE);
         let color_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&color_texture]);
-        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA16, COLOR_CELL_SIZE);
+        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA16F, COLOR_CELL_SIZE);
         let color_framebuffer_scratch =
             GlFramebuffer::with_color_attachments(gl, &[&color_texture_scratch]);
         let advect_painter = AdvectPainter::new(gl);
 
         let inflow_painter = InflowPainter::new(gl);
 
-        let water_texture = new_empty_texture(TextureFormat::RGBA16, COLOR_CELL_SIZE);
+        let water_texture = new_empty_texture(TextureFormat::RGBA16F, COLOR_CELL_SIZE);
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
@@ -315,9 +319,11 @@ impl SimulationPainter {
     }
 
     pub unsafe fn write_water_color(&mut self, gl: &glow::Context, color: &RgbaField) {
-        // TODO: We need to write Rgba8 data as ushort data
+        // color_texture is RGBA16F so we need to upload as u16
+        let f32_color = color.map(|rgba| rgba.to_f32());
+
         self.color_texture
-            .texture_image_as_bytes(gl, TextureFormat::RGBA16, color);
+            .texture_image_field(gl, TextureFormat::RGBA16F, &f32_color);
     }
 }
 

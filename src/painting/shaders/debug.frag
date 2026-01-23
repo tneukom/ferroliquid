@@ -3,7 +3,7 @@ precision highp float;
 
 in vec2 pass_uv;
 
-uniform sampler2D texture;
+uniform sampler2D sampler;
 uniform int style;
 
 out vec4 out_color;
@@ -12,7 +12,7 @@ const int STYLE_DEFAULT = 0;
 const int STYLE_ADVECTION = 1;
 
 void main() {
-    vec4 color = texture2D(texture, pass_uv);
+    vec4 color = texture(sampler, pass_uv);
     if (style == STYLE_DEFAULT) {
         out_color = color;
     } else if (style == STYLE_ADVECTION) {

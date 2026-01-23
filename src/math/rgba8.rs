@@ -104,6 +104,7 @@ pub struct Rgba<T> {
 // Pod for generic Rgba<T> wants packed repr, but Serde wants not packed, so we explicitly
 // impl Pod for the types that actually need it.
 unsafe impl Pod for Rgba<u8> {}
+unsafe impl Pod for Rgba<u16> {}
 unsafe impl Pod for Rgba<f32> {}
 
 #[allow(non_snake_case)]

@@ -378,8 +378,7 @@ impl EguiApp {
         if extension == "json" {
             self.load_from_json(buf_reader);
         } else if extension == "json_snap" {
-            let snap_reader = snap::read::FrameDecoder::new(buf_reader);
-            self.load_from_snap_json(snap_reader);
+            self.load_from_snap_json(buf_reader);
         } else {
             panic!("Unsupported extension");
         };
@@ -389,6 +388,7 @@ impl EguiApp {
         ui.horizontal(|ui| {
             let save_icon = egui::include_image!("icons/file_save.png").atom_size(Self::ICON_SIZE);
             if ui.button((save_icon, "Save")).clicked() {
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Some(path) = rfd::FileDialog::new()
                     .add_filter("json_snap", &["json_snap"])
                     .add_filter("json", &["json"])
@@ -400,6 +400,7 @@ impl EguiApp {
 
             let load_icon = egui::include_image!("icons/file_load.png").atom_size(Self::ICON_SIZE);
             if ui.button((load_icon, "Load")).clicked() {
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Some(path) = rfd::FileDialog::new()
                     .add_filter("json_snap", &["json_snap"])
                     .add_filter("json", &["json"])

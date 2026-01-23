@@ -1,10 +1,19 @@
 use crate::{
     field::{Field, RgbaField},
-    math::{affine_map::AffineMap, point::Point, rect::Rect},
-    painting::gl_garbage::{GlResource, gl_release},
+    math::{
+        affine_map::AffineMap,
+        point::Point,
+        rect::Rect,
+        rgba8::{Rgba, Rgba8},
+    },
+    painting::{
+        gl_garbage::{GlResource, gl_release},
+        utils::check_gl_error,
+    },
 };
 use bytemuck::{Pod, cast_slice};
 use glow::{HasContext, PixelUnpackData};
+use log::warn;
 
 pub struct GlTexture {
     pub id: glow::Texture,
@@ -31,12 +40,12 @@ pub enum Wrap {
 pub enum TextureFormat {
     SRGBA8,
     RGBA8,
-    RGBA16,
-    R16U,
-    R8,
-    RGBA32F,
+    // RGBA16,
+    // R16U,
+    // R8,
+    // RGBA32F,
     RGBA16F,
-    R32F,
+    // R32F,
     R16F,
 }
 
@@ -45,12 +54,12 @@ impl TextureFormat {
         match self {
             Self::SRGBA8 => glow::SRGB8_ALPHA8,
             Self::RGBA8 => glow::RGBA8,
-            Self::RGBA16 => glow::RGBA16,
-            Self::R16U => glow::R16UI,
-            Self::R8 => glow::R8,
-            Self::RGBA32F => glow::RGBA32F,
+            // Self::RGBA16 => glow::RGBA16,
+            // Self::R16U => glow::R16UI,
+            // Self::R8 => glow::R8,
+            // Self::RGBA32F => glow::RGBA32F,
             Self::RGBA16F => glow::RGBA16F,
-            Self::R32F => glow::R32F,
+            // Self::R32F => glow::R32F,
             Self::R16F => glow::R16F,
         }
     }
@@ -59,15 +68,58 @@ impl TextureFormat {
         match self {
             Self::SRGBA8 => glow::RGBA,
             Self::RGBA8 => glow::RGBA,
-            Self::RGBA16 => glow::RGBA,
-            Self::R16U => glow::RED_INTEGER,
-            Self::R8 => glow::RED,
-            Self::RGBA32F => glow::RGBA,
+            // Self::RGBA16 => glow::RGBA,
+            // Self::R16U => glow::RED_INTEGER,
+            // Self::R8 => glow::RED,
+            // Self::RGBA32F => glow::RGBA,
             Self::RGBA16F => glow::RGBA,
-            Self::R32F => glow::RED,
+            // Self::R32F => glow::RED,
             Self::R16F => glow::RED,
         }
     }
+
+    /// Type
+    pub fn data_type(self) -> u32 {
+        match self {
+            Self::SRGBA8 => glow::UNSIGNED_BYTE,
+            Self::RGBA8 => glow::UNSIGNED_BYTE,
+            // Self::RGBA16 => glow::UNSIGNED_SHORT,
+            // Self::R16U => glow::UNSIGNED_SHORT,
+            // Self::R8 => glow::UNSIGNED_BYTE,
+            // Self::RGBA32F => glow::FLOAT,
+            Self::RGBA16F => glow::FLOAT,
+            // Self::R32F => glow::FLOAT,
+            Self::R16F => glow::FLOAT,
+        }
+    }
+}
+
+pub trait GlPrimitive {
+    const GL_PRIMITIVE: u32;
+}
+
+impl GlPrimitive for u8 {
+    const GL_PRIMITIVE: u32 = glow::UNSIGNED_BYTE;
+}
+
+impl GlPrimitive for u16 {
+    const GL_PRIMITIVE: u32 = glow::UNSIGNED_SHORT;
+}
+
+impl GlPrimitive for f32 {
+    const GL_PRIMITIVE: u32 = glow::FLOAT;
+}
+
+impl GlPrimitive for Rgba8 {
+    const GL_PRIMITIVE: u32 = glow::UNSIGNED_BYTE;
+}
+
+impl GlPrimitive for Rgba<f32> {
+    const GL_PRIMITIVE: u32 = glow::FLOAT;
+}
+
+impl GlPrimitive for Rgba<u16> {
+    const GL_PRIMITIVE: u32 = glow::UNSIGNED_SHORT;
 }
 
 impl GlTexture {
@@ -102,7 +154,7 @@ impl GlTexture {
         wrap: Wrap,
     ) -> Self {
         let mut texture = Self::new(gl, width, height, filter, wrap);
-        texture.texture_image_bytes(gl, format, None);
+        texture.texture_image_empty(gl, format);
         texture
     }
 
@@ -114,18 +166,14 @@ impl GlTexture {
         wrap: Wrap,
     ) -> Self {
         let mut texture = Self::new(gl, bitmap.width(), bitmap.height(), filter, wrap);
-        texture.texture_image_as_bytes(gl, format, bitmap);
+        texture.texture_image_field(gl, format, bitmap);
         texture
     }
 
-    unsafe fn texture_image_bytes(
-        &mut self,
-        gl: &glow::Context,
-        format: TextureFormat,
-        bytes: Option<&[u8]>,
-    ) {
+    pub unsafe fn texture_image_empty(&mut self, gl: &glow::Context, format: TextureFormat) {
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
+
         gl.tex_image_2d(
             glow::TEXTURE_2D,
             0,
@@ -134,12 +182,44 @@ impl GlTexture {
             self.height as i32,
             0,
             format.format(),
-            glow::UNSIGNED_BYTE,
-            PixelUnpackData::Slice(bytes),
+            format.data_type(),
+            PixelUnpackData::Slice(None),
         );
+        check_gl_error(gl);
     }
 
-    pub unsafe fn texture_image_as_bytes<T: Pod>(
+    pub unsafe fn texture_image<T: GlPrimitive + Pod>(
+        &mut self,
+        gl: &glow::Context,
+        format: TextureFormat,
+        data: &[T],
+    ) {
+        gl.active_texture(glow::TEXTURE0);
+        gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
+        warn!("tex_image_2d(format={format:?})");
+
+        assert_eq!(T::GL_PRIMITIVE, format.data_type());
+
+        let data_bytes: &[u8] = cast_slice(data);
+
+        // In WebGL type compatibility with internal_format is much stricter than in Desktop GL
+        // For example R16F with type UNSIGNED_BYTE does not work!
+        // See https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/texImage2D
+        gl.tex_image_2d(
+            glow::TEXTURE_2D,
+            0,
+            format.internal_format() as i32,
+            self.width as i32,
+            self.height as i32,
+            0,
+            format.format(),
+            format.data_type(),
+            PixelUnpackData::Slice(Some(data_bytes)),
+        );
+        check_gl_error(gl);
+    }
+
+    pub unsafe fn texture_image_field<T: GlPrimitive + Pod>(
         &mut self,
         gl: &glow::Context,
         format: TextureFormat,
@@ -148,8 +228,7 @@ impl GlTexture {
         assert_eq!(bitmap.width(), self.width);
         assert_eq!(bitmap.height(), self.height);
 
-        let bitmap_bytes: &[u8] = cast_slice(bitmap.as_slice());
-        self.texture_image_bytes(gl, format, Some(bitmap_bytes));
+        self.texture_image(gl, format, bitmap.as_slice());
     }
 
     pub unsafe fn generate_mipmaps(&self, gl: &glow::Context) {
@@ -189,6 +268,7 @@ impl GlTexture {
             glow::UNSIGNED_BYTE,
             PixelUnpackData::Slice(Some(bitmap_bytes)),
         );
+        check_gl_error(gl);
         gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, 0);
     }
 

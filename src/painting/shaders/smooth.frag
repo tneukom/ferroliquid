@@ -15,7 +15,7 @@ out float out_density;
 void main() {
     float sum = 0.0;
     for (int i = 0; i < kernel_size; ++i) {
-        float density_sample = texture(density_texture, pass_uv + uv_offsets[i]);
+        float density_sample = texture(density_texture, pass_uv + uv_offsets[i]).r;
         sum += kernel[i] * density_sample;
     }
 
