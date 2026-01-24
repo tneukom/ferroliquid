@@ -560,6 +560,15 @@ impl EguiApp {
                         &blocks,
                         BlockPaintingMode::ForegroundBrush,
                     );
+
+                    // WebGL canvas created by eframe has default settings for alpha=true and
+                    // premultipliedAlpha=true, see:
+                    // https://github.com/emilk/egui/blob/fa78d25564a5dbcb546ff6db0a9e14cb603ba03b/crates/eframe/src/web/web_painter_glow.rs#L151-L154
+                    // https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/getContext
+                    // So the framebuffer is blended with the website background.
+                    gl.color_mask(false, false, false, true); // write alpha only
+                    gl.clear_color(0.0, 0.0, 0.0, 1.0); // alpha = 1
+                    gl.clear(glow::COLOR_BUFFER_BIT);
                 }
             })
         };
