@@ -1,4 +1,5 @@
 use crate::{
+    event_trace::{MeasureDuration, TimingSection},
     grid::Grid,
     interpolator::interpolate_div_free_velocity_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
@@ -240,6 +241,7 @@ impl Simulation {
     #[inline(never)]
     pub fn integrate(&mut self, dt: f64, steps: usize) {
         let _span = tracy_client::span!("integrate");
+        let _duration = MeasureDuration::new(TimingSection::Integration);
 
         let bounds = self.grid.bounds.as_f64();
         let inset_bounds = bounds.padded(-1.0);
@@ -301,6 +303,7 @@ impl Simulation {
     #[inline(never)]
     pub fn step(&mut self, dt: f64, settings: &SimulationSettings) {
         let _span = tracy_client::span!("step");
+        let _duration = MeasureDuration::new(TimingSection::Step);
 
         self.grid.clear();
 

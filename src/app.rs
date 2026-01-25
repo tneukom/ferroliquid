@@ -1,6 +1,7 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     demos::Demo,
+    event_trace::{ProfilerWindow, events_ui, trace_begin_frame},
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
@@ -97,6 +98,7 @@ pub struct EguiApp {
 
     simulation_debug_window: SimulationDebugWindow,
     render_debug_ui: RenderDebugUi,
+    profiler_window: ProfilerWindow,
 
     simulation_painter: Arc<Mutex<SimulationPainter>>,
     simulation_painter_settings: SimulationPainterSettings,
@@ -142,6 +144,7 @@ impl EguiApp {
             world,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
+            profiler_window: ProfilerWindow::new(),
             simulation_painter_settings,
             scene_rect: egui::Rect::ZERO,
             run: false,
@@ -466,6 +469,8 @@ impl EguiApp {
         styled_space(ui);
 
         self.debug_ui(ui);
+
+        self.profiler_window.window_toggle(ui);
     }
 
     pub fn debug_ui(&mut self, ui: &mut egui::Ui) {
@@ -706,6 +711,8 @@ impl EguiApp {
 
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        trace_begin_frame();
+
         // TODO: Avoid cloning
         unsafe {
             self.simulation_painter.lock().unwrap().paint(

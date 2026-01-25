@@ -1,4 +1,5 @@
 use crate::{
+    event_trace::{MeasureDuration, TimingSection},
     field::Field,
     math::{point::Point, rect::Rect},
     sides::{Direction, Side, Sides},
@@ -302,6 +303,7 @@ impl Grid {
     #[inline(never)]
     pub fn solve_pressure(&mut self, settings: &SimulationSettings) {
         let _span = tracy_client::span!("solve_pressure");
+        let _duration = MeasureDuration::new(TimingSection::SolvePressure);
 
         self.cells_pressure.fill(0.0);
         if !self.fluid_cells.is_empty() {
