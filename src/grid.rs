@@ -184,6 +184,7 @@ impl Grid {
         settings: &SimulationSettings,
     ) -> Vec<Particle> {
         let _span = tracy_client::span!("insert_particles");
+        let _duration = MeasureDuration::new(TimingSection::PrepareGrid);
 
         let particles = particles
             .into_iter()

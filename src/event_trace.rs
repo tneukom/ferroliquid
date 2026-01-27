@@ -1,27 +1,31 @@
-use derive_more::From;
+use derive_more::{From, with_trait::Display};
+use egui_plot::PlotPoints;
+use enum_map::{Enum, EnumMap};
 use std::{collections::VecDeque, sync::Mutex};
 use web_time::Instant;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Enum)]
 pub enum TimingSection {
-    Total,
     Integration,
     SolvePressure,
-    Step,
+    PrepareGrid,
 }
 
 #[derive(Clone, Copy, From)]
 pub enum Event {
     TimingEvent(TimingSection, f64),
+    FrameDuration(f64),
 }
 
 pub struct Events {
+    frame_begin: Option<Instant>,
     frames: VecDeque<Vec<Event>>,
 }
 
 impl Events {
     pub const fn new() -> Self {
         Self {
+            frame_begin: None,
             frames: VecDeque::new(),
         }
     }
@@ -38,6 +42,19 @@ pub fn trace_event(event: impl Into<Event>) {
 
 pub fn trace_begin_frame() {
     let mut trace_events = TRACE_EVENTS.lock().unwrap();
+
+    // Measure time since last frame
+    if let Some(frame_begin) = trace_events.frame_begin {
+        if let Some(active_frame) = trace_events.frames.back_mut() {
+            let total = frame_begin.elapsed().as_secs_f64();
+            // println!("total: {total}");
+            active_frame.push(Event::FrameDuration(total));
+        }
+    }
+
+    trace_events.frame_begin = Some(Instant::now());
+
+    // Add new frame
     trace_events.frames.push_back(Vec::new());
     while trace_events.frames.len() > 128 {
         trace_events.frames.pop_front();
@@ -68,70 +85,112 @@ impl Drop for MeasureDuration {
 }
 
 #[derive(Default)]
-struct FrameDurations {
-    total: f64,
-    integration: f64,
-    solve_pressure: f64,
-    step: f64,
+struct FrameProfile {
+    durations: EnumMap<TimingSection, f64>,
+    whole_frame_duration: f64,
 }
 
-/// Duration plot for a single section, multiple of these are stacked
-fn duration_plot(name: &str, durations: impl IntoIterator<Item = f64>) -> egui_plot::BarChart {
-    let bars: Vec<egui_plot::Bar> = durations
-        .into_iter()
-        .enumerate()
-        .map(|(i, duration)| egui_plot::Bar::new(i as f64, duration))
-        .collect();
-    egui_plot::BarChart::new(name, bars)
-}
-
-pub fn events_ui(ui: &mut egui::Ui) {
-    let frames = {
-        let events = TRACE_EVENTS.lock().unwrap();
-        let mut frames = Vec::new();
-        for frame_events in &events.frames {
-            let mut durations = FrameDurations::default();
-            for event in frame_events {
-                match event {
-                    &Event::TimingEvent(TimingSection::Step, duration) => durations.step = duration,
-                    &Event::TimingEvent(TimingSection::Integration, duration) => {
-                        durations.integration = duration
-                    }
-                    &Event::TimingEvent(TimingSection::SolvePressure, duration) => {
-                        durations.solve_pressure = duration
-                    }
-                    _ => {}
-                }
-            }
-
-            frames.push(durations);
-        }
-
-        frames
-    };
-
-    egui_plot::Plot::new("profile")
-        // .legend(egui_plot::Legend::default())
-        .show(ui, |plot_ui| {
-            let solve_pressure_plot =
-                duration_plot("solve", frames.iter().map(|frame| frame.solve_pressure));
-
-            let integration_plot =
-                duration_plot("integration", frames.iter().map(|frame| frame.integration))
-                    .stack_on(&[&solve_pressure_plot]);
-
-            plot_ui.bar_chart(solve_pressure_plot);
-            plot_ui.bar_chart(integration_plot);
-        });
+impl FrameProfile {
+    pub fn total(&self) -> f64 {
+        self.durations.values().sum()
+    }
 }
 
 pub struct ProfilerWindow {
     show_window: bool,
+    paused: bool,
+    frame_profiles: Vec<FrameProfile>,
 }
 
 impl ProfilerWindow {
     pub fn new() -> Self {
-        Self { show_window: false }
+        Self {
+            show_window: false,
+            paused: false,
+            frame_profiles: Vec::new(),
+        }
+    }
+
+    pub fn update_frame_profiles(&mut self) {
+        // Collect profile events into FrameProfiles
+        self.frame_profiles = {
+            let events = TRACE_EVENTS.lock().unwrap();
+            let mut frame_profiles = Vec::new();
+            for frame_events in &events.frames {
+                let mut frame_profile = FrameProfile::default();
+                for event in frame_events {
+                    match event {
+                        &Event::TimingEvent(section, duration) => {
+                            frame_profile.durations[section] = duration
+                        }
+                        &Event::FrameDuration(whole_frame_duration) => {
+                            frame_profile.whole_frame_duration = whole_frame_duration;
+                        }
+                    }
+                }
+
+                frame_profiles.push(frame_profile);
+            }
+
+            frame_profiles
+        };
+
+        // The last frame is not finished at this point, drop it.
+        self.frame_profiles.pop();
+    }
+
+    pub fn plot_ui(&mut self, ui: &mut egui::Ui) {
+        let delta_x = 1.0;
+        let width = 1.0;
+
+        let mut bar_charts = Vec::new();
+
+        // One bar chart for each section, stacked
+        for section in [
+            TimingSection::PrepareGrid,
+            TimingSection::SolvePressure,
+            TimingSection::Integration,
+        ] {
+            let bars: Vec<egui_plot::Bar> = self
+                .frame_profiles
+                .iter()
+                .enumerate()
+                .map(|(i, frame)| {
+                    let duration = frame.durations[section];
+                    egui_plot::Bar::new(i as f64 * delta_x, duration).stroke(egui::Stroke::NONE)
+                })
+                .collect();
+            let mut bar_chart = egui_plot::BarChart::new(section.to_string(), bars).width(width);
+
+            if let Some(previous_bar_chart) = bar_charts.last() {
+                bar_chart = bar_chart.stack_on(&[previous_bar_chart]);
+            }
+
+            bar_charts.push(bar_chart);
+        }
+
+        // Line chart for the whole frame duration
+        let line_points: Vec<_> = self
+            .frame_profiles
+            .iter()
+            .enumerate()
+            .map(|(i, frame)| {
+                egui_plot::PlotPoint::new(i as f64 * delta_x, frame.whole_frame_duration)
+            })
+            .collect();
+        let line = egui_plot::Line::new("whole_frame", PlotPoints::Owned(line_points));
+
+        egui_plot::Plot::new("profile")
+            .legend(egui_plot::Legend::default())
+            // .default_y_bounds(0.0, 0.2)
+            .include_y(0.0)
+            .include_y(0.015)
+            .show(ui, |plot_ui| {
+                for bar_char in bar_charts {
+                    plot_ui.bar_chart(bar_char);
+                }
+                plot_ui.line(line);
+            });
     }
 
     pub fn window_toggle(&mut self, ui: &mut egui::Ui) {
@@ -142,11 +201,18 @@ impl ProfilerWindow {
             self.show_window = !self.show_window;
         }
 
+        let mut show_window = self.show_window;
         egui::Window::new("Profiler Window")
-            .open(&mut self.show_window)
+            .open(&mut show_window)
             .collapsible(false)
             .show(ui.ctx(), |ui| {
-                events_ui(ui);
+                ui.checkbox(&mut self.paused, "Paused");
+                if !self.paused {
+                    self.update_frame_profiles();
+                }
+
+                self.plot_ui(ui);
             });
+        self.show_window = show_window;
     }
 }

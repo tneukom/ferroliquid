@@ -1,7 +1,7 @@
 use crate::{
     blocks::{Block, BlockKind, BlockPalette},
     demos::Demo,
-    event_trace::{ProfilerWindow, events_ui, trace_begin_frame},
+    event_trace::{ProfilerWindow, trace_begin_frame},
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,

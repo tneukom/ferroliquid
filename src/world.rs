@@ -8,7 +8,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
-use web_time::Instant;
 
 slotmap::new_key_type! { pub struct ForceKey; }
 slotmap::new_key_type! { pub struct InflowKey; }
@@ -133,12 +132,9 @@ impl World {
                 .apply(&mut self.simulation.particles, self.simulation.time, dt);
         }
 
-        // self.simulation.apply_constant_force(Point(0.0, 60.0));
-        let instant = Instant::now();
         self.blocks
             .assign_simulation_grid(&mut self.simulation.grid);
         self.simulation.step(dt, &self.settings);
-        println!("time to simulate: {}", instant.elapsed().as_secs_f64());
     }
 
     pub fn to_save_world(&self) -> SaveWorld {

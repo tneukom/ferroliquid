@@ -1,10 +1,7 @@
 use crate::{
     field::RgbaField,
     inflow::Inflow,
-    math::{
-        rect::Rect,
-        rgba8::{Rgba, Rgba8},
-    },
+    math::rect::Rect,
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
@@ -16,7 +13,6 @@ use crate::{
         particle_painter::{ParticlePainter, ParticlePainterSettings},
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
         step_painter::{StepPainter, StepPainterSettings},
-        utils::check_gl_error,
         water_painter::{WaterPainter, WaterPainterSettings},
     },
     sides::Orientation,
@@ -205,7 +201,6 @@ impl SimulationPainter {
         self.advect(gl);
 
         if self.i_step != simulation.i_step {
-            println!("swapping color texture & fbo");
             // Swap to and from color framebuffers and textures
             swap(&mut self.color_texture, &mut self.color_texture_scratch);
             swap(

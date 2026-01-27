@@ -161,7 +161,7 @@ impl Solver {
 
             let error_norm = inf_norm(&r);
             if error_norm < stop_epsilon {
-                println!("Solved with error_norm: {error_norm}");
+                // println!("Solved with error_norm: {error_norm}");
                 return k;
             }
 

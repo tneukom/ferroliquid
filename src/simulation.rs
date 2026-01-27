@@ -303,7 +303,6 @@ impl Simulation {
     #[inline(never)]
     pub fn step(&mut self, dt: f64, settings: &SimulationSettings) {
         let _span = tracy_client::span!("step");
-        let _duration = MeasureDuration::new(TimingSection::Step);
 
         self.grid.clear();
 
@@ -315,7 +314,7 @@ impl Simulation {
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(settings);
 
-        self.integrate(dt, 2);
+        self.integrate(dt, 1);
 
         if self.i_step % 120 == 0 {
             self.sort_particles();
