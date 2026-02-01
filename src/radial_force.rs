@@ -58,7 +58,7 @@ impl RadialFunction for GravityFunction {
     fn settings_ui(&mut self, ui: &mut Ui) {
         labeled_drag_value(ui, "Radius:", &mut self.radius, 0.0..=40.0, 0.1);
 
-        labeled_drag_value(ui, "Density:", &mut self.density, 1.0..=500.0, 0.5);
+        labeled_drag_value(ui, "Density:", &mut self.density, -500.0..=500.0, 0.5);
 
         ui.label("Force");
         radial_plot_ui(ui, "force_plot", |r| self.eval(r));
@@ -86,10 +86,10 @@ impl Default for PiecewiseLinearRadialFunction {
 impl PiecewiseLinearRadialFunction {
     pub fn ring_attraction(strength: f64) -> Self {
         let knots = vec![
-            crate::math::point::Point(20.0, 0.0),
-            crate::math::point::Point(25.0, -25.0),
-            crate::math::point::Point(35.0, 25.0),
-            crate::math::point::Point(40.0, 0.0),
+            Point(20.0, 0.0),
+            Point(25.0, -25.0),
+            Point(35.0, 25.0),
+            Point(40.0, 0.0),
         ];
         let function = PiecewiseLinear::new(knots);
         Self { function, strength }
@@ -172,7 +172,7 @@ impl RadialFunction for PiecewiseLinearRadialFunction {
     }
 
     fn settings_ui(&mut self, ui: &mut Ui) {
-        labeled_drag_value(ui, "Strength:", &mut self.strength, 0.5..=100.0, 0.5);
+        labeled_drag_value(ui, "Strength:", &mut self.strength, -100.0..=100.0, 0.5);
 
         ui.label("Force");
         self.editable_plot(ui);
