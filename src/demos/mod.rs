@@ -5,23 +5,47 @@ pub struct Demo {
 
 impl Demo {
     pub const GRAVITY_NEAT: Self = Self {
-        name: "Gravity neat",
+        name: "Gravity Neat",
         bytes: include_bytes!("gravity_neat.json_snap"),
     };
 
     pub const GRAVITY_DOUBLE: Self = Self {
-        name: "Gravity double",
+        name: "Gravity Double",
         bytes: include_bytes!("double_gravity.json_snap"),
     };
 
     pub const GRAVITY_TRIPLE: Self = Self {
-        name: "Gravity triple",
+        name: "Gravity Triple",
         bytes: include_bytes!("triple_gravity.json_snap"),
     };
 
-    pub const ALL: [&'static Self; 3] = [
+    pub const NEGATIVE_GRAVITY: Self = Self {
+        name: "Negative Gravity",
+        bytes: include_bytes!("negative_gravity.json_snap"),
+    };
+
+    pub const CIRCULAR_SIPHON: Self = Self {
+        name: "Circular Siphon",
+        bytes: include_bytes!("circular_siphon.json_snap"),
+    };
+
+    pub const RING: Self = Self {
+        name: "Ring",
+        bytes: include_bytes!("ring.json_snap"),
+    };
+
+    pub const WHIRL: Self = Self {
+        name: "Whirl",
+        bytes: include_bytes!("whirl.json_snap"),
+    };
+
+    pub const ALL: [&'static Self; 7] = [
         &Self::GRAVITY_NEAT,
         &Self::GRAVITY_DOUBLE,
         &Self::GRAVITY_TRIPLE,
+        &Self::NEGATIVE_GRAVITY,
+        &Self::CIRCULAR_SIPHON,
+        &Self::RING,
+        &Self::WHIRL,
     ];
 }
