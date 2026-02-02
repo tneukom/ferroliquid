@@ -126,16 +126,16 @@ impl EguiApp {
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 
         let simulation_painter_settings = SimulationPainterSettings {
-            particles: ParticlePainterSettings { point_size: 20.0 },
+            particles: ParticlePainterSettings { point_size: 11.0 },
             smooth: SmoothPainterSettings {
-                sigma: 0.4,
-                radius: 8,
+                sigma: 0.32,
+                radius: 6,
             },
-            step: StepPainterSettings { edge: 0.3 },
+            step: StepPainterSettings { edge: 0.1 },
             water: WaterPainterSettings {
-                edge_low: 0.86,
-                edge_high: 0.9,
-                darken_edge_low: 0.86,
+                edge_low: 0.9,
+                edge_high: 0.95,
+                darken_edge_low: 0.925,
                 darken_edge_high: 1.0,
             },
         };

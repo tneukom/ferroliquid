@@ -66,8 +66,8 @@ pub struct SimulationPainter {
 
 impl SimulationPainter {
     pub unsafe fn new(gl: &glow::Context, simulation_bounds: Rect<i64>) -> Self {
-        const CELL_SIZE: i64 = 6; // in pixels
-        const COLOR_CELL_SIZE: i64 = CELL_SIZE * 2;
+        const CELL_SIZE: i64 = 3; // in pixels
+        const COLOR_CELL_SIZE: i64 = CELL_SIZE * 4;
 
         let new_empty_texture = |format: TextureFormat, cell_size: i64| {
             let texture_size = simulation_bounds.size() * cell_size;
@@ -105,16 +105,16 @@ impl SimulationPainter {
         // Weird color banding artifacts when using RGBA8 instead of RGBA16. Would it be better
         // to use RGBA16F? Probably not, we need precision over the [0, 1] not only for small
         // numbers.
-        let color_texture = new_empty_texture(TextureFormat::RGBA16F, COLOR_CELL_SIZE);
+        let color_texture = new_empty_texture(TextureFormat::RGBA8, COLOR_CELL_SIZE);
         let color_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&color_texture]);
-        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA16F, COLOR_CELL_SIZE);
+        let color_texture_scratch = new_empty_texture(TextureFormat::RGBA8, COLOR_CELL_SIZE);
         let color_framebuffer_scratch =
             GlFramebuffer::with_color_attachments(gl, &[&color_texture_scratch]);
         let advect_painter = AdvectPainter::new(gl);
 
         let inflow_painter = InflowPainter::new(gl);
 
-        let water_texture = new_empty_texture(TextureFormat::RGBA16F, COLOR_CELL_SIZE);
+        let water_texture = new_empty_texture(TextureFormat::RGBA8, COLOR_CELL_SIZE);
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
@@ -315,10 +315,12 @@ impl SimulationPainter {
 
     pub unsafe fn write_water_color(&mut self, gl: &glow::Context, color: &RgbaField) {
         // color_texture is RGBA16F so we need to upload as u16
-        let f32_color = color.map(|rgba| rgba.to_f32());
+        // let f32_color = color.map(|rgba| rgba.to_f32());
 
+        // self.color_texture
+        //     .texture_image_field(gl, TextureFormat::RGBA16F, &f32_color);
         self.color_texture
-            .texture_image_field(gl, TextureFormat::RGBA16F, &f32_color);
+            .texture_image_field(gl, TextureFormat::RGBA8, &color);
     }
 }
 
