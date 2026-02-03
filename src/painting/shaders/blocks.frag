@@ -1,9 +1,9 @@
 #version 300 es
-precision highp float;
+precision mediump float;
 
-in vec2 pass_uv;
-in vec4 pass_pen_color;
-in vec4 pass_brush_color;
+in highp vec2 pass_uv;
+in highp vec4 pass_pen_color;
+in highp vec4 pass_brush_color;
 
 uniform sampler2D brush_texture;
 uniform sampler2D pen_texture;

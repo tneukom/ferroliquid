@@ -182,41 +182,6 @@ impl World {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct SaveParticle {
-    pub position: Point<i64>,
-    pub previous_position: Point<i64>,
-    pub velocity: Point<i64>,
-}
-
-impl SaveParticle {
-    fn f64_to_fixed_point(p: Point<f64>) -> Point<i64> {
-        Point((p.x * 128.0) as i64, (p.y * 128.0) as i64)
-    }
-
-    fn fixed_point_to_f64(p: Point<i64>) -> Point<f64> {
-        Point(p.x as f64 / 128.0, p.y as f64 / 128.0)
-    }
-
-    pub fn from_particle(particle: &Particle) -> Self {
-        Self {
-            position: Self::f64_to_fixed_point(particle.position),
-            previous_position: Self::f64_to_fixed_point(particle.previous_position),
-            velocity: Self::f64_to_fixed_point(particle.velocity),
-        }
-    }
-
-    pub fn to_particle(&self) -> Particle {
-        let position = Self::fixed_point_to_f64(self.position);
-        Particle {
-            position,
-            // previous_position: Self::fixed_point_to_f64(self.previous_position),
-            previous_position: position,
-            velocity: Self::fixed_point_to_f64(self.velocity),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SaveParticles {
     pub positions: Vec<[f64; 2]>,

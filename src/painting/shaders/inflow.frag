@@ -1,13 +1,13 @@
 #version 300 es
-precision highp float;
+precision mediump float;
 
-in vec2 pass_simulation_position;
+in highp vec2 pass_simulation_position;
 
 uniform sampler2D noise_texture;
 uniform vec4 color_a;
 uniform vec4 color_b;
 
-uniform mat3 uv_from_simulation;
+uniform highp mat3 uv_from_simulation;
 
 out vec4 out_color;
 

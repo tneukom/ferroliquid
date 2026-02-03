@@ -1,7 +1,7 @@
 #version 300 es
-precision highp float;
+precision mediump float;
 
-in vec2 pass_uv;
+in highp vec2 pass_uv;
 
 uniform sampler2D color_sampler;
 uniform sampler2D density_sampler;

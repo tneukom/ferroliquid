@@ -1,13 +1,13 @@
 #version 300 es
-precision highp float;
+precision mediump float;
 
-in vec2 pass_uv;
+in highp vec2 pass_uv;
 
 #define KERNEL_MAX_SIZE 32
 
 uniform sampler2D density_texture;
 uniform float kernel[KERNEL_MAX_SIZE];
-uniform vec2 uv_offsets[KERNEL_MAX_SIZE];
+uniform highp vec2 uv_offsets[KERNEL_MAX_SIZE];
 uniform int kernel_size;
 
 out float out_density;

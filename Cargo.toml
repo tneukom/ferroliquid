@@ -72,3 +72,7 @@ debug = true
 
 [profile.dev]
 debug = true
+
+# Don't strip debug symbols
+#[package.metadata.wasm-pack.profile.profiling]
+#wasm-opt = ['-O', '-g']
