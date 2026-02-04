@@ -5,6 +5,7 @@ use crate::{
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::{Side, Sides},
 };
+use fastrand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -84,6 +85,8 @@ pub struct Simulation {
     pub grid: Grid,
     pub particles: Vec<Particle>,
     pub time: f64,
+    #[serde(skip, default)]
+    pub rng: Rng,
 }
 
 impl Simulation {
@@ -95,6 +98,7 @@ impl Simulation {
             grid: Grid::new(bounds),
             particles: Vec::new(),
             time: 0.0,
+            rng: Rng::with_seed(345073457), // Random keyboard bashing seed!
         }
     }
 
@@ -149,7 +153,6 @@ impl Simulation {
         velocity: Point<f64>,
         sides: &Sides,
         dt: f64,
-        random_velocity_c: f64,
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
         let pos1 = position;
@@ -174,8 +177,7 @@ impl Simulation {
 
         let k4 = interpolate_div_free_velocity_bilinear(sides, pos4, velocity);
 
-        position =
-            position + random_velocity_c * (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+        position = position + (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
 
         if !bounds.contains(position) {
             return None;
@@ -189,7 +191,6 @@ impl Simulation {
         velocity: Point<f64>,
         sides: &Sides,
         dt: f64,
-        random_velocity_c: f64,
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
         // let velocity =
@@ -197,7 +198,7 @@ impl Simulation {
         let velocity = interpolate_div_free_velocity_bilinear(sides, position, velocity);
         debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
 
-        position = position + dt * random_velocity_c * velocity;
+        position = position + dt * velocity;
 
         if !bounds.contains(position) {
             return None;
@@ -254,17 +255,16 @@ impl Simulation {
         self.particles = std::mem::take(&mut self.particles)
             .into_iter()
             .filter_map(|mut particle| {
-                // Perturb the velocity a tiny amount to dissolve clumps.
-                // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
-                let random_velocity_strength = 0.02;
-                let random_velocity_c =
-                    1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
-
                 particle.previous_position = particle.position;
                 let mut position = particle.position;
                 // If velocity is not defined on the grid the velocity from the previous step is
                 // used.
                 let velocity = particle.velocity;
+
+                // Perturb the velocity a tiny amount to dissolve clumps.
+                // let velocity =
+                //     velocity + 0.02 * velocity.norm() * Point(self.rng.f64(), self.rng.f64());
+                let velocity = velocity + 0.02 * Point(self.rng.f64(), self.rng.f64());
 
                 debug_assert!(bounds.contains(particle.position));
 
@@ -275,7 +275,6 @@ impl Simulation {
                         velocity,
                         &self.grid.sides,
                         step_dt,
-                        random_velocity_c,
                         inset_bounds,
                     )?;
                 }
