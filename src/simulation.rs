@@ -313,9 +313,11 @@ impl Simulation {
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(settings);
 
-        self.integrate(dt, 1);
+        // 2 steps at 60 fps (dt ~= 0.016), 1 step at 120 fps (dt ~= 0.083)
+        let n_steps = if dt > 0.012 { 2 } else { 1 };
+        self.integrate(dt, n_steps);
 
-        if self.i_step % 120 == 0 {
+        if self.i_step % 480 == 0 {
             self.sort_particles();
         }
         self.i_step += 1;
