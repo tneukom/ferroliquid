@@ -11,9 +11,8 @@ use std::sync::{Arc, Mutex};
 pub struct Textures {
     density_texture: TextureWindowOptions,
     advection_texture: TextureWindowOptions,
-    step_texture: TextureWindowOptions,
-    vertical_smoothed_texture: TextureWindowOptions,
-    horizontal_smoothed_texture: TextureWindowOptions,
+    hsmoothed_distance_texture: TextureWindowOptions,
+    vsmoothed_distance_texture: TextureWindowOptions,
     water_texture: TextureWindowOptions,
     color_texture_from: TextureWindowOptions,
     color_texture_to: TextureWindowOptions,
@@ -23,29 +22,24 @@ impl Textures {
     pub fn new() -> Self {
         Self {
             density_texture: TextureWindowOptions::new(
-                "Density",
+                "Distance",
                 DebugPainterStyle::Default,
-                |painter| &painter.density_texture,
+                |painter| &painter.distance_texture,
             ),
             advection_texture: TextureWindowOptions::new(
                 "Advection",
                 DebugPainterStyle::Advection,
                 |painter| &painter.advection_texture,
             ),
-            step_texture: TextureWindowOptions::new(
-                "Step",
-                DebugPainterStyle::Default,
-                |painter| &painter.step_texture,
-            ),
-            vertical_smoothed_texture: TextureWindowOptions::new(
+            hsmoothed_distance_texture: TextureWindowOptions::new(
                 "Vertical Smoothed",
                 DebugPainterStyle::Default,
-                |painter| &painter.vertical_smoothed_texture,
+                |painter| &painter.hsmoothed_distance_texture,
             ),
-            horizontal_smoothed_texture: TextureWindowOptions::new(
+            vsmoothed_distance_texture: TextureWindowOptions::new(
                 "Horizontal Smoothed",
                 DebugPainterStyle::Default,
-                |painter| &painter.horizontal_smoothed_texture,
+                |painter| &painter.vsmoothed_distance_texture,
             ),
             water_texture: TextureWindowOptions::new(
                 "Water",
@@ -169,19 +163,13 @@ impl RenderDebugUi {
         Self::window(
             ui,
             simulation_painter.clone(),
-            &mut self.textures.step_texture,
+            &mut self.textures.hsmoothed_distance_texture,
         );
 
         Self::window(
             ui,
             simulation_painter.clone(),
-            &mut self.textures.horizontal_smoothed_texture,
-        );
-
-        Self::window(
-            ui,
-            simulation_painter.clone(),
-            &mut self.textures.vertical_smoothed_texture,
+            &mut self.textures.vsmoothed_distance_texture,
         );
 
         Self::window(

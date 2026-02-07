@@ -13,11 +13,15 @@ use std::mem::{offset_of, size_of};
 #[derive(Debug, Clone)]
 pub struct ParticlePainterSettings {
     pub point_size: f64,
+    pub distance_point_size: f64,
 }
 
 impl Default for ParticlePainterSettings {
     fn default() -> Self {
-        Self { point_size: 20.0 }
+        Self {
+            point_size: 20.0,
+            distance_point_size: 11.0,
+        }
     }
 }
 
@@ -29,6 +33,7 @@ struct ParticleVertex {
 
 pub struct ParticlePainter {
     shader: Shader,
+    distance_shader: Shader,
     dot_shader: Shader,
     array_buffer: GlBuffer<ParticleVertex>,
     vertex_array: GlVertexArrayObject,
@@ -39,6 +44,12 @@ impl ParticlePainter {
         let shader = {
             let vs_source = include_str!("shaders/particle.vert");
             let fs_source = include_str!("shaders/particle.frag");
+            Shader::from_source(gl, &vs_source, &fs_source)
+        };
+
+        let distance_shader = {
+            let vs_source = include_str!("shaders/particle_distance.vert");
+            let fs_source = include_str!("shaders/particle_distance.frag");
             Shader::from_source(gl, &vs_source, &fs_source)
         };
 
@@ -83,6 +94,7 @@ impl ParticlePainter {
 
         Self {
             shader,
+            distance_shader,
             dot_shader,
             array_buffer,
             vertex_array,
@@ -119,6 +131,31 @@ impl ParticlePainter {
         self.shader.use_program(gl);
         self.shader.uniform(gl, "point_size", settings.point_size);
         self.shader.uniform(
+            gl,
+            "device_from_simulation",
+            &affine_device_from_simulation(simulation_bounds),
+        );
+
+        gl.draw_arrays(glow::POINTS, 0, self.array_buffer.len() as i32);
+    }
+
+    pub unsafe fn draw_distance(
+        &self,
+        gl: &glow::Context,
+        simulation_bounds: Rect<f64>,
+        settings: &ParticlePainterSettings,
+    ) {
+        gl.enable(glow::PROGRAM_POINT_SIZE);
+        gl.enable(glow::BLEND);
+        gl.blend_func(glow::ONE, glow::ONE);
+        gl.blend_equation(glow::MAX);
+
+        self.vertex_array.bind(gl);
+
+        self.distance_shader.use_program(gl);
+        self.distance_shader
+            .uniform(gl, "point_size", settings.distance_point_size);
+        self.distance_shader.uniform(
             gl,
             "device_from_simulation",
             &affine_device_from_simulation(simulation_bounds),

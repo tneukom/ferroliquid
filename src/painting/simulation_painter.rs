@@ -12,7 +12,6 @@ use crate::{
         inflow_painter::InflowPainter,
         particle_painter::{ParticlePainter, ParticlePainterSettings},
         smoothing_painter::{SmoothPainter, SmoothPainterSettings},
-        step_painter::{StepPainter, StepPainterSettings},
         water_painter::{WaterPainter, WaterPainterSettings},
     },
     sides::Orientation,
@@ -25,22 +24,20 @@ pub struct SimulationPainter {
     pub i_step: usize,
 
     pub simulation_bounds: Rect<i64>,
-    pub density_texture: GlTexture,
+
+    pub distance_texture: GlTexture,
+    pub distance_framebuffer: GlFramebuffer,
+    pub vsmoothed_distance_texture: GlTexture,
+    pub vsmoothed_distance_framebuffer: GlFramebuffer,
+    pub hsmoothed_distance_texture: GlTexture,
+    pub hsmoothed_distance_framebuffer: GlFramebuffer,
     pub advection_texture: GlTexture,
-    pub particles_framebuffer: GlFramebuffer,
+    pub advection_framebuffer: GlFramebuffer,
     pub particle_painter: ParticlePainter,
 
     pub particle_dots_texture: GlTexture,
     pub particle_dots_framebuffer: GlFramebuffer,
 
-    pub step_texture: GlTexture,
-    pub step_framebuffer: GlFramebuffer,
-    pub step_painter: StepPainter,
-
-    pub vertical_smoothed_texture: GlTexture,
-    pub vertical_smoothed_framebuffer: GlFramebuffer,
-    pub horizontal_smoothed_texture: GlTexture,
-    pub horizontal_smoothed_framebuffer: GlFramebuffer,
     pub smooth_painter: SmoothPainter,
 
     pub color_texture: GlTexture,
@@ -81,26 +78,27 @@ impl SimulationPainter {
             )
         };
 
-        let density_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
+        let smooth_painter = SmoothPainter::new(gl);
+
+        let distance_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
+        let distance_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&distance_texture]);
+
+        let vsmoothed_distance_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
+        let vsmoothed_distance_framebuffer =
+            GlFramebuffer::with_color_attachments(gl, &[&vsmoothed_distance_texture]);
+
+        let hsmoothed_distance_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
+        let hsmoothed_distance_framebuffer =
+            GlFramebuffer::with_color_attachments(gl, &[&hsmoothed_distance_texture]);
+
         let advection_texture = new_empty_texture(TextureFormat::RGBA16F, CELL_SIZE);
-        let particles_framebuffer =
-            GlFramebuffer::with_color_attachments(gl, &[&density_texture, &advection_texture]);
+        let advection_framebuffer =
+            GlFramebuffer::with_color_attachments(gl, &[&advection_texture]);
+
         let particle_dots_texture = new_empty_texture(TextureFormat::RGBA8, CELL_SIZE);
         let particle_dots_framebuffer =
             GlFramebuffer::with_color_attachments(gl, &[&particle_dots_texture]);
         let particle_painter = ParticlePainter::new(gl);
-
-        let step_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
-        let step_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&step_texture]);
-        let step_painter = StepPainter::new(gl);
-
-        let vertical_smoothed_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
-        let vertical_smoothed_framebuffer =
-            GlFramebuffer::with_color_attachments(gl, &[&vertical_smoothed_texture]);
-        let horizontal_smoothed_texture = new_empty_texture(TextureFormat::R16F, CELL_SIZE);
-        let horizontal_smoothed_framebuffer =
-            GlFramebuffer::with_color_attachments(gl, &[&horizontal_smoothed_texture]);
-        let smooth_painter = SmoothPainter::new(gl);
 
         // Weird color banding artifacts when using RGBA8 instead of RGBA16. Would it be better
         // to use RGBA16F? Probably not, we need precision over the [0, 1] not only for small
@@ -140,20 +138,18 @@ impl SimulationPainter {
         Self {
             i_step: 0,
             simulation_bounds,
-            density_texture,
+            smooth_painter,
+            distance_texture,
+            distance_framebuffer,
+            vsmoothed_distance_texture,
+            vsmoothed_distance_framebuffer,
+            hsmoothed_distance_texture,
+            hsmoothed_distance_framebuffer,
             advection_texture,
-            particles_framebuffer,
+            advection_framebuffer,
             particle_dots_texture,
             particle_dots_framebuffer,
             particle_painter,
-            step_texture,
-            step_framebuffer,
-            step_painter,
-            vertical_smoothed_texture,
-            vertical_smoothed_framebuffer,
-            horizontal_smoothed_texture,
-            horizontal_smoothed_framebuffer,
-            smooth_painter,
             water_texture,
             water_framebuffer,
             water_painter,
@@ -185,15 +181,9 @@ impl SimulationPainter {
         self.particle_painter
             .update_particles(gl, &simulation.particles);
 
-        self.particles(gl, &settings.particles);
+        self.particles(gl, &settings);
 
         self.particle_dots(gl);
-
-        self.step(gl, &settings.step);
-
-        self.smooth_vertical(gl, &settings.smooth);
-
-        self.smooth_horizontal(gl, &settings.smooth);
 
         self.inflows(gl, inflows, time);
 
@@ -214,15 +204,50 @@ impl SimulationPainter {
         self.i_step = simulation.i_step;
     }
 
-    unsafe fn particles(&mut self, gl: &glow::Context, settings: &ParticlePainterSettings) {
+    unsafe fn particles(&mut self, gl: &glow::Context, settings: &SimulationPainterSettings) {
         // Draw particles
-        self.particles_framebuffer.bind(gl);
-        self.particles_framebuffer.viewport(gl);
+        self.distance_framebuffer.bind(gl);
+        self.distance_framebuffer.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
         gl.clear(glow::COLOR_BUFFER_BIT);
-        self.particle_painter
-            .draw_particles(gl, self.simulation_bounds.as_f64(), settings);
-        self.particles_framebuffer.unbind(gl);
+        self.particle_painter.draw_distance(
+            gl,
+            self.simulation_bounds.as_f64(),
+            &settings.particles,
+        );
+
+        // Smooth horizontal and vertical
+        self.vsmoothed_distance_framebuffer.bind(gl);
+        self.vsmoothed_distance_framebuffer.viewport(gl);
+        self.smooth_painter.draw(
+            gl,
+            &self.distance_texture,
+            Orientation::Vertical,
+            &settings.distance_smoothing,
+        );
+        self.vsmoothed_distance_framebuffer.unbind(gl);
+
+        self.hsmoothed_distance_framebuffer.bind(gl);
+        self.hsmoothed_distance_framebuffer.viewport(gl);
+        self.smooth_painter.draw(
+            gl,
+            &self.vsmoothed_distance_texture,
+            Orientation::Horizontal,
+            &settings.distance_smoothing,
+        );
+        self.hsmoothed_distance_framebuffer.unbind(gl);
+
+        // Draw advection
+        self.advection_framebuffer.bind(gl);
+        self.advection_framebuffer.viewport(gl);
+        gl.clear_color(0.0, 0.0, 0.0, 1.0);
+        gl.clear(glow::COLOR_BUFFER_BIT);
+        self.particle_painter.draw_particles(
+            gl,
+            self.simulation_bounds.as_f64(),
+            &settings.particles,
+        );
+        self.advection_framebuffer.unbind(gl);
     }
 
     unsafe fn particle_dots(&mut self, gl: &glow::Context) {
@@ -266,35 +291,6 @@ impl SimulationPainter {
         self.color_framebuffer_scratch.unbind(gl);
     }
 
-    unsafe fn step(&mut self, gl: &glow::Context, settings: &StepPainterSettings) {
-        self.step_framebuffer.bind(gl);
-        self.step_framebuffer.viewport(gl);
-        gl.clear_color(0.0, 0.0, 0.0, 1.0);
-        gl.clear(glow::COLOR_BUFFER_BIT);
-        self.step_painter.draw(gl, &self.density_texture, settings);
-        self.step_framebuffer.unbind(gl);
-    }
-
-    unsafe fn smooth_vertical(&mut self, gl: &glow::Context, settings: &SmoothPainterSettings) {
-        self.vertical_smoothed_framebuffer.bind(gl);
-        self.vertical_smoothed_framebuffer.viewport(gl);
-        self.smooth_painter
-            .draw(gl, &self.step_texture, Orientation::Vertical, settings);
-        self.vertical_smoothed_framebuffer.unbind(gl);
-    }
-
-    unsafe fn smooth_horizontal(&mut self, gl: &glow::Context, settings: &SmoothPainterSettings) {
-        self.horizontal_smoothed_framebuffer.bind(gl);
-        self.horizontal_smoothed_framebuffer.viewport(gl);
-        self.smooth_painter.draw(
-            gl,
-            &self.vertical_smoothed_texture,
-            Orientation::Horizontal,
-            settings,
-        );
-        self.horizontal_smoothed_framebuffer.unbind(gl);
-    }
-
     pub unsafe fn water(&mut self, gl: &glow::Context, settings: &WaterPainterSettings) {
         self.water_framebuffer.bind(gl);
         self.water_framebuffer.viewport(gl);
@@ -302,7 +298,7 @@ impl SimulationPainter {
         gl.clear(glow::COLOR_BUFFER_BIT);
         self.water_painter.draw(
             gl,
-            &self.horizontal_smoothed_texture,
+            &self.hsmoothed_distance_texture,
             &self.color_texture,
             settings,
         );
@@ -327,8 +323,7 @@ impl SimulationPainter {
 #[derive(Clone, Default, Debug)]
 pub struct SimulationPainterSettings {
     pub particles: ParticlePainterSettings,
-    pub smooth: SmoothPainterSettings,
-    pub step: StepPainterSettings,
+    pub distance_smoothing: SmoothPainterSettings,
     pub water: WaterPainterSettings,
 }
 
@@ -342,29 +337,29 @@ impl SimulationPainterSettings {
                 ui.label("Particle point size");
                 ui.add(
                     egui::DragValue::new(&mut self.particles.point_size)
-                        .range(1.0..=60.0)
+                        .range(1.0..=30.0)
                         .speed(0.1),
                 );
                 ui.end_row();
 
-                ui.label("Step edge");
+                ui.label("Particle distance point size");
                 ui.add(
-                    egui::DragValue::new(&mut self.step.edge)
-                        .range(0.0..=2.0)
-                        .speed(0.01),
+                    egui::DragValue::new(&mut self.particles.distance_point_size)
+                        .range(1.0..=30.0)
+                        .speed(0.1),
                 );
                 ui.end_row();
 
-                ui.label("Smooth sigma");
+                ui.label("Distance smooth sigma");
                 ui.add(
-                    egui::DragValue::new(&mut self.smooth.sigma)
+                    egui::DragValue::new(&mut self.distance_smoothing.sigma)
                         .range(0.0..=1.0)
                         .speed(0.005),
                 );
                 ui.end_row();
 
-                ui.label("Smooth radius");
-                ui.add(egui::DragValue::new(&mut self.smooth.radius).range(1..=8));
+                ui.label("Distance smooth radius");
+                ui.add(egui::DragValue::new(&mut self.distance_smoothing.radius).range(1..=8));
                 ui.end_row();
 
                 ui.label("Water edge low");

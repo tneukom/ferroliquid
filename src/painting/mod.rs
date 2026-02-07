@@ -13,6 +13,5 @@ pub(crate) mod shader;
 pub(crate) mod simulation_painter;
 pub(crate) mod smoothing_painter;
 pub(crate) mod sprite_painter;
-pub(crate) mod step_painter;
 mod utils;
 pub(crate) mod water_painter;

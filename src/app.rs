@@ -15,7 +15,6 @@ use crate::{
         particle_painter::ParticlePainterSettings,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
         smoothing_painter::SmoothPainterSettings,
-        step_painter::StepPainterSettings,
         water_painter::WaterPainterSettings,
     },
     piecewise_linear::PiecewiseLinear,
@@ -126,17 +125,19 @@ impl EguiApp {
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 
         let simulation_painter_settings = SimulationPainterSettings {
-            particles: ParticlePainterSettings { point_size: 11.0 },
-            smooth: SmoothPainterSettings {
-                sigma: 0.32,
+            particles: ParticlePainterSettings {
+                point_size: 11.0,
+                distance_point_size: 11.0,
+            },
+            distance_smoothing: SmoothPainterSettings {
+                sigma: 0.25,
                 radius: 6,
             },
-            step: StepPainterSettings { edge: 0.1 },
             water: WaterPainterSettings {
-                edge_low: 0.9,
-                edge_high: 0.95,
-                darken_edge_low: 0.925,
-                darken_edge_high: 1.0,
+                edge_low: 0.55,
+                edge_high: 0.6,
+                darken_edge_low: 0.6,
+                darken_edge_high: 0.7,
             },
         };
 
@@ -547,7 +548,7 @@ impl EguiApp {
 
                     simulation_painter.water_painter.draw(
                         gl,
-                        &simulation_painter.horizontal_smoothed_texture,
+                        &simulation_painter.hsmoothed_distance_texture,
                         &simulation_painter.color_texture,
                         &settings.water,
                     );
