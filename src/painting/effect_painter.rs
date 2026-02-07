@@ -46,12 +46,12 @@ impl EffectPainter {
         ];
 
         // Create vertex, index buffers and assign to shader
-        let mut array_buffer = GlBuffer::new(gl, GlBufferTarget::ArrayBuffer);
+
         let vertex_array = GlVertexArrayObject::new(gl);
-
         vertex_array.bind(gl);
-        array_buffer.bind(gl);
 
+        let mut array_buffer = GlBuffer::new(gl, GlBufferTarget::ArrayBuffer);
+        array_buffer.bind(gl);
         array_buffer.buffer_data(gl, &vertices);
 
         let size = size_of::<EffectVertex>();

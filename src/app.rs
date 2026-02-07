@@ -126,8 +126,8 @@ impl EguiApp {
 
         let simulation_painter_settings = SimulationPainterSettings {
             particles: ParticlePainterSettings {
-                point_size: 11.0,
-                distance_point_size: 11.0,
+                delta_point_radius: 1.75,
+                distance_point_radius: 1.75,
             },
             distance_smoothing: SmoothPainterSettings {
                 sigma: 0.25,

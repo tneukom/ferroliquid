@@ -55,6 +55,35 @@ impl VertexAttribDesc {
         utype: glow::INT,
         normalized: false,
     };
+
+    pub unsafe fn assign_attribute_f32(
+        &self,
+        gl: &glow::Context,
+        location: u32,
+        offset: i32,
+        stride: i32,
+    ) {
+        gl.enable_vertex_attrib_array(location);
+        gl.vertex_attrib_pointer_f32(
+            location,
+            self.components,
+            self.utype,
+            self.normalized,
+            stride,
+            offset,
+        );
+    }
+
+    pub unsafe fn assign_attribute_i32(
+        &self,
+        gl: &glow::Context,
+        location: u32,
+        offset: i32,
+        stride: i32,
+    ) {
+        gl.enable_vertex_attrib_array(location);
+        gl.vertex_attrib_pointer_i32(location, self.components, self.utype, stride, offset);
+    }
 }
 
 pub struct Shader {

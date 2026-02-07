@@ -242,11 +242,8 @@ impl SimulationPainter {
         self.advection_framebuffer.viewport(gl);
         gl.clear_color(0.0, 0.0, 0.0, 1.0);
         gl.clear(glow::COLOR_BUFFER_BIT);
-        self.particle_painter.draw_particles(
-            gl,
-            self.simulation_bounds.as_f64(),
-            &settings.particles,
-        );
+        self.particle_painter
+            .draw_delta(gl, self.simulation_bounds.as_f64(), &settings.particles);
         self.advection_framebuffer.unbind(gl);
     }
 
@@ -334,17 +331,17 @@ impl SimulationPainterSettings {
             // .spacing([40.0, 4.0])
             .striped(true)
             .show(ui, |ui| {
-                ui.label("Particle point size");
+                ui.label("Particle delta point radius");
                 ui.add(
-                    egui::DragValue::new(&mut self.particles.point_size)
+                    egui::DragValue::new(&mut self.particles.delta_point_radius)
                         .range(1.0..=30.0)
                         .speed(0.1),
                 );
                 ui.end_row();
 
-                ui.label("Particle distance point size");
+                ui.label("Particle distance point radius");
                 ui.add(
-                    egui::DragValue::new(&mut self.particles.distance_point_size)
+                    egui::DragValue::new(&mut self.particles.distance_point_radius)
                         .range(1.0..=30.0)
                         .speed(0.1),
                 );

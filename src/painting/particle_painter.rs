@@ -12,15 +12,18 @@ use std::mem::{offset_of, size_of};
 
 #[derive(Debug, Clone)]
 pub struct ParticlePainterSettings {
-    pub point_size: f64,
-    pub distance_point_size: f64,
+    /// radius in simulation coordinates
+    pub delta_point_radius: f64,
+
+    /// radius in simulation coordinates
+    pub distance_point_radius: f64,
 }
 
 impl Default for ParticlePainterSettings {
     fn default() -> Self {
         Self {
-            point_size: 20.0,
-            distance_point_size: 11.0,
+            delta_point_radius: 20.0,
+            distance_point_radius: 11.0,
         }
     }
 }
@@ -31,17 +34,24 @@ struct ParticleVertex {
     pub previous_position: [f32; 2],
 }
 
+#[derive(Debug, Clone, Copy)]
+struct QuadVertex {
+    pub offset: [f32; 2],
+}
+
+/// All shaders use explicit attribute locations, so we can use one vertex array for all of them.
 pub struct ParticlePainter {
-    shader: Shader,
+    delta_shader: Shader,
     distance_shader: Shader,
     dot_shader: Shader,
-    array_buffer: GlBuffer<ParticleVertex>,
+    particle_vertex_buffer: GlBuffer<ParticleVertex>,
+    quad_vertex_buffer: GlBuffer<QuadVertex>,
     vertex_array: GlVertexArrayObject,
 }
 
 impl ParticlePainter {
     pub unsafe fn new(gl: &glow::Context) -> Self {
-        let shader = {
+        let delta_shader = {
             let vs_source = include_str!("shaders/particle.vert");
             let fs_source = include_str!("shaders/particle.frag");
             Shader::from_source(gl, &vs_source, &fs_source)
@@ -59,44 +69,64 @@ impl ParticlePainter {
             Shader::from_source(gl, &vs_source, &fs_source)
         };
 
-        // Create vertex, index buffers and assign to shader
-        let array_buffer = GlBuffer::new(gl, GlBufferTarget::ArrayBuffer);
+        // 2           3
+        // ┌──────────┐
+        // │          │
+        // └──────────┘
+        // 0           1
+        let quad_vertices = [
+            QuadVertex {
+                offset: [-1.0, -1.0],
+            },
+            QuadVertex {
+                offset: [1.0, -1.0],
+            },
+            QuadVertex {
+                offset: [-1.0, 1.0],
+            },
+            QuadVertex { offset: [1.0, 1.0] },
+        ];
+
         let vertex_array = GlVertexArrayObject::new(gl);
-
         vertex_array.bind(gl);
-        array_buffer.bind(gl);
 
-        let size = size_of::<ParticleVertex>();
-        shader.assign_attribute_f32(
+        let particle_vertex_buffer = GlBuffer::new(gl, GlBufferTarget::ArrayBuffer);
+        let mut quad_vertex_buffer = GlBuffer::new(gl, GlBufferTarget::ArrayBuffer);
+        quad_vertex_buffer.buffer_data(gl, &quad_vertices);
+
+        // Setup vertex array for delta shader
+        quad_vertex_buffer.bind(gl);
+        VertexAttribDesc::VEC2.assign_attribute_f32(
             gl,
-            "in_simulation_position",
-            &VertexAttribDesc::VEC2,
-            offset_of!(ParticleVertex, position) as i32,
-            size as i32,
+            0,
+            offset_of!(QuadVertex, offset) as i32,
+            size_of::<QuadVertex>() as i32,
         );
-        shader.assign_attribute_f32(
+
+        particle_vertex_buffer.bind(gl);
+        VertexAttribDesc::VEC2.assign_attribute_f32(
             gl,
-            "in_simulation_previous_position",
-            &VertexAttribDesc::VEC2,
+            1,
+            offset_of!(ParticleVertex, position) as i32,
+            size_of::<ParticleVertex>() as i32,
+        );
+        gl.vertex_attrib_divisor(1, 1);
+        VertexAttribDesc::VEC2.assign_attribute_f32(
+            gl,
+            2,
             offset_of!(ParticleVertex, previous_position) as i32,
-            size as i32,
+            size_of::<ParticleVertex>() as i32,
         );
+        gl.vertex_attrib_divisor(2, 1);
 
-        dot_shader.assign_attribute_f32(
-            gl,
-            "in_simulation_position",
-            &VertexAttribDesc::VEC2,
-            offset_of!(ParticleVertex, position) as i32,
-            size as i32,
-        );
-
-        array_buffer.unbind(gl);
+        vertex_array.unbind(gl);
 
         Self {
-            shader,
+            delta_shader,
             distance_shader,
             dot_shader,
-            array_buffer,
+            particle_vertex_buffer,
+            quad_vertex_buffer,
             vertex_array,
         }
     }
@@ -111,10 +141,16 @@ impl ParticlePainter {
             .collect();
 
         self.vertex_array.bind(gl);
-        self.array_buffer.buffer_data(gl, &vertices);
+        self.particle_vertex_buffer.buffer_data(gl, &vertices);
     }
 
-    pub unsafe fn draw_particles(
+    pub unsafe fn draw_arrays_instanced(&self, gl: &glow::Context) {
+        let instance_count = self.particle_vertex_buffer.len() as i32;
+        let vertex_count = self.quad_vertex_buffer.len() as i32;
+        gl.draw_arrays_instanced(glow::TRIANGLE_STRIP, 0, vertex_count, instance_count);
+    }
+
+    pub unsafe fn draw_delta(
         &self,
         gl: &glow::Context,
         simulation_bounds: Rect<f64>,
@@ -128,15 +164,17 @@ impl ParticlePainter {
 
         self.vertex_array.bind(gl);
 
-        self.shader.use_program(gl);
-        self.shader.uniform(gl, "point_size", settings.point_size);
-        self.shader.uniform(
+        self.delta_shader.use_program(gl);
+        self.delta_shader.uniform(
             gl,
             "device_from_simulation",
             &affine_device_from_simulation(simulation_bounds),
         );
+        self.delta_shader
+            .uniform(gl, "simulation_radius", settings.delta_point_radius);
 
-        gl.draw_arrays(glow::POINTS, 0, self.array_buffer.len() as i32);
+        self.draw_arrays_instanced(gl);
+        self.vertex_array.unbind(gl);
     }
 
     pub unsafe fn draw_distance(
@@ -153,15 +191,16 @@ impl ParticlePainter {
         self.vertex_array.bind(gl);
 
         self.distance_shader.use_program(gl);
-        self.distance_shader
-            .uniform(gl, "point_size", settings.distance_point_size);
         self.distance_shader.uniform(
             gl,
             "device_from_simulation",
             &affine_device_from_simulation(simulation_bounds),
         );
+        self.distance_shader
+            .uniform(gl, "simulation_radius", settings.distance_point_radius);
 
-        gl.draw_arrays(glow::POINTS, 0, self.array_buffer.len() as i32);
+        self.draw_arrays_instanced(gl);
+        self.vertex_array.unbind(gl);
     }
 
     pub unsafe fn draw_particle_dots(&self, gl: &glow::Context, simulation_bounds: Rect<f64>) {
@@ -172,13 +211,14 @@ impl ParticlePainter {
         self.vertex_array.bind(gl);
 
         self.dot_shader.use_program(gl);
-        self.dot_shader.uniform(gl, "point_size", 2.0);
         self.dot_shader.uniform(
             gl,
             "device_from_simulation",
             &affine_device_from_simulation(simulation_bounds),
         );
+        self.dot_shader.uniform(gl, "simulation_radius", 0.33);
 
-        gl.draw_arrays(glow::POINTS, 0, self.array_buffer.len() as i32);
+        self.draw_arrays_instanced(gl);
+        self.vertex_array.unbind(gl);
     }
 }

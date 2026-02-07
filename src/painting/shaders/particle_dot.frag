@@ -1,6 +1,8 @@
 #version 300 es
 precision mediump float;
 
+in highp vec2 pass_point_uv;
+
 out vec4 out_color;
 
 void main() {
