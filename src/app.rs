@@ -416,27 +416,31 @@ impl EguiApp {
         });
     }
 
+    pub fn run_ui(&mut self, ui: &mut egui::Ui) {
+        let run_icon = egui::include_image!("icons/play.png").atom_size(Self::ICON_SIZE);
+        let run_button = egui::Button::new((run_icon, "Run")).selected(self.run);
+        if ui.add(run_button).clicked() {
+            self.run = !self.run;
+        }
+
+        let step_icon = egui::include_image!("icons/step.png").atom_size(Self::ICON_SIZE);
+        let step_clicked = ui.button((step_icon, "Step")).clicked();
+
+        if self.run {
+            self.simulation_step();
+        }
+
+        if step_clicked {
+            // Single step at 1/60s dt
+            self.world.step(1.0 / 60.0);
+        }
+    }
+
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
         self.demo_menu_button_ui(ui);
 
         ui.horizontal(|ui| {
-            let run_icon = egui::include_image!("icons/play.png").atom_size(Self::ICON_SIZE);
-            let run_button = egui::Button::new((run_icon, "Run")).selected(self.run);
-            if ui.add(run_button).clicked() {
-                self.run = !self.run;
-            }
-
-            let step_icon = egui::include_image!("icons/step.png").atom_size(Self::ICON_SIZE);
-            let step_clicked = ui.button((step_icon, "Step")).clicked();
-
-            if self.run {
-                self.simulation_step();
-            }
-
-            if step_clicked {
-                // Single step at 1/60s dt
-                self.world.step(1.0 / 60.0);
-            }
+            self.run_ui(ui);
         });
 
         ui.label(format!(
@@ -730,6 +734,21 @@ impl EguiApp {
             });
         }
     }
+
+    fn compact_ui(&mut self, ctx: &egui::Context) {
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                self.demo_menu_button_ui(ui);
+                self.run_ui(ui);
+            });
+        });
+    }
+
+    fn full_ui(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("left_panel").show(ctx, |ui| {
+            self.side_panel_ui(ui);
+        });
+    }
 }
 
 impl eframe::App for EguiApp {
@@ -765,9 +784,12 @@ impl eframe::App for EguiApp {
         // let visuals = egui::Visuals::dark();
         ctx.set_visuals(visuals);
 
-        egui::SidePanel::left("left_panel").show(ctx, |ui| {
-            self.side_panel_ui(ui);
-        });
+        let show_compact_ui = Self::screen_is_narrow(ctx);
+        if show_compact_ui {
+            self.compact_ui(ctx);
+        } else {
+            self.full_ui(ctx);
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             self.central_panel_ui(ui);
