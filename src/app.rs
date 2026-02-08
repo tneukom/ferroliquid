@@ -585,10 +585,28 @@ impl EguiApp {
             egui::Sense::empty()
         };
 
-        // let scene = egui::Scene::new();
-        // let response = scene.show(ui, &mut self.scene_rect, |ui| {
-        let size = Self::CELL_SIZE * self.world.bounds().size().as_f64();
-        let (egui_rect, response) = ui.allocate_exact_size(size.into(), sense);
+        // Calculate size that fits available space while keeping aspect ratio
+        let simulation_size = self.world.bounds().size().as_f64();
+
+        let egui_rect = {
+            let egui_available_size = ui.available_size();
+
+            // Scale simulation but stay smaller than available_size.
+            let scale = (egui_available_size.x as f64 / simulation_size.x)
+                .min(egui_available_size.y as f64 / simulation_size.y);
+            let fit_size = scale * simulation_size;
+
+            let (available_rect, _) =
+                ui.allocate_exact_size(egui_available_size, egui::Sense::empty());
+
+            egui::Rect::from_center_size(available_rect.center(), fit_size.into())
+        };
+
+        // Calculate the actual cell size based on the scaled rect
+        let cell_size = egui_rect.width() as f64 / simulation_size.x;
+
+        // Interact with the centered rect
+        let response = ui.interact(egui_rect, ui.id().with("simulation"), sense);
 
         if response.is_pointer_button_down_on()
             && let Some(pointer_pos) = response.interact_pointer_pos()
@@ -603,8 +621,8 @@ impl EguiApp {
             let drag_previous = drag_current - drag_delta;
 
             // Two simulation cells per block
-            let simulation_drag_previous = drag_previous / (2.0 * Self::CELL_SIZE);
-            let simulation_drag_current = drag_current / (2.0 * Self::CELL_SIZE);
+            let simulation_drag_previous = drag_previous / (2.0 * cell_size);
+            let simulation_drag_current = drag_current / (2.0 * cell_size);
             let arrow = Arrow::new(
                 simulation_drag_previous.floor().as_i64(),
                 simulation_drag_current.floor().as_i64(),
@@ -633,8 +651,12 @@ impl EguiApp {
     pub fn central_panel_ui(&mut self, ui: &mut egui::Ui) {
         let egui_rect = self.simulation_ui(ui);
 
+        // Calculate the actual cell size based on the scaled rect
+        let simulation_size = self.world.bounds().size().as_f64();
+        let cell_size = egui_rect.width() as f64 / simulation_size.x;
+
         let egui_from_simulation: AffineMap<f64> = AffineMap::new(
-            Matrix2::diagonal_splat(Self::CELL_SIZE),
+            Matrix2::diagonal_splat(cell_size),
             egui_rect.left_top().into(),
         );
 
