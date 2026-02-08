@@ -30,9 +30,8 @@ use glow::HasContext;
 use log::warn;
 use std::{
     fs,
-    io::{BufReader, BufWriter, Cursor, Read},
-    path::Path,
-    sync::{Arc, Mutex},
+    io::{BufReader, BufWriter, Cursor},
+    sync::{Arc, Mutex, mpsc},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +107,10 @@ pub struct EguiApp {
     selected: Selected,
 
     tool: Tool,
+
+    // For async load file in WASM
+    channel_receiver: mpsc::Receiver<SaveWorld>,
+    channel_sender: mpsc::SyncSender<SaveWorld>,
 }
 
 impl EguiApp {
@@ -141,6 +144,8 @@ impl EguiApp {
             },
         };
 
+        let (channel_sender, channel_receiver) = mpsc::sync_channel(1);
+
         Self {
             world,
             simulation_debug_window: SimulationDebugWindow::new(),
@@ -154,6 +159,8 @@ impl EguiApp {
             gl,
             selected: Selected::None,
             tool: Tool::Pointer,
+            channel_sender,
+            channel_receiver,
         }
     }
 
@@ -323,38 +330,17 @@ impl EguiApp {
         self.step_timestamp = Some(timestamp);
     }
 
-    pub fn save(&self, path: impl AsRef<Path>) {
+    pub fn save(&self) -> SaveWorld {
         // Get color image
         let simulation_painter = self.simulation_painter.lock().unwrap();
         let color_image = unsafe { simulation_painter.read_water_color(&self.gl) };
         let color_jpeg_base64_url = color_image.encode_base64_url_jpeg(95);
         let mut save_world = self.world.to_save_world();
         save_world.color_jpeg_base64_url = Some(color_jpeg_base64_url);
-
-        let path = path.as_ref();
-        let extension = path.extension().unwrap().to_ascii_lowercase();
-        let file = fs::File::create(path).expect("Failed to open file");
-
-        if extension == "json" {
-            let buf_writer = BufWriter::new(file);
-            serde_json::to_writer(buf_writer, &save_world).expect("Failed to write json");
-        } else if extension == "json_snap" {
-            let buf_writer = BufWriter::new(file);
-            let snap_writer = snap::write::FrameEncoder::new(buf_writer);
-            serde_json::to_writer(snap_writer, &save_world).expect("Failed to write json");
-        } else {
-            panic!("Unsupported extension");
-        };
+        save_world
     }
 
-    pub fn load_from_snap_json(&mut self, reader: impl Read) {
-        let snap_reader = snap::read::FrameDecoder::new(reader);
-        self.load_from_json(snap_reader);
-    }
-
-    pub fn load_from_json(&mut self, reader: impl Read) {
-        let mut save_world: SaveWorld = serde_json::from_reader(reader).unwrap();
-
+    pub fn load(&mut self, mut save_world: SaveWorld) {
         let mut simulation_painter = self.simulation_painter.lock().unwrap();
         simulation_painter.reset();
 
@@ -373,33 +359,41 @@ impl EguiApp {
         self.selected = Selected::None;
     }
 
-    pub fn load(&mut self, path: impl AsRef<Path>) {
-        let path = path.as_ref();
-        let extension = path.extension().unwrap().to_ascii_lowercase();
-        let file = fs::File::open(path).unwrap();
-
-        let buf_reader = BufReader::new(file);
-        if extension == "json" {
-            self.load_from_json(buf_reader);
-        } else if extension == "json_snap" {
-            self.load_from_snap_json(buf_reader);
-        } else {
-            panic!("Unsupported extension");
-        };
-    }
-
     pub fn save_load_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let save_icon = egui::include_image!("icons/file_save.png").atom_size(Self::ICON_SIZE);
             if ui.button((save_icon, "Save")).clicked() {
+                let save_world = self.save();
+
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(path) = rfd::FileDialog::new()
                     .add_filter("json_snap", &["json_snap"])
                     .add_filter("json", &["json"])
                     .save_file()
                 {
-                    self.save(path);
+                    let file = fs::File::create(&path).expect("Failed to open file");
+                    let writer = BufWriter::new(file);
+                    save_world.write(path, writer);
                 }
+
+                #[cfg(target_arch = "wasm32")]
+                wasm_bindgen_futures::spawn_local(async move {
+                    if let Some(file) = rfd::AsyncFileDialog::new()
+                        .set_file_name("world.json_snap")
+                        .add_filter("json_snap", &["json_snap"])
+                        .add_filter("json", &["json"])
+                        .save_file()
+                        .await
+                    {
+                        use std::path::PathBuf;
+                        let path = PathBuf::from(file.file_name());
+                        let mut buf = Vec::new();
+                        save_world.write(path, &mut buf);
+                        if let Err(err) = file.write(&buf).await {
+                            println!("Failed to write file because {err}");
+                        }
+                    }
+                });
             }
 
             let load_icon = egui::include_image!("icons/file_load.png").atom_size(Self::ICON_SIZE);
@@ -410,7 +404,28 @@ impl EguiApp {
                     .add_filter("json", &["json"])
                     .pick_file()
                 {
-                    self.load(path);
+                    let file = fs::File::open(&path).expect("Failed to open file");
+                    let buf_reader = BufReader::new(file);
+                    let save_world = SaveWorld::read(&path, buf_reader);
+                    self.load(save_world);
+                }
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let channel_sender = self.channel_sender.clone();
+                    wasm_bindgen_futures::spawn_local(async move {
+                        if let Some(file) = rfd::AsyncFileDialog::new()
+                            .add_filter("json_snap", &["json_snap"])
+                            .add_filter("json", &["json"])
+                            .pick_file()
+                            .await
+                        {
+                            let content = file.read().await;
+                            let cursor = Cursor::new(&content);
+                            let save_world = SaveWorld::read(file.file_name(), cursor);
+                            channel_sender.send(save_world).unwrap();
+                        }
+                    });
                 }
             }
         });
@@ -728,7 +743,8 @@ impl EguiApp {
 
                 if ui.button(demo.name).clicked() {
                     let reader = Cursor::new(demo.bytes);
-                    self.load_from_snap_json(reader);
+                    let save_world = SaveWorld::read_from_snap_json(reader);
+                    self.load(save_world);
                     self.run = true;
                 }
             });
@@ -754,6 +770,13 @@ impl EguiApp {
 impl eframe::App for EguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         trace_begin_frame();
+        tracy_client::frame_mark();
+
+        // Check if any files have finished loading
+        #[cfg(target_arch = "wasm32")]
+        if let Ok(save_world) = self.channel_receiver.try_recv() {
+            self.load(save_world);
+        }
 
         // TODO: Avoid cloning
         unsafe {
@@ -766,8 +789,6 @@ impl eframe::App for EguiApp {
             );
         }
         // println!("time to render: {}", instant.elapsed().as_secs_f64());
-
-        tracy_client::frame_mark();
 
         // ctx.style_mut(|style| {
         //     style.spacing.button_padding = egui::Vec2::splat(6.0);

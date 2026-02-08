@@ -8,6 +8,10 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
+use std::{
+    io::{Read, Write},
+    path::Path,
+};
 
 slotmap::new_key_type! { pub struct ForceKey; }
 slotmap::new_key_type! { pub struct InflowKey; }
@@ -243,4 +247,41 @@ pub struct SaveWorld {
     pub settings: SimulationSettings,
     pub color_jpeg: Option<Vec<u8>>,
     pub color_jpeg_base64_url: Option<String>,
+}
+
+impl SaveWorld {
+    pub fn write(&self, path: impl AsRef<Path>, writer: impl Write) {
+        let extension = path.as_ref().extension().unwrap().to_ascii_lowercase();
+
+        if extension == "json" {
+            serde_json::to_writer(writer, self).expect("Failed to write json");
+        } else if extension == "json_snap" {
+            let snap_writer = snap::write::FrameEncoder::new(writer);
+            serde_json::to_writer(snap_writer, self).expect("Failed to write json");
+        } else {
+            panic!("Unsupported file extension {extension:?}");
+        };
+    }
+
+    pub fn read_from_snap_json(reader: impl Read) -> Self {
+        let snap_reader = snap::read::FrameDecoder::new(reader);
+        Self::read_from_json(snap_reader)
+    }
+
+    pub fn read_from_json(reader: impl Read) -> Self {
+        serde_json::from_reader(reader).unwrap()
+    }
+
+    pub fn read(path: impl AsRef<Path>, reader: impl Read) -> Self {
+        let path = path.as_ref();
+        let extension = path.extension().unwrap().to_ascii_lowercase();
+
+        if extension == "json" {
+            Self::read_from_json(reader)
+        } else if extension == "json_snap" {
+            Self::read_from_snap_json(reader)
+        } else {
+            panic!("Unsupported extension");
+        }
+    }
 }
