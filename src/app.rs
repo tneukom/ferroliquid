@@ -299,7 +299,8 @@ impl EguiApp {
 
         self.selected_manipulator_ui(ui);
 
-        if ui.button("Clear particles").clicked() {
+        let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
+        if ui.button((trash_icon, "Clear particles")).clicked() {
             self.world.simulation.particles.clear();
         }
     }
@@ -729,7 +730,8 @@ impl EguiApp {
     }
 
     pub fn demo_menu_button_ui(&mut self, ui: &mut egui::Ui) {
-        let mut demos_button = egui::containers::menu::MenuButton::new("Demos");
+        let folder_icon = egui::include_image!("icons/folder.png").atom_size(Self::ICON_SIZE);
+        let mut demos_button = egui::containers::menu::MenuButton::new((folder_icon, "Demos"));
         demos_button.button = demos_button.button.fill(egui::Color32::ORANGE);
         demos_button.ui(ui, |ui| {
             self.demo_menu_ui(ui);
