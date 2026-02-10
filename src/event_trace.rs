@@ -1,5 +1,5 @@
+use crate::{utils::ReflectEnum, widgets::enum_choice_buttons, world::Energy};
 use derive_more::{From, with_trait::Display};
-use egui_plot::PlotPoints;
 use enum_map::{Enum, EnumMap};
 use std::{collections::VecDeque, sync::Mutex};
 use web_time::Instant;
@@ -14,6 +14,8 @@ pub enum TimingSection {
 #[derive(Clone, Copy, From)]
 pub enum Event {
     TimingEvent(TimingSection, f64),
+    ParticleCount(usize),
+    Energy(Energy),
     FrameDuration(f64),
 }
 
@@ -33,7 +35,7 @@ impl Events {
 
 pub static TRACE_EVENTS: Mutex<Events> = Mutex::new(Events::new());
 
-pub fn trace_event(event: impl Into<Event>) {
+pub fn trace_event(event: Event) {
     if let Some(active_frame) = TRACE_EVENTS.lock().unwrap().frames.back_mut() {
         let event = event.into();
         active_frame.push(event);
@@ -88,6 +90,8 @@ impl Drop for MeasureDuration {
 struct FrameProfile {
     durations: EnumMap<TimingSection, f64>,
     whole_frame_duration: f64,
+    energy: Energy,
+    particle_count: usize,
 }
 
 impl FrameProfile {
@@ -96,9 +100,36 @@ impl FrameProfile {
     }
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum ProfileTab {
+    #[default]
+    Timing,
+    Energy,
+    ParticleCount,
+}
+
+impl ProfileTab {
+    pub const ALL: [ProfileTab; 3] = [Self::Timing, Self::Energy, Self::ParticleCount];
+}
+
+impl ReflectEnum for ProfileTab {
+    fn all() -> &'static [Self] {
+        &Self::ALL
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Timing => "Timing",
+            Self::Energy => "Energy",
+            Self::ParticleCount => "Particle Count",
+        }
+    }
+}
+
 pub struct ProfilerWindow {
     show_window: bool,
     paused: bool,
+    tab: ProfileTab,
     frame_profiles: Vec<FrameProfile>,
 }
 
@@ -107,6 +138,7 @@ impl ProfilerWindow {
         Self {
             show_window: false,
             paused: false,
+            tab: ProfileTab::Timing,
             frame_profiles: Vec::new(),
         }
     }
@@ -126,6 +158,10 @@ impl ProfilerWindow {
                         &Event::FrameDuration(whole_frame_duration) => {
                             frame_profile.whole_frame_duration = whole_frame_duration;
                         }
+                        &Event::Energy(energy) => frame_profile.energy = energy,
+                        &Event::ParticleCount(particle_count) => {
+                            frame_profile.particle_count = particle_count;
+                        }
                     }
                 }
 
@@ -139,7 +175,63 @@ impl ProfilerWindow {
         self.frame_profiles.pop();
     }
 
-    pub fn plot_ui(&mut self, ui: &mut egui::Ui) {
+    fn frame_plot_points(
+        &self,
+        mut f: impl FnMut(&FrameProfile) -> f64,
+    ) -> egui_plot::PlotPoints<'static> {
+        let delta_x = 1.0;
+
+        // Line chart for the whole frame duration
+        let line_points: Vec<_> = self
+            .frame_profiles
+            .iter()
+            .enumerate()
+            .map(|(i, frame)| egui_plot::PlotPoint::new(i as f64 * delta_x, f(frame)))
+            .collect();
+        egui_plot::PlotPoints::Owned(line_points)
+    }
+
+    pub fn energy_plot_ui(&mut self, ui: &mut egui::Ui) {
+        let kinetic = egui_plot::Line::new(
+            "Kinetic Energy",
+            self.frame_plot_points(|frame| frame.energy.kinetic),
+        );
+
+        let potential = egui_plot::Line::new(
+            "Potential Energy",
+            self.frame_plot_points(|frame| frame.energy.potential),
+        );
+
+        let total = egui_plot::Line::new(
+            "Total Energy",
+            self.frame_plot_points(|frame| frame.energy.total()),
+        );
+
+        egui_plot::Plot::new("energy")
+            .legend(egui_plot::Legend::default())
+            // .default_y_bounds(0.0, 0.2)
+            .show(ui, |plot_ui| {
+                plot_ui.line(kinetic);
+                plot_ui.line(potential);
+                plot_ui.line(total);
+            });
+    }
+
+    pub fn particle_count_plot_ui(&mut self, ui: &mut egui::Ui) {
+        let particle_count = egui_plot::Line::new(
+            "Particle count",
+            self.frame_plot_points(|frame| frame.particle_count as f64),
+        );
+
+        egui_plot::Plot::new("particles")
+            .legend(egui_plot::Legend::default())
+            .default_y_bounds(0.0, 20_000.0)
+            .show(ui, |plot_ui| {
+                plot_ui.line(particle_count);
+            });
+    }
+
+    pub fn timing_plot_ui(&mut self, ui: &mut egui::Ui) {
         let delta_x = 1.0;
         let width = 1.0;
 
@@ -178,7 +270,7 @@ impl ProfilerWindow {
                 egui_plot::PlotPoint::new(i as f64 * delta_x, frame.whole_frame_duration)
             })
             .collect();
-        let line = egui_plot::Line::new("whole_frame", PlotPoints::Owned(line_points));
+        let line = egui_plot::Line::new("whole_frame", egui_plot::PlotPoints::Owned(line_points));
 
         egui_plot::Plot::new("profile")
             .legend(egui_plot::Legend::default())
@@ -206,12 +298,20 @@ impl ProfilerWindow {
             .open(&mut show_window)
             .collapsible(false)
             .show(ui.ctx(), |ui| {
-                ui.checkbox(&mut self.paused, "Paused");
-                if !self.paused {
-                    self.update_frame_profiles();
-                }
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut self.paused, "Paused");
+                    if !self.paused {
+                        self.update_frame_profiles();
+                    }
 
-                self.plot_ui(ui);
+                    enum_choice_buttons(ui, None, &mut self.tab);
+                });
+
+                match self.tab {
+                    ProfileTab::Timing => self.timing_plot_ui(ui),
+                    ProfileTab::Energy => self.energy_plot_ui(ui),
+                    ProfileTab::ParticleCount => self.particle_count_plot_ui(ui),
+                };
             });
         self.show_window = show_window;
     }

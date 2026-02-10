@@ -453,16 +453,10 @@ impl EguiApp {
     }
 
     pub fn side_panel_ui(&mut self, ui: &mut egui::Ui) {
-        self.demo_menu_button_ui(ui);
-
         ui.horizontal(|ui| {
+            self.demo_menu_button_ui(ui);
             self.run_ui(ui);
         });
-
-        ui.label(format!(
-            "Particle count:{}",
-            self.world.simulation.particles.len()
-        ));
 
         self.world.settings.basic_ui(ui);
         styled_space(ui);
@@ -490,8 +484,6 @@ impl EguiApp {
         styled_space(ui);
 
         self.debug_ui(ui);
-
-        self.profiler_window.window_toggle(ui);
     }
 
     pub fn debug_ui(&mut self, ui: &mut egui::Ui) {
@@ -509,16 +501,12 @@ impl EguiApp {
             self.simulation_painter_settings.ui(ui);
         });
 
-        self.simulation_debug_window
-            .window_toggle(ui, &self.world.simulation);
+        ui.horizontal(|ui| {
+            self.profiler_window.window_toggle(ui);
 
-        let energy = self.world.energy();
-        ui.label(format!(
-            "Kinetic: {:.0}k, potential: {:.0}k, total: {:.0}k",
-            energy.kinetic / 1e3,
-            energy.potential / 1e3,
-            energy.total() / 1e3
-        ));
+            self.simulation_debug_window
+                .window_toggle(ui, &self.world.simulation);
+        });
 
         // Put debug ui at the bottom of the left side panel
         // let bottom_panel =

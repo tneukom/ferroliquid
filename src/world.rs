@@ -1,5 +1,6 @@
 use crate::{
     blocks::Blocks,
+    event_trace::{Event, trace_event},
     forces::{AnyForce, UniformForce},
     inflow::{Inflow, InflowPattern, InflowStats},
     math::{point::Point, rect::Rect, rgba8::Rgba},
@@ -34,6 +35,7 @@ pub struct World {
     pub settings: SimulationSettings,
 }
 
+#[derive(Default, Clone, Copy)]
 pub struct Energy {
     pub potential: f64,
     pub kinetic: f64,
@@ -139,6 +141,9 @@ impl World {
         self.blocks
             .assign_simulation_grid(&mut self.simulation.grid);
         self.simulation.step(dt, &self.settings);
+
+        trace_event(Event::Energy(self.energy()));
+        trace_event(Event::ParticleCount(self.simulation.particles.len()));
     }
 
     pub fn to_save_world(&self) -> SaveWorld {
