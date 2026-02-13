@@ -20,8 +20,13 @@ pub struct Particle {
 pub struct SimulationSettings {
     pub density_correction_strength: f64,
     pub target_density: f64,
-    pub alpha: f64,
+    #[serde(default = "tau_default")]
+    pub tau: f64,
     pub speed: f64,
+}
+
+fn tau_default() -> f64 {
+    0.5
 }
 
 impl SimulationSettings {
@@ -31,7 +36,7 @@ impl SimulationSettings {
 
             ui.horizontal(|ui| {
                 ui.label("Viscosity");
-                ui.add(egui::Slider::new(&mut self.alpha, 0.01..=1.0));
+                ui.add(egui::Slider::new(&mut self.tau, 0.001..=1.0));
             });
 
             ui.horizontal(|ui| {
@@ -73,7 +78,7 @@ impl Default for SimulationSettings {
         Self {
             density_correction_strength: 2.0,
             target_density: 8.0,
-            alpha: 0.02,
+            tau: 0.5,
             speed: 1.0,
         }
     }
@@ -103,8 +108,31 @@ impl Simulation {
     }
 
     #[inline(never)]
-    pub fn interpolate_particle_velocities_from_grid(&mut self, settings: &SimulationSettings) {
+    pub fn interpolate_particle_velocities_from_grid(
+        &mut self,
+        dt: f64,
+        settings: &SimulationSettings,
+    ) {
         let _span = tracy_client::span!("interpolate_particle_velocities_from_grid");
+
+        // Compute alpha for dt from alpha for 120Hz in settings
+        // (1 - normalized_alpha)^(1/normalized_dt) = (1 - alpha)^(1/dt)
+        // so alpha = 1 - (1 - normalized_alpha)^(dt/normalized_dt)
+        // let normalized_dt = 1.0 / 120.0;
+        // let normalized_alpha = settings.alpha;
+        // let alpha = 1.0 - (1.0 - normalized_alpha).pow(dt / normalized_dt);
+        // let alpha = alpha.clamp(0.0, 1.0);
+
+        // Compute alpha from time constant tau
+        // see (https://en.wikipedia.org/wiki/Exponential_smoothing#Time_constant)
+        // alpha = 1 - exp(-T/tau),
+        // alpha = 1 for tau = 0
+        // alpha = 0 for tau = inf
+        let alpha = if settings.tau <= 0.0 {
+            1.0
+        } else {
+            1.0 - (-dt / settings.tau).exp()
+        };
 
         for particle in &mut self.particles {
             let floored_pos = particle.position.floor();
@@ -132,8 +160,8 @@ impl Simulation {
                         * bottom_coeff,
             );
 
-            particle.velocity = (1.0 - settings.alpha) * particle.velocity
-                + settings.alpha * velocity_interpolated
+            particle.velocity = (1.0 - alpha) * particle.velocity
+                + alpha * velocity_interpolated
                 + velocity_correction;
         }
     }
@@ -311,7 +339,7 @@ impl Simulation {
         self.grid.solve_pressure(settings);
 
         //Rebuild particles
-        self.interpolate_particle_velocities_from_grid(settings);
+        self.interpolate_particle_velocities_from_grid(dt, settings);
 
         // 2 steps at 60 fps (dt ~= 0.016), 1 step at 120 fps (dt ~= 0.083)
         let n_steps = if dt > 0.012 { 2 } else { 1 };
