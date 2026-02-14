@@ -39,7 +39,22 @@ impl Demo {
         bytes: include_bytes!("whirl.json_snap"),
     };
 
-    pub const ALL: [&'static Self; 7] = [
+    pub const FOUNTAIN: Self = Self {
+        name: "Fountain",
+        bytes: include_bytes!("fountain.json_snap"),
+    };
+
+    pub const TURBULENCE: Self = Self {
+        name: "Turbulence",
+        bytes: include_bytes!("turbulence.json_snap"),
+    };
+
+    pub const STICKY: Self = Self {
+        name: "Sticky",
+        bytes: include_bytes!("sticky.json_snap"),
+    };
+
+    pub const ALL: [&'static Self; 10] = [
         &Self::GRAVITY_NEAT,
         &Self::GRAVITY_DOUBLE,
         &Self::GRAVITY_TRIPLE,
@@ -47,5 +62,8 @@ impl Demo {
         &Self::CIRCULAR_SIPHON,
         &Self::RING,
         &Self::WHIRL,
+        &Self::FOUNTAIN,
+        &Self::TURBULENCE,
+        &Self::STICKY,
     ];
 }
