@@ -6,7 +6,10 @@ use crate::{
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
     line_drawing::slope_draw_thin_line,
-    math::{affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect},
+    math::{
+        affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect,
+        rgba8::Rgba8,
+    },
     outflow::Outflow,
     painting::{
         block_painter::BlockPaintingMode,
@@ -302,6 +305,10 @@ impl EguiApp {
         let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
         if ui.button((trash_icon, "Clear particles")).clicked() {
             self.world.simulation.particles.clear();
+            let mut simulation_painter = self.simulation_painter.lock().unwrap();
+            unsafe {
+                simulation_painter.clear_water_color(&self.gl, Rgba8::BLACK);
+            }
         }
     }
 

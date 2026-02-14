@@ -1,7 +1,7 @@
 use crate::{
     field::RgbaField,
     inflow::Inflow,
-    math::rect::Rect,
+    math::{point::Point, rect::Rect, rgba8::Rgba8},
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
@@ -314,6 +314,12 @@ impl SimulationPainter {
         //     .texture_image_field(gl, TextureFormat::RGBA16F, &f32_color);
         self.color_texture
             .texture_image_field(gl, TextureFormat::RGBA8, &color);
+    }
+
+    pub unsafe fn clear_water_color(&mut self, gl: &glow::Context, clear_color: Rgba8) {
+        let bounds = Rect::low_size(Point::ZERO, self.color_texture.size());
+        let field = RgbaField::filled(bounds, clear_color);
+        self.write_water_color(gl, &field);
     }
 }
 
