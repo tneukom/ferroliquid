@@ -26,7 +26,7 @@ pub struct SimulationSettings {
 }
 
 fn tau_default() -> f64 {
-    0.5
+    0.4
 }
 
 impl SimulationSettings {
@@ -78,7 +78,7 @@ impl Default for SimulationSettings {
         Self {
             density_correction_strength: 2.0,
             target_density: 8.0,
-            tau: 0.5,
+            tau: 0.4,
             speed: 1.0,
         }
     }
