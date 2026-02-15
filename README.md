@@ -6,7 +6,7 @@ fluid simulation to Rust with an egui interface for experimentation.
 
 https://github.com/user-attachments/assets/7df9a042-7d4d-4377-807a-6d19eb4b9519
 
-[Run in browser]()
+[Run in browser](https://tneukom.github.io/ferroliquid)
 
 Features
 
