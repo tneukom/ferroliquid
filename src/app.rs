@@ -149,7 +149,7 @@ impl EguiApp {
 
         let (channel_sender, channel_receiver) = mpsc::sync_channel(1);
 
-        Self {
+        let mut app = Self {
             world,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(&gl),
@@ -164,7 +164,11 @@ impl EguiApp {
             tool: Tool::Pointer,
             channel_sender,
             channel_receiver,
-        }
+        };
+
+        app.load_demo(&Demo::GRAVITY_NEAT);
+        app.run = true;
+        app
     }
 
     pub fn selected_manipulator_ui(&mut self, ui: &mut egui::Ui) {
@@ -365,6 +369,12 @@ impl EguiApp {
 
         self.world = World::from_save_world(save_world);
         self.selected = Selected::None;
+    }
+
+    pub fn load_demo(&mut self, demo: &Demo) {
+        let reader = Cursor::new(demo.bytes);
+        let save_world = SaveWorld::read_from_snap_json(reader);
+        self.load(save_world);
     }
 
     pub fn save_load_ui(&mut self, ui: &mut egui::Ui) {
@@ -739,9 +749,7 @@ impl EguiApp {
                 ui.add_space(10.0);
 
                 if ui.button(demo.name).clicked() {
-                    let reader = Cursor::new(demo.bytes);
-                    let save_world = SaveWorld::read_from_snap_json(reader);
-                    self.load(save_world);
+                    self.load_demo(demo);
                     self.run = true;
                 }
             });
