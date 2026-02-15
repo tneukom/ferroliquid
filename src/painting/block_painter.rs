@@ -134,10 +134,10 @@ impl BlockPainter {
 
                 let target_rect = Rect::low_size(coord.as_f64(), Point::ONE);
 
-                let tile_index = tileset[block.tile_choice % tileset.len()];
+                let tile_index = tileset[(block.tile_choice % tileset.len() as u64) as usize];
                 let sprite = self.tile_sheet.sprite(tile_index, target_rect, rotation);
                 let palette = &palettes[&block.palette];
-                let color = palette[block.color_choice % palette.len()];
+                let color = palette[(block.color_choice % palette.len() as u64) as usize];
                 let aux = WallAux {
                     brush_color: color,
                     // Dark gray looks better than black

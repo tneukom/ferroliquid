@@ -82,8 +82,8 @@ impl BlockKind {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Block {
     pub kind: BlockKind,
-    pub tile_choice: usize,
-    pub color_choice: usize,
+    pub tile_choice: u64,
+    pub color_choice: u64,
     pub palette: BlockPalette,
 }
 
@@ -91,9 +91,9 @@ impl Block {
     pub fn new(kind: BlockKind, palette: BlockPalette) -> Self {
         Self {
             kind,
-            tile_choice: fastrand::usize(0..usize::MAX),
+            tile_choice: fastrand::u64(0..u64::MAX),
             palette,
-            color_choice: fastrand::usize(0..usize::MAX),
+            color_choice: fastrand::u64(0..u64::MAX),
         }
     }
 }
