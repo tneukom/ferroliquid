@@ -4,9 +4,11 @@ on [iOS Appstore](https://apps.apple.com/us/app/liquidsketch/id544717096),
 [Android Appstore](https://play.google.com/store/apps/details?id=net.tobiasneukom.liquidsketch))
 fluid simulation to Rust with an egui interface for experimentation.
 
+**[Run in browser](https://tneukom.github.io/ferroliquid)**
+
 https://github.com/user-attachments/assets/7df9a042-7d4d-4377-807a-6d19eb4b9519
 
-[Run in browser](https://tneukom.github.io/ferroliquid)
+
 
 Features
 
