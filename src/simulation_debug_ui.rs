@@ -16,6 +16,7 @@ pub struct SimulationDebugDrawSettings {
     divergence: bool,
     velocity_div_free: bool,
     velocity_correction: bool,
+    flow_rate: bool,
     divergence_corrected: bool,
     pressure: bool,
     grid: bool,
@@ -35,6 +36,7 @@ impl Default for SimulationDebugDrawSettings {
             divergence: false,
             velocity_div_free: false,
             velocity_correction: false,
+            flow_rate: false,
             divergence_corrected: false,
             pressure: false,
             grid: true,
@@ -60,6 +62,7 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.divergence, "Divergence");
     ui.checkbox(&mut settings.velocity_div_free, "Velocity Div Free");
     ui.checkbox(&mut settings.velocity_correction, "Velocity Correction");
+    ui.checkbox(&mut settings.flow_rate, "Flow Rate");
     ui.checkbox(&mut settings.divergence_corrected, "Divergence Corrected");
     ui.checkbox(&mut settings.pressure, "Pressure");
     ui.checkbox(&mut settings.grid, "Grid");
@@ -223,6 +226,15 @@ pub fn draw_simulation(
             font.clone(),
             ui_rect,
             &simulation.grid.sides.velocity_interpolated,
+        );
+    }
+
+    if settings.flow_rate {
+        draw_side_field(
+            painter,
+            font.clone(),
+            ui_rect,
+            &simulation.grid.sides.flow_rate,
         );
     }
 

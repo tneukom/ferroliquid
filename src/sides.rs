@@ -1,7 +1,9 @@
 use crate::{
-    field::Field,
+    field::{Field, RgbaField},
     math::{point::Point, rect::Rect},
 };
+use egui::Key::M;
+use itertools::Either;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -35,8 +37,8 @@ impl Orientation {
     }
 }
 
-/// Side(pixel, side) is the counterclockwise side around pixel
-/// Each pixel has therefore 6 sides, see docs/sides_and_corners.jpg
+/// Side(i, j) start in the top left corner of Cell(i, j). The direction of vertical sides is
+/// down and horizontal sides right.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Side {
     pub orientation: Orientation,
@@ -114,6 +116,44 @@ impl Side {
         match self.orientation {
             Orientation::Vertical => self.upper_cell().left(),
             Orientation::Horizontal => self.upper_cell().up(),
+        }
+    }
+
+    /// ┌──┐┌──┐┌──┐┌──┐
+    /// │L0││L1││L2││L3│
+    /// └──┘└──┘└──┘└──┘
+    /// ───────────────► Side
+    /// ┌──┐┌──┐┌──┐┌──┐
+    /// │R0││R1││R2││R3│
+    /// └──┘└──┘└──┘└──┘
+    ///
+    /// ┌───────┐
+    /// │Left   │
+    /// │Cell   │
+    /// ├─┬─┬─┬─┤
+    /// ├─┼─┼─┼─┤
+    /// ├─┴─┴─┴─┤
+    /// │Right  │
+    /// │Cell   │
+    /// └───────┘
+    /// Returns (L0, R0), (L1, R1), ...
+    pub fn adjacent_pixels(
+        self,
+        resolution: i64,
+    ) -> impl Iterator<Item = (Point<i64>, Point<i64>)> {
+        debug_assert!(resolution > 0);
+        if self.orientation == Orientation::Horizontal {
+            let start_x = resolution * self.index.x;
+            let stop_x = resolution * (self.index.x + 1);
+            let y = resolution * self.index.y;
+            let iter = (start_x..stop_x).map(move |x| (Point(x, y - 1), Point(x, y)));
+            Either::Left(iter)
+        } else {
+            let start_y = resolution * self.index.y;
+            let stop_y = resolution * (self.index.y + 1);
+            let x = resolution * self.index.x;
+            let iter = (start_y..stop_y).map(move |y| (Point(x - 1, y), Point(x, y)));
+            Either::Right(iter)
         }
     }
 }
@@ -249,12 +289,45 @@ impl<T> IndexMut<Side> for SideField<T> {
     }
 }
 
+pub fn flow_rate_from_bitmap(bounds: Rect<i64>, bitmap: &RgbaField) -> SideField<f64> {
+    assert_eq!(bitmap.size().x % bounds.size().x, 0);
+    let resolution = bitmap.size().x / bounds.size().x;
+    assert_eq!(bounds * resolution, bitmap.bounds());
+
+    let is_blocked = |pixel: Point<i64>| {
+        if let Some(color) = bitmap.get(pixel) {
+            color.a > 128
+        } else {
+            false
+        }
+    };
+
+    let mut flow_rate = SideField::filled(bounds, 0.0);
+    for side in flow_rate.indices() {
+        let mut blocked_count = 0;
+        let mut total = 0;
+        for (left_pixel, right_pixel) in side.adjacent_pixels(resolution) {
+            total += 1;
+            if is_blocked(left_pixel) || is_blocked(right_pixel) {
+                blocked_count += 1;
+            }
+        }
+        flow_rate[side] = blocked_count as f64 / total as f64;
+    }
+
+    flow_rate
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sides {
     pub velocity_interpolated: SideField<f64>,
+
+    /// Used for interpolating particle velocities to velocity_interpolated
+    pub weight: SideField<f64>,
+
     pub velocity_div_free: SideField<f64>,
     pub velocity_correction: SideField<f64>,
-    pub density: SideField<f64>,
+
     // TODO: Why not bool?
     pub defined: SideField<f64>,
 
@@ -265,6 +338,9 @@ pub struct Sides {
     /// f(v) = boundary_linear * v + boundary_constant
     pub boundary_constant: SideField<f64>,
     pub boundary_linear: SideField<f64>,
+
+    /// flow = flow_rate * velocity
+    pub flow_rate: SideField<f64>,
 }
 
 impl Sides {
@@ -273,11 +349,12 @@ impl Sides {
             velocity_interpolated: SideField::filled(bounds, 0.0),
             velocity_div_free: SideField::filled(bounds, 0.0),
             velocity_correction: SideField::filled(bounds, 0.0),
-            density: SideField::filled(bounds, 0.0),
+            weight: SideField::filled(bounds, 0.0),
             defined: SideField::filled(bounds, 0.0),
 
             boundary_constant: SideField::filled(bounds, 0.0),
             boundary_linear: SideField::filled(bounds, 1.0),
+            flow_rate: SideField::filled(bounds, 1.0),
         }
     }
 
@@ -285,7 +362,7 @@ impl Sides {
         self.velocity_interpolated.fill(0.0);
         self.velocity_div_free.fill(0.0);
         self.velocity_correction.fill(0.0);
-        self.density.fill(0.0);
+        self.weight.fill(0.0);
         self.defined.fill(0.0);
     }
 

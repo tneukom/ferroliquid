@@ -1,6 +1,6 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
-    field::Field,
+    field::{Field, RgbaField},
     math::{point::Point, rect::Rect},
     sides::{Direction, Side, Sides},
     simulation::{Particle, SimulationSettings},
@@ -61,6 +61,27 @@ impl Grid {
         }
     }
 
+    pub fn make_solid_from_bitmap(&mut self, bitmap: &RgbaField) {
+        assert_eq!(bitmap.size().x % self.bounds.size().x, 0);
+        let resolution = bitmap.size().x / self.bounds.size().x;
+        assert_eq!(self.bounds * resolution, bitmap.bounds());
+
+        for cell_coord in self.bounds.iter_indices() {
+            let pixel_bounds = Rect::low_size(cell_coord, Point::ONE) * resolution;
+            let mut solid_pixel_count = 0;
+            for pixel in pixel_bounds.iter_indices() {
+                let rgba = bitmap[pixel];
+                if rgba.a > 128 {
+                    solid_pixel_count += 1;
+                }
+            }
+
+            if solid_pixel_count >= resolution * resolution {
+                self.make_solid(cell_coord);
+            }
+        }
+    }
+
     pub fn insert_particle(
         &mut self,
         mut particle: Particle,
@@ -106,19 +127,19 @@ impl Grid {
 
             self.sides.velocity_interpolated[left_top_side] +=
                 (1.0 - fractional.x) * (1.0 - fractional.y) * particle.velocity.x;
-            self.sides.density[left_top_side] += (1.0 - fractional.x) * (1.0 - fractional.y);
+            self.sides.weight[left_top_side] += (1.0 - fractional.x) * (1.0 - fractional.y);
 
             self.sides.velocity_interpolated[left_bottom_side] +=
                 (1.0 - fractional.x) * fractional.y * particle.velocity.x;
-            self.sides.density[left_bottom_side] += (1.0 - fractional.x) * fractional.y;
+            self.sides.weight[left_bottom_side] += (1.0 - fractional.x) * fractional.y;
 
             self.sides.velocity_interpolated[right_top_side] +=
                 fractional.x * (1.0 - fractional.y) * particle.velocity.x;
-            self.sides.density[right_top_side] += fractional.x * (1.0 - fractional.y);
+            self.sides.weight[right_top_side] += fractional.x * (1.0 - fractional.y);
 
             self.sides.velocity_interpolated[right_bottom_side] +=
                 fractional.x * fractional.y * particle.velocity.x;
-            self.sides.density[right_bottom_side] += fractional.x * fractional.y;
+            self.sides.weight[right_bottom_side] += fractional.x * fractional.y;
         }
 
         // Interpolate horizontal sides velocities
@@ -136,19 +157,19 @@ impl Grid {
 
             self.sides.velocity_interpolated[left_top_side] +=
                 (1.0 - fractional.x) * (1.0 - fractional.y) * particle.velocity.y;
-            self.sides.density[left_top_side] += (1.0 - fractional.x) * (1.0 - fractional.y);
+            self.sides.weight[left_top_side] += (1.0 - fractional.x) * (1.0 - fractional.y);
 
             self.sides.velocity_interpolated[left_bottom_side] +=
                 (1.0 - fractional.x) * fractional.y * particle.velocity.y;
-            self.sides.density[left_bottom_side] += (1.0 - fractional.x) * fractional.y;
+            self.sides.weight[left_bottom_side] += (1.0 - fractional.x) * fractional.y;
 
             self.sides.velocity_interpolated[right_top_side] +=
                 fractional.x * (1.0 - fractional.y) * particle.velocity.y;
-            self.sides.density[right_top_side] += fractional.x * (1.0 - fractional.y);
+            self.sides.weight[right_top_side] += fractional.x * (1.0 - fractional.y);
 
             self.sides.velocity_interpolated[right_bottom_side] +=
                 fractional.x * fractional.y * particle.velocity.y;
-            self.sides.density[right_bottom_side] += fractional.x * fractional.y;
+            self.sides.weight[right_bottom_side] += fractional.x * fractional.y;
         }
 
         //Interpolate cell densities
@@ -241,7 +262,7 @@ impl Grid {
                 self.sides.defined[side] = 1.0;
             }
 
-            let density = self.sides.density[side].max(MIN_DENSITY);
+            let density = self.sides.weight[side].max(MIN_DENSITY);
             self.sides.velocity_interpolated[side] /= density;
         }
 

@@ -138,8 +138,8 @@ impl World {
                 .apply(&mut self.simulation.particles, self.simulation.time, dt);
         }
 
-        self.blocks
-            .assign_simulation_grid(&mut self.simulation.grid);
+        // self.blocks
+        //     .assign_simulation_grid(&mut self.simulation.grid);
         self.simulation.step(dt, &self.settings);
 
         trace_event(Event::Energy(self.energy()));
