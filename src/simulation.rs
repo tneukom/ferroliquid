@@ -1,7 +1,7 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
     grid::Grid,
-    interpolator::interpolate_div_free_velocity_bilinear,
+    interpolator::{interpolate_div_free_velocity, interpolate_div_free_velocity_bilinear},
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::{Side, Sides},
 };
@@ -184,26 +184,26 @@ impl Simulation {
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
         let pos1 = position;
-        let k1 = interpolate_div_free_velocity_bilinear(sides, pos1, velocity);
+        let k1 = interpolate_div_free_velocity(sides, pos1, velocity);
 
         let pos2 = pos1 + 0.5 * dt * k1;
         if !bounds.contains(pos2) {
             return None;
         }
 
-        let k2 = interpolate_div_free_velocity_bilinear(sides, pos2, velocity);
+        let k2 = interpolate_div_free_velocity(sides, pos2, velocity);
         let pos3 = pos1 + 0.5 * dt * k2;
         if !bounds.contains(pos3) {
             return None;
         }
 
-        let k3 = interpolate_div_free_velocity_bilinear(sides, pos3, velocity);
+        let k3 = interpolate_div_free_velocity(sides, pos3, velocity);
         let pos4 = pos1 + dt * k3;
         if !bounds.contains(pos4) {
             return None;
         }
 
-        let k4 = interpolate_div_free_velocity_bilinear(sides, pos4, velocity);
+        let k4 = interpolate_div_free_velocity(sides, pos4, velocity);
 
         position = position + (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
 
