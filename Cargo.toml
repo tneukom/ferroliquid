@@ -63,7 +63,7 @@ debug = true
 # Faster compile time, release is pretty bad
 [profile.prerelease]
 inherits = "release"
-opt-level = 2
+opt-level = 1
 lto = false
 incremental = true
 
