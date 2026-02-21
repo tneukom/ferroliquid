@@ -2,7 +2,6 @@ use crate::{
     field::{Field, RgbaField},
     math::{point::Point, rect::Rect},
 };
-use egui::Key::M;
 use itertools::Either;
 use serde::{Deserialize, Serialize};
 use std::{
