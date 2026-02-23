@@ -409,21 +409,21 @@ impl Simulation {
             .grid
             .insert_particles(std::mem::take(&mut self.particles), settings);
 
-        Self::fixup_corner_densities(
-            &self.grid.cells_type,
-            &mut self.grid.cells_density,
-            settings,
-        );
+        // Self::fixup_corner_densities(
+        //     &self.grid.cells_type,
+        //     &mut self.grid.cells_density,
+        //     settings,
+        // );
 
         self.grid.solve_pressure(settings);
 
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(dt, settings);
 
-        Self::fixup_corners_velocities(
-            &self.grid.cells_type,
-            &mut self.grid.sides.velocity_div_free,
-        );
+        // Self::fixup_corners_velocities(
+        //     &self.grid.cells_type,
+        //     &mut self.grid.sides.velocity_div_free,
+        // );
 
         // 2 steps at 60 fps (dt ~= 0.016), 1 step at 120 fps (dt ~= 0.083)
         let n_steps = if dt > 0.012 { 2 } else { 1 };

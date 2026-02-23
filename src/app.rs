@@ -23,7 +23,7 @@ use crate::{
     piecewise_linear::PiecewiseLinear,
     radial_force::{GravityFunction, PiecewiseLinearRadialFunction, RadialForce},
     render_debug_ui::RenderDebugUi,
-    sides::flow_rate_from_bitmap,
+    sides::passable_from_bitmap,
     simulation_debug_ui::SimulationDebugWindow,
     utils::monotonic_time,
     widgets::{icon_button, styled_space},
@@ -126,11 +126,11 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
-        let bounds = Rect::low_size(Point::ZERO, Point(120, 100));
+        let bounds = Rect::low_size(Point::ZERO, Point(40, 40));
         let mut world = World::new(bounds);
         let solid_bitmap = RgbaField::load_from_memory(include_bytes!("solid.png")).unwrap();
-        let flow_rate = flow_rate_from_bitmap(world.bounds(), &solid_bitmap);
-        world.simulation.grid.sides.flow_rate = flow_rate;
+        let passable = passable_from_bitmap(world.bounds(), &solid_bitmap);
+        world.simulation.grid.sides.passable = passable;
         world.simulation.grid.make_solid_from_bitmap(&solid_bitmap);
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
