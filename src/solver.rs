@@ -48,6 +48,7 @@ impl Solver {
         }
     }
 
+    // b = Ax where A = [rows...]
     #[inline(never)]
     pub fn apply(&self, x: &[f64], b: &mut [f64]) {
         for i in 0..x.len() {

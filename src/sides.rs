@@ -288,33 +288,33 @@ impl<T> IndexMut<Side> for SideField<T> {
     }
 }
 
-pub fn flow_rate_from_bitmap(bounds: Rect<i64>, bitmap: &RgbaField) -> SideField<f64> {
+pub fn passable_from_bitmap(bounds: Rect<i64>, bitmap: &RgbaField) -> SideField<f64> {
     assert_eq!(bitmap.size().x % bounds.size().x, 0);
     let resolution = bitmap.size().x / bounds.size().x;
     assert_eq!(bounds * resolution, bitmap.bounds());
 
-    let is_blocked = |pixel: Point<i64>| {
+    let is_passable = |pixel: Point<i64>| {
         if let Some(color) = bitmap.get(pixel) {
-            color.a > 128
+            color.a < 128
         } else {
-            false
+            true
         }
     };
 
-    let mut flow_rate = SideField::filled(bounds, 0.0);
-    for side in flow_rate.indices() {
-        let mut blocked_count = 0;
+    let mut passable = SideField::filled(bounds, 0.0);
+    for side in passable.indices() {
+        let mut passable_count = 0;
         let mut total = 0;
         for (left_pixel, right_pixel) in side.adjacent_pixels(resolution) {
             total += 1;
-            if is_blocked(left_pixel) || is_blocked(right_pixel) {
-                blocked_count += 1;
+            if is_passable(left_pixel) && is_passable(right_pixel) {
+                passable_count += 1;
             }
         }
-        flow_rate[side] = blocked_count as f64 / total as f64;
+        passable[side] = passable_count as f64 / total as f64;
     }
 
-    flow_rate
+    passable
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -330,16 +330,8 @@ pub struct Sides {
     // TODO: Why not bool?
     pub defined: SideField<f64>,
 
-    /// bounday(v) = ..
-    /// solid(v) = 0
-    /// fluid(v) = v
-    /// pump(v) = 0.1*v + v0
-    /// f(v) = boundary_linear * v + boundary_constant
-    pub boundary_constant: SideField<f64>,
-    pub boundary_linear: SideField<f64>,
-
-    /// flow = flow_rate * velocity
-    pub flow_rate: SideField<f64>,
+    /// Proportion of the side that is not blocked by solid
+    pub passable: SideField<f64>,
 }
 
 impl Sides {
@@ -350,10 +342,7 @@ impl Sides {
             velocity_correction: SideField::filled(bounds, 0.0),
             weight: SideField::filled(bounds, 0.0),
             defined: SideField::filled(bounds, 0.0),
-
-            boundary_constant: SideField::filled(bounds, 0.0),
-            boundary_linear: SideField::filled(bounds, 1.0),
-            flow_rate: SideField::filled(bounds, 1.0),
+            passable: SideField::filled(bounds, 1.0),
         }
     }
 
@@ -366,15 +355,12 @@ impl Sides {
     }
 
     pub fn make_solid(&mut self, side: Side) {
-        //this->defined[coord] = 1.0;
-        self.boundary_constant[side] = 0.0;
-        self.boundary_linear[side] = 0.0;
+        self.passable[side] = 0.0;
     }
 
     /// Clear boundary condition on all sides
     pub fn clear_solid(&mut self) {
-        self.boundary_constant.fill(0.0);
-        self.boundary_linear.fill(1.0);
+        self.passable.fill(1.0);
     }
 
     pub fn make_fluid(&mut self, side: Side) {

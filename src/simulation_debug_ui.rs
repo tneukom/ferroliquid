@@ -11,18 +11,17 @@ const DRAW_SCALE: f64 = 40.0;
 #[derive(Debug, Clone, Copy)]
 pub struct SimulationDebugDrawSettings {
     particles: bool,
+    previous_particles: bool,
     particle_velocity_labels: bool,
     velocity_interpolated: bool,
     divergence: bool,
     velocity_div_free: bool,
     velocity_correction: bool,
-    flow_rate: bool,
+    passable: bool,
     divergence_corrected: bool,
     pressure: bool,
     grid: bool,
     cell_types: bool,
-    boundary_constant: bool,
-    boundary_linear: bool,
     density: bool,
     defined: bool,
 }
@@ -31,18 +30,17 @@ impl Default for SimulationDebugDrawSettings {
     fn default() -> Self {
         Self {
             particles: true,
+            previous_particles: false,
             particle_velocity_labels: false,
             velocity_interpolated: false,
             divergence: false,
             velocity_div_free: false,
             velocity_correction: false,
-            flow_rate: false,
+            passable: false,
             divergence_corrected: false,
             pressure: false,
             grid: true,
             cell_types: false,
-            boundary_constant: false,
-            boundary_linear: false,
             density: false,
             defined: false,
         }
@@ -54,6 +52,7 @@ pub fn simulation_draw_settings_widget(
     settings: &mut SimulationDebugDrawSettings,
 ) {
     ui.checkbox(&mut settings.particles, "Particles");
+    ui.checkbox(&mut settings.previous_particles, "Previous Particles");
     ui.checkbox(
         &mut settings.particle_velocity_labels,
         "Particle Velocity Labels",
@@ -62,13 +61,11 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.divergence, "Divergence");
     ui.checkbox(&mut settings.velocity_div_free, "Velocity Div Free");
     ui.checkbox(&mut settings.velocity_correction, "Velocity Correction");
-    ui.checkbox(&mut settings.flow_rate, "Flow Rate");
+    ui.checkbox(&mut settings.passable, "Passable");
     ui.checkbox(&mut settings.divergence_corrected, "Divergence Corrected");
     ui.checkbox(&mut settings.pressure, "Pressure");
     ui.checkbox(&mut settings.grid, "Grid");
     ui.checkbox(&mut settings.cell_types, "Cell Types");
-    ui.checkbox(&mut settings.boundary_constant, "Boundary Constant");
-    ui.checkbox(&mut settings.boundary_linear, "Boundary Linear");
     ui.checkbox(&mut settings.density, "Density");
     ui.checkbox(&mut settings.defined, "Defined");
 }
@@ -99,6 +96,37 @@ pub fn draw_side_field(
         );
     }
 }
+
+// pub fn draw_particles(
+//     painter: &egui::Painter,
+//     rect: egui::Rect,
+//     draw_labels: bool,
+//     positions: impl IntoIterator<Item = Point<f64>>,
+// ) {
+//     let particle_radius = 2.0;
+//
+//     for position in positions {
+//         let center: egui::Vec2 = (DRAW_SCALE * position).into();
+//
+//         painter.circle_filled(
+//             rect.left_top() + center,
+//             particle_radius,
+//             egui::Color32::from_rgb(255, 0, 0),
+//         );
+//
+//         if draw_labels {
+//             // Draw velocity text next to the particle
+//             let text = format!("{:.1},{:.1}", particle.velocity.x, particle.velocity.y);
+//             painter.text(
+//                 ui_rect.left_top() + center + egui::vec2(-20.0, 0.0),
+//                 egui::Align2::LEFT_CENTER,
+//                 text,
+//                 font.clone(),
+//                 egui::Color32::from_rgb(0, 0, 0),
+//             );
+//         }
+//     }
+// }
 
 pub fn draw_cell_texts(
     painter: &egui::Painter,
@@ -229,12 +257,12 @@ pub fn draw_simulation(
         );
     }
 
-    if settings.flow_rate {
+    if settings.passable {
         draw_side_field(
             painter,
             font.clone(),
             ui_rect,
-            &simulation.grid.sides.flow_rate,
+            &simulation.grid.sides.passable,
         );
     }
 
@@ -298,24 +326,6 @@ pub fn draw_simulation(
                 format!("{div:.1}")
             },
         )
-    }
-
-    if settings.boundary_constant {
-        draw_side_field(
-            painter,
-            font.clone(),
-            ui_rect,
-            &simulation.grid.sides.boundary_constant,
-        );
-    }
-
-    if settings.boundary_linear {
-        draw_side_field(
-            painter,
-            font.clone(),
-            ui_rect,
-            &simulation.grid.sides.boundary_linear,
-        );
     }
 
     if settings.defined {

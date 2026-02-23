@@ -56,9 +56,9 @@ impl Grid {
 
     pub fn make_solid(&mut self, coord: Point<i64>) {
         self.cells_type[coord] = CellType::Solid;
-        for side in Side::sides(coord) {
-            self.sides.make_solid(side);
-        }
+        // for side in Side::sides(coord) {
+        //     self.sides.make_solid(side);
+        // }
     }
 
     pub fn make_solid_from_bitmap(&mut self, bitmap: &RgbaField) {
@@ -258,7 +258,8 @@ impl Grid {
         const MIN_DENSITY: f64 = 0.0001;
 
         for side in self.sides.indices() {
-            if self.sides.boundary_linear[side] == 0.0 {
+            // Solid sides are defined
+            if self.sides.passable[side] == 0.0 {
                 self.sides.defined[side] = 1.0;
             }
 
@@ -273,47 +274,54 @@ impl Grid {
     pub fn solve(&mut self, settings: &SimulationSettings) -> Vec<f64> {
         let mut solver = Solver::new(self.fluid_cells.len());
 
-        let l = &self.sides.boundary_linear;
-        let v0 = &self.sides.boundary_constant;
         let u = &self.sides.velocity_interpolated;
+        let passable = &self.sides.passable;
 
-        // Set up the system of linear equation to find the pressure
+        // Set up system of linear equations A*pressure = -b where b is the divergence plus a
+        // density correction term.
+        // A * pressure
+        // = -div (passable[direction] * grad p)
+        // = sum_direction passable[direction] * (pressure[center]- pressure[direction])
+        // = sum_direction passable[direction] * pressure[center]
+        //   + sum_direction -passable[direction] * pressure[direction]
+        //           ┌─────────┐
+        //           │p[up]    │
+        // ┌─────────┼─────────┼─────────┐
+        // │p[left]  │p[center]│p[right] │
+        // └─────────┼─────────┼─────────┘
+        //           │p[down]  │
+        //           └─────────┘
         for i in 0..self.fluid_cells.len() {
             let c = self.fluid_cells[i];
             let cell_fluid_index = self.cells_fluid_index[c];
             let row = &mut solver.rows[cell_fluid_index];
 
             let density_correction = self.cells_density[c] - settings.target_density;
-            // let density_correction = 0.0;
 
-            // flow from outside pressure: div (l * grad p)
+            // flow from outside pressure: div (passable * grad p)
             for direction in Direction::ALL {
                 let to_coord = c.neighbor(direction);
 
-                let flow = l[Side::side(c, direction)];
+                let passable = passable[Side::side(c, direction)];
 
                 // flow from outside pressure in "direction" = -l[side(c, direction)] * p[neighbor(c, direction)]
                 // cells of type AIR have pressure = 0 and sides of type SOLID have l = 0
                 if self.cells_type[to_coord] == CellType::Fluid {
-                    row.coeffs[direction as usize] = -flow;
+                    row.coeffs[direction as usize] = -passable;
                     row.neighbors[direction as usize] = self.cells_fluid_index[to_coord];
                 }
 
                 // flow from inside pressure in "direction" = l[side(c, direction)] * p[c]
-                row.diagonal += flow;
+                row.diagonal += passable;
             }
 
             row.diagonal += 0.00005;
 
-            // solver.b = div (l*u + v_0)
-            solver.b[cell_fluid_index] = l[Side::right_side(c)] * u[Side::right_side(c)]
-                - l[Side::left_side(c)] * u[Side::left_side(c)]
-                + l[Side::bottom_side(c)] * u[Side::bottom_side(c)]
-                - l[Side::top_side(c)] * u[Side::top_side(c)]
-                + v0[Side::right_side(c)]
-                - v0[Side::left_side(c)]
-                + v0[Side::bottom_side(c)]
-                - v0[Side::top_side(c)]
+            // solver.b = div (passable * u)
+            solver.b[cell_fluid_index] = passable[Side::right_side(c)] * u[Side::right_side(c)]
+                - passable[Side::left_side(c)] * u[Side::left_side(c)]
+                + passable[Side::bottom_side(c)] * u[Side::bottom_side(c)]
+                - passable[Side::top_side(c)] * u[Side::top_side(c)]
                 - density_correction * settings.density_correction_strength;
         }
 
@@ -339,9 +347,13 @@ impl Grid {
             let upper_pressure = self.cells_pressure[side.upper_cell()];
             let lower_pressure = self.cells_pressure[side.lower_cell()];
 
-            self.sides.velocity_div_free[side] = self.sides.boundary_linear[side]
-                * (self.sides.velocity_interpolated[side] + (upper_pressure - lower_pressure))
-                + self.sides.boundary_constant[side];
+            if self.sides.passable[side] > 0.0 {
+                let pressure_velocity = upper_pressure - lower_pressure;
+                self.sides.velocity_div_free[side] =
+                    self.sides.velocity_interpolated[side] + pressure_velocity;
+            } else {
+                self.sides.velocity_div_free[side] = 0.0;
+            };
             self.sides.velocity_correction[side] =
                 self.sides.velocity_div_free[side] - self.sides.velocity_interpolated[side];
         }
