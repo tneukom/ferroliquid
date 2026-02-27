@@ -172,6 +172,20 @@ impl<T> Field<T> {
         }
     }
 
+    pub fn zip_with<S, R>(&self, other: &Field<S>, mut f: impl FnMut(&T, &S) -> R) -> Field<R> {
+        assert_eq!(self.bounds, other.bounds);
+        let elems: Vec<R> = self
+            .elems
+            .iter()
+            .zip(&other.elems)
+            .map(|(lhs, rhs)| f(lhs, rhs))
+            .collect();
+        Field {
+            bounds: self.bounds,
+            elems,
+        }
+    }
+
     pub fn map<S>(&self, f: impl FnMut(&T) -> S) -> Field<S> {
         let elems = self.elems.iter().map(f).collect();
         Field {

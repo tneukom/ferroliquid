@@ -25,6 +25,7 @@ use crate::{
     render_debug_ui::RenderDebugUi,
     sides::passable_from_bitmap,
     simulation_debug_ui::SimulationDebugWindow,
+    solid_boundary::SolidBoundary,
     utils::monotonic_time,
     widgets::{icon_button, styled_space},
     world::{ForceKey, InflowKey, OutflowKey, SaveWorld, World},
@@ -132,6 +133,8 @@ impl EguiApp {
         let passable = passable_from_bitmap(world.bounds(), &solid_bitmap);
         world.simulation.grid.sides.passable = passable;
         world.simulation.grid.make_solid_from_bitmap(&solid_bitmap);
+        let solid = solid_bitmap.map(|rgba| rgba.a > 128);
+        world.solid = Some(SolidBoundary::new(&solid));
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 
@@ -526,8 +529,7 @@ impl EguiApp {
         ui.horizontal(|ui| {
             self.profiler_window.window_toggle(ui);
 
-            self.simulation_debug_window
-                .window_toggle(ui, &self.world.simulation);
+            self.simulation_debug_window.window_toggle(ui, &self.world);
         });
 
         // Put debug ui at the bottom of the left side panel

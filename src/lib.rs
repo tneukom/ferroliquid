@@ -33,6 +33,7 @@ pub(crate) mod sides;
 pub(crate) mod simulation;
 pub(crate) mod simulation_debug_ui;
 pub(crate) mod simulation_widgets;
+pub(crate) mod solid_boundary;
 pub(crate) mod solver;
 pub(crate) mod utils;
 pub(crate) mod widgets;
