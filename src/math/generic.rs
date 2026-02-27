@@ -1,7 +1,7 @@
 use num_traits::{ConstOne, ConstZero, Euclid, Float, Inv, Signed};
 use std::{
     fmt::{Debug, Display},
-    ops::{Add, Div, Mul, Neg, Sub},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 pub trait Dot<Rhs = Self> {
@@ -99,6 +99,10 @@ pub trait Num:
     + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
+    + AddAssign
+    + SubAssign
+    + MulAssign
+    + DivAssign
     + Euclid
     + MinMax
 {

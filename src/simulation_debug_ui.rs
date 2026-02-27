@@ -3,8 +3,10 @@ use crate::{
     grid::CellType,
     math::{point::Point, rect::Rect},
     sides::{Orientation, Side, SideField},
-    simulation::Simulation,
+    world::World,
 };
+use num_traits::real::Real;
+use ordered_float::NotNan;
 
 const DRAW_SCALE: f64 = 40.0;
 
@@ -24,6 +26,7 @@ pub struct SimulationDebugDrawSettings {
     cell_types: bool,
     density: bool,
     defined: bool,
+    smoothed_distance: bool,
 }
 
 impl Default for SimulationDebugDrawSettings {
@@ -43,6 +46,7 @@ impl Default for SimulationDebugDrawSettings {
             cell_types: false,
             density: false,
             defined: false,
+            smoothed_distance: false,
         }
     }
 }
@@ -68,14 +72,25 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.cell_types, "Cell Types");
     ui.checkbox(&mut settings.density, "Density");
     ui.checkbox(&mut settings.defined, "Defined");
+    ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
 }
 
-pub fn draw_side_field(
-    painter: &egui::Painter,
-    font: egui::FontId,
-    rect: egui::Rect,
-    field: &SideField<f64>,
-) {
+// pub fn draw_vector_field(
+//     painter: &egui::Painter,
+//     font: egui::FontId,
+//     scene_rect: egui::Rect,
+//     f: impl FnMut(Point<f64>) -> Point<f64>,
+// ) {
+//     let n_steps: i64 = 40;
+//     let step = scene_rect.width() as f64 / n_steps as f64;
+//     for iy in 0..n_steps {
+//         for ix in 0..n_steps {
+//             let position =
+//         }
+//     }
+// }
+
+pub fn draw_side_field(painter: &egui::Painter, font: egui::FontId, field: &SideField<f64>) {
     for side in field.indices() {
         // Compute the world-space center of the side depending on orientation
         let world_pos = match side.orientation {
@@ -88,7 +103,7 @@ pub fn draw_side_field(
         let text = format!("{:.1}", velocity);
 
         painter.text(
-            rect.left_top() + (DRAW_SCALE * world_pos).into(),
+            (DRAW_SCALE * world_pos).into(),
             egui::Align2::CENTER_CENTER,
             text,
             font.clone(),
@@ -97,41 +112,47 @@ pub fn draw_side_field(
     }
 }
 
-// pub fn draw_particles(
-//     painter: &egui::Painter,
-//     rect: egui::Rect,
-//     draw_labels: bool,
-//     positions: impl IntoIterator<Item = Point<f64>>,
-// ) {
-//     let particle_radius = 2.0;
-//
-//     for position in positions {
-//         let center: egui::Vec2 = (DRAW_SCALE * position).into();
-//
-//         painter.circle_filled(
-//             rect.left_top() + center,
-//             particle_radius,
-//             egui::Color32::from_rgb(255, 0, 0),
-//         );
-//
-//         if draw_labels {
-//             // Draw velocity text next to the particle
-//             let text = format!("{:.1},{:.1}", particle.velocity.x, particle.velocity.y);
-//             painter.text(
-//                 ui_rect.left_top() + center + egui::vec2(-20.0, 0.0),
-//                 egui::Align2::LEFT_CENTER,
-//                 text,
-//                 font.clone(),
-//                 egui::Color32::from_rgb(0, 0, 0),
-//             );
-//         }
-//     }
-// }
+/// Draws a square for each field index. The square is red if f(index) is negative, blue if
+/// positive. The size of the square is proportional to |f(index)|.
+pub fn draw_square_field(
+    painter: &egui::Painter,
+    grid_spacing: f64,
+    bounds: Rect<f64>,
+    mut f: impl FnMut(Point<f64>) -> f64,
+) {
+    // Grid nodes in bounds with given spacing
+    let grid_nodes = (bounds * (1.0 / grid_spacing))
+        .as_i64()
+        .iter_indices()
+        .map(|index| index.as_f64() * grid_spacing);
+
+    let max_abs = grid_nodes
+        .clone()
+        .filter_map(|position| NotNan::new(f(position)).ok())
+        .map(NotNan::abs)
+        .max()
+        .unwrap()
+        .into_inner();
+
+    for grid_node in grid_nodes {
+        let value = f(grid_node);
+        let center: egui::Pos2 = (DRAW_SCALE * grid_node).into();
+        let size = (DRAW_SCALE * grid_spacing * value.abs() / max_abs) as f32;
+
+        let color = if value < 0.0 {
+            egui::Color32::from_rgba_premultiplied(255, 0, 0, 128)
+        } else {
+            egui::Color32::from_rgba_premultiplied(0, 0, 255, 128)
+        };
+
+        let rect = egui::Rect::from_center_size(center, egui::Vec2::splat(size));
+        painter.rect_filled(rect, 0.0, color);
+    }
+}
 
 pub fn draw_cell_texts(
     painter: &egui::Painter,
     font: egui::FontId,
-    ui_rect: egui::Rect,
     field_bounds: Rect<i64>,
     mut f: impl FnMut(Point<i64>) -> String,
 ) {
@@ -140,7 +161,7 @@ pub fn draw_cell_texts(
         let text = f(coord);
 
         painter.text(
-            ui_rect.left_top() + (DRAW_SCALE * world_pos).into(),
+            (DRAW_SCALE * world_pos).into(),
             egui::Align2::CENTER_CENTER,
             text,
             font.clone(),
@@ -149,44 +170,27 @@ pub fn draw_cell_texts(
     }
 }
 
-pub fn draw_cell_field(
-    painter: &egui::Painter,
-    font: egui::FontId,
-    ui_rect: egui::Rect,
-    field: &Field<f64>,
-) {
-    draw_cell_texts(painter, font, ui_rect, field.bounds(), |coord| {
+pub fn draw_cell_field(painter: &egui::Painter, font: egui::FontId, field: &Field<f64>) {
+    draw_cell_texts(painter, font, field.bounds(), |coord| {
         format!("{:.1}", field[coord])
     });
 }
 
-pub fn draw_grid(painter: &egui::Painter, rect: egui::Rect, bounds: Rect<i64>) {
+pub fn draw_grid(painter: &egui::Painter, bounds: Rect<i64>) {
     let stroke = egui::Stroke::new(0.5, egui::Color32::RED);
 
     // Vertical lines
     for x in bounds.left()..=bounds.right() {
         let start = DRAW_SCALE * Point(x, bounds.top()).as_f64();
         let stop = DRAW_SCALE * Point(x, bounds.bottom()).as_f64();
-        painter.line(
-            vec![
-                rect.left_top() + start.into(),
-                rect.left_top() + stop.into(),
-            ],
-            stroke,
-        );
+        painter.line(vec![start.into(), stop.into()], stroke);
     }
 
     // Horizontal lines
     for y in bounds.top()..=bounds.bottom() {
         let start = DRAW_SCALE * Point(bounds.left(), y).as_f64();
         let stop = DRAW_SCALE * Point(bounds.right(), y).as_f64();
-        painter.line(
-            vec![
-                rect.left_top() + start.into(),
-                rect.left_top() + stop.into(),
-            ],
-            stroke,
-        );
+        painter.line(vec![start.into(), stop.into()], stroke);
     }
 }
 
@@ -196,22 +200,22 @@ pub fn divergence(u: &SideField<f64>, coord: Point<i64>) -> f64 {
 }
 
 pub fn draw_simulation(
-    simulation: &Simulation,
+    world: &World,
     painter: &egui::Painter,
-    ui_rect: egui::Rect,
     settings: &SimulationDebugDrawSettings,
 ) {
     // ui_rect = ui_rect.translate(egui::Vec2::splat(10.0));
+    let simulation = &world.simulation;
 
     let font = egui::FontId::new(9.0, egui::FontFamily::Monospace);
 
     if settings.grid {
-        draw_grid(painter, ui_rect, simulation.grid.bounds);
+        draw_grid(painter, simulation.grid.bounds);
     }
 
     if settings.cell_types {
         let field = &simulation.grid.cells_type;
-        draw_cell_texts(painter, font.clone(), ui_rect, field.bounds(), |coord| {
+        draw_cell_texts(painter, font.clone(), field.bounds(), |coord| {
             let text = match field[coord] {
                 CellType::Solid => "S",
                 CellType::Air => "A",
@@ -226,19 +230,15 @@ pub fn draw_simulation(
         let particle_radius = 2.0;
 
         for particle in &simulation.particles {
-            let center: egui::Vec2 = (DRAW_SCALE * particle.position).into();
+            let center: egui::Pos2 = (DRAW_SCALE * particle.position).into();
 
-            painter.circle_filled(
-                ui_rect.left_top() + center,
-                particle_radius,
-                egui::Color32::from_rgb(255, 0, 0),
-            );
+            painter.circle_filled(center, particle_radius, egui::Color32::from_rgb(255, 0, 0));
 
             if settings.particle_velocity_labels {
                 // Draw velocity text next to the particle
                 let text = format!("{:.1},{:.1}", particle.velocity.x, particle.velocity.y);
                 painter.text(
-                    ui_rect.left_top() + center + egui::vec2(-20.0, 0.0),
+                    center + egui::vec2(-20.0, 0.0),
                     egui::Align2::LEFT_CENTER,
                     text,
                     font.clone(),
@@ -252,25 +252,18 @@ pub fn draw_simulation(
         draw_side_field(
             painter,
             font.clone(),
-            ui_rect,
             &simulation.grid.sides.velocity_interpolated,
         );
     }
 
     if settings.passable {
-        draw_side_field(
-            painter,
-            font.clone(),
-            ui_rect,
-            &simulation.grid.sides.passable,
-        );
+        draw_side_field(painter, font.clone(), &simulation.grid.sides.passable);
     }
 
     if settings.velocity_div_free {
         draw_side_field(
             painter,
             font.clone(),
-            ui_rect,
             &simulation.grid.sides.velocity_div_free,
         );
     }
@@ -279,34 +272,22 @@ pub fn draw_simulation(
         draw_side_field(
             painter,
             font.clone(),
-            ui_rect,
             &simulation.grid.sides.velocity_correction,
         );
     }
 
     if settings.pressure {
-        draw_cell_field(
-            painter,
-            font.clone(),
-            ui_rect,
-            &simulation.grid.cells_pressure,
-        );
+        draw_cell_field(painter, font.clone(), &simulation.grid.cells_pressure);
     }
 
     if settings.density {
-        draw_cell_field(
-            painter,
-            font.clone(),
-            ui_rect,
-            &simulation.grid.cells_density,
-        )
+        draw_cell_field(painter, font.clone(), &simulation.grid.cells_density)
     }
 
     if settings.divergence {
         draw_cell_texts(
             painter,
             font.clone(),
-            ui_rect,
             simulation.grid.cells_pressure.bounds().padded(-1),
             |coord| {
                 let div = divergence(&simulation.grid.sides.velocity_interpolated, coord);
@@ -319,7 +300,6 @@ pub fn draw_simulation(
         draw_cell_texts(
             painter,
             font.clone(),
-            ui_rect,
             simulation.grid.cells_pressure.bounds().padded(-1),
             |coord| {
                 let div = divergence(&simulation.grid.sides.velocity_div_free, coord);
@@ -329,29 +309,48 @@ pub fn draw_simulation(
     }
 
     if settings.defined {
-        draw_side_field(
-            painter,
-            font.clone(),
-            ui_rect,
-            &simulation.grid.sides.defined,
-        );
+        draw_side_field(painter, font.clone(), &simulation.grid.sides.defined);
+    }
+
+    if settings.smoothed_distance {
+        if let Some(solid) = &world.solid {
+            // draw_cell_field(painter, font, &solid.signed_distance);
+
+            draw_square_field(
+                painter,
+                0.25,
+                world.simulation.grid.bounds.as_f64(),
+                |position| solid.distance_at(position),
+            );
+
+            draw_cell_texts(painter, font, world.simulation.grid.bounds, |index| {
+                let distance = solid.distance_at(index.as_f64() + Point(0.5, 0.5));
+                match distance {
+                    f64::INFINITY => "∞".to_string(),
+                    f64::NEG_INFINITY => "-∞".to_string(),
+                    distance => format!("{distance:.1}"),
+                }
+            });
+        }
     }
 }
 
 pub fn debug_simulation_scene_ui(
     ui: &mut egui::Ui,
     scene_rect: &mut egui::Rect,
-    simulation: &Simulation,
+    world: &World,
     settings: &SimulationDebugDrawSettings,
 ) {
+    let copy_scene_rect = *scene_rect;
     egui::Scene::new()
         .zoom_range(0.25..=4.0)
         .show(ui, scene_rect, |ui| {
-            let size = DRAW_SCALE * simulation.grid.bounds.size().as_f64();
+            let size = DRAW_SCALE * world.simulation.grid.bounds.size().as_f64();
 
-            let (response, painter) = ui.allocate_painter(size.into(), egui::Sense::click());
-            let rect = response.rect;
-            draw_simulation(simulation, &painter, rect, settings);
+            let (_response, painter) = ui.allocate_painter(size.into(), egui::Sense::click());
+
+            println!("scene_rect: {}", copy_scene_rect);
+            draw_simulation(world, &painter, settings);
         });
 }
 
@@ -370,7 +369,7 @@ impl SimulationDebugWindow {
         }
     }
 
-    pub fn window_toggle(&mut self, ui: &mut egui::Ui, simulation: &Simulation) {
+    pub fn window_toggle(&mut self, ui: &mut egui::Ui, world: &World) {
         // ui.toggle_value(&mut self.show_window, "Debug Window");
 
         if ui
@@ -391,7 +390,7 @@ impl SimulationDebugWindow {
                 debug_simulation_scene_ui(
                     ui,
                     &mut self.debug_scene_rect,
-                    simulation,
+                    world,
                     &self.simulation_debug_draw_settings,
                 );
 

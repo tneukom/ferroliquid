@@ -1,27 +1,28 @@
 use crate::{
     field::Field,
-    math::{interval::Interval, point::Point, rect::Rect},
-    piecewise_linear::PiecewiseLinear,
-    utils::KeyValueItertools,
+    math::{point::Point, rect::Rect},
 };
-use fastrand::i64;
 
 /// Represent the distance of each pixel to a given set of obstacle pixels.
-struct DistanceField {
+pub struct DistanceField {
     /// offset to nearest obstacle pixel
     pub nearest: Field<Point<i64>>,
 }
 
+// 2*INF^2 should not overflow, 2^30 is more than enough
+const INF_DIST: i64 = 1073741824;
+
 impl DistanceField {
-    // 2*INF^2 should not overflow, 2^30 is more than enough
-    const INF: i64 = 1073741824;
+    pub fn bounds(&self) -> Rect<i64> {
+        self.nearest.bounds()
+    }
 
     pub fn new(
         mut obstacle: impl FnMut(Point<i64>) -> bool,
         bounds: Rect<i64>,
         radius: i64,
     ) -> Self {
-        let mut nearest_in_row_field = Field::filled(bounds, Self::INF);
+        let mut nearest_in_row_field = Field::filled(bounds, INF_DIST);
 
         // Propagate nearest in row direction
         // Example of nearest_in_row_field, x marks an obstacle
@@ -48,12 +49,12 @@ impl DistanceField {
         }
 
         // Propagate nearest in column direction
-        let mut nearest_field = Field::filled(bounds, Point(Self::INF, Self::INF));
+        let mut nearest_field = Field::filled(bounds, Point(INF_DIST, INF_DIST));
 
         for p in nearest_field.bounds().iter_indices() {
             // Offset to nearest obstacle in the row of p
             let nearest_in_row = nearest_in_row_field[p];
-            if nearest_in_row == Self::INF {
+            if nearest_in_row == INF_DIST {
                 continue;
             }
 
@@ -80,12 +81,37 @@ impl DistanceField {
     }
 }
 
+pub fn distance_field(obstacle: &Field<bool>, radius: i64) -> Field<f64> {
+    let nearest_field = DistanceField::from_field(obstacle, radius).nearest;
+    nearest_field.map(|&nearest| {
+        if nearest == Point(INF_DIST, INF_DIST) {
+            f64::INFINITY
+        } else {
+            (nearest.norm_squared() as f64).sqrt()
+        }
+    })
+}
+
+/// Negative inside the obstacle, positive outside. +-inf where undefined.
+pub fn signed_distance_field(obstacle: &Field<bool>, radius: i64) -> Field<f64> {
+    let distance = distance_field(obstacle, radius);
+    let complement_obstacle = obstacle.map(|b| !b);
+    let complement_distance = distance_field(&complement_obstacle, radius);
+
+    Field::from_map(obstacle.bounds(), |index| {
+        if obstacle[index] {
+            -complement_distance[index]
+        } else {
+            distance[index]
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use itertools::Itertools;
 
-    const INF: i64 = DistanceField::INF;
+    const INF: i64 = INF_DIST;
 
     /// Calculate the distance squared to the nearest obstacle with radius by brute force.
     fn distance_squared(obstacle: &Field<bool>, p: Point<i64>, radius: i64) -> i64 {
@@ -94,7 +120,7 @@ mod tests {
             .filter(|&delta| obstacle.get(p + delta) == Some(&true))
             .map(Point::norm_squared)
             .min()
-            .unwrap_or(Point(DistanceField::INF, DistanceField::INF).norm_squared())
+            .unwrap_or(Point(INF, INF).norm_squared())
     }
 
     fn verify_distance_field_for_radius(obstacle: &Field<bool>, radius: i64) {

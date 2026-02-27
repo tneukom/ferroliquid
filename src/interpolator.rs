@@ -2,9 +2,37 @@ use crate::{
     math::point::Point,
     sides::{Side, Sides},
 };
+use std::ops::{Add, Mul};
 
-pub fn interpolate_linear(lower: f64, upper: f64, relative: f64) -> f64 {
-    (1.0 - relative) * lower + relative * upper
+pub fn interpolate_linear<T>(lower: T, upper: T, s: f64) -> T
+where
+    T: Add<Output = T> + Mul<f64, Output = T>,
+{
+    lower * (1.0 - s) + upper * s
+}
+
+pub fn interpolate_bilinear<T>(
+    position: Point<f64>,
+    grid_offset: Point<f64>,
+    mut f: impl FnMut(Point<i64>) -> T,
+) -> T
+where
+    T: Add<Output = T> + Mul<f64, Output = T>,
+{
+    let offset_position = position - grid_offset;
+    let coord = offset_position.as_i64();
+    let fractional = offset_position - coord.as_f64();
+
+    let left_top = f(Point(coord.x, coord.y));
+    let left_bottom = f(Point(coord.x, coord.y + 1));
+    let right_top = f(Point(coord.x + 1, coord.y));
+    let right_bottom = f(Point(coord.x + 1, coord.y + 1));
+
+    interpolate_linear(
+        interpolate_linear(left_top, left_bottom, fractional.y),
+        interpolate_linear(right_top, right_bottom, fractional.y),
+        fractional.x,
+    )
 }
 
 pub fn interpolate_div_free_velocity_bilinear(
