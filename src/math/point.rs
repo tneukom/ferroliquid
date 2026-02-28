@@ -3,7 +3,7 @@ use crate::{
     sides::Direction,
 };
 use bytemuck::{Pod, Zeroable};
-use num_traits::{AsPrimitive, real::Real};
+use num_traits::{AsPrimitive, Float, real::Real};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
@@ -181,6 +181,12 @@ impl<T: Real + Num> Point<T> {
 
     pub fn floor(self) -> Self {
         Self::new(self.x.floor(), self.y.floor())
+    }
+}
+
+impl<T: Float + Num> Point<T> {
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
     }
 }
 
