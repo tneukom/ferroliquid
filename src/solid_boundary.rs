@@ -15,27 +15,30 @@ pub struct SolidBoundary {
     pub signed_distance: Field<f64>,
 
     pub smoothed_signed_distance: Field<f64>,
-    // /// Gradient of smoothed_distance by doing central difference, padding of 1 where it's zero
-    // /// because we cannot calculate the central difference there.
-    // pub grad: Field<Point<f64>>,
+
+    /// Gradient of smoothed_distance by doing central difference, padding of 1 where it's zero
+    /// because we cannot calculate the central difference there.
+    pub grad: Field<Point<f64>>,
 }
 
 impl SolidBoundary {
     pub fn new(solid: &Field<bool>) -> Self {
-        let signed_distance = signed_distance_field(solid, 5);
+        let cell_size = 4;
+        let signed_distance = signed_distance_field(solid, 10);
         let kernel = gaussian_kernel(3, 1.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
+        let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
         Self {
-            cell_size: 4,
+            cell_size,
             signed_distance,
             smoothed_signed_distance,
+            grad,
         }
     }
 
     pub fn distance_at(&self, position: Point<f64>) -> f64 {
         debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
 
-        // Bilinear interpolation
         interpolate_bilinear(
             position * self.cell_size as f64,
             Point::ZERO,
@@ -45,6 +48,31 @@ impl SolidBoundary {
             },
         )
     }
+
+    pub fn grad_at(&self, position: Point<f64>) -> Point<f64> {
+        debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
+
+        interpolate_bilinear(
+            position * self.cell_size as f64,
+            Point::ZERO,
+            |index| match self.grad.get(index) {
+                None => Point::ZERO,
+                Some(&grad) => grad,
+            },
+        )
+    }
+}
+
+/// Calculate the gradient of field using central difference method. A border of width one will
+/// be set to zero since we cannot calculate central difference there.
+pub fn grad_central_difference(field: &Field<f64>, spacing: f64) -> Field<Point<f64>> {
+    let mut grad = Field::filled(field.bounds(), Point::ZERO);
+    for index in grad.bounds().padded(-1).iter_half_open() {
+        let grad_x = (field[index + Point::E_X] - field[index - Point::E_X]) / (2.0 * spacing);
+        let grad_y = (field[index + Point::E_Y] - field[index - Point::E_Y]) / (2.0 * spacing);
+        grad[index] = Point(grad_x, grad_y)
+    }
+    grad
 }
 
 /// 1d convolution in the given direction. kernel must have size 2n + 1. Ignores non-finite values.

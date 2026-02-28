@@ -27,6 +27,8 @@ pub struct SimulationDebugDrawSettings {
     density: bool,
     defined: bool,
     smoothed_distance: bool,
+    distance_grad: bool,
+    highres_solid: bool,
 }
 
 impl Default for SimulationDebugDrawSettings {
@@ -47,6 +49,8 @@ impl Default for SimulationDebugDrawSettings {
             density: false,
             defined: false,
             smoothed_distance: false,
+            distance_grad: false,
+            highres_solid: false,
         }
     }
 }
@@ -73,22 +77,9 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.density, "Density");
     ui.checkbox(&mut settings.defined, "Defined");
     ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
+    ui.checkbox(&mut settings.distance_grad, "Distance Grad");
+    ui.checkbox(&mut settings.highres_solid, "Highres Solid");
 }
-
-// pub fn draw_vector_field(
-//     painter: &egui::Painter,
-//     font: egui::FontId,
-//     scene_rect: egui::Rect,
-//     f: impl FnMut(Point<f64>) -> Point<f64>,
-// ) {
-//     let n_steps: i64 = 40;
-//     let step = scene_rect.width() as f64 / n_steps as f64;
-//     for iy in 0..n_steps {
-//         for ix in 0..n_steps {
-//             let position =
-//         }
-//     }
-// }
 
 pub fn draw_side_field(painter: &egui::Painter, font: egui::FontId, field: &SideField<f64>) {
     for side in field.indices() {
@@ -112,6 +103,14 @@ pub fn draw_side_field(painter: &egui::Painter, font: egui::FontId, field: &Side
     }
 }
 
+/// Iterate over grid points in bounds, starting at bounds.low() with the given spacing.
+pub fn grid_nodes(bounds: Rect<f64>, spacing: f64) -> impl Iterator<Item = Point<f64>> + Clone {
+    let indices_size = (bounds.size() / spacing).floor().as_i64();
+    Rect::low_size(Point::ZERO, indices_size)
+        .iter_closed()
+        .map(move |index| bounds.low() + index.as_f64() * spacing)
+}
+
 /// Draws a square for each field index. The square is red if f(index) is negative, blue if
 /// positive. The size of the square is proportional to |f(index)|.
 pub fn draw_square_field(
@@ -120,21 +119,13 @@ pub fn draw_square_field(
     bounds: Rect<f64>,
     mut f: impl FnMut(Point<f64>) -> f64,
 ) {
-    // Grid nodes in bounds with given spacing
-    let grid_nodes = (bounds * (1.0 / grid_spacing))
-        .as_i64()
-        .iter_indices()
-        .map(|index| index.as_f64() * grid_spacing);
-
-    let max_abs = grid_nodes
-        .clone()
-        .filter_map(|position| NotNan::new(f(position)).ok())
-        .map(NotNan::abs)
+    let max_abs = grid_nodes(bounds, grid_spacing)
+        .filter_map(|position| NotNan::new(f(position).abs()).ok())
         .max()
         .unwrap()
         .into_inner();
 
-    for grid_node in grid_nodes {
+    for grid_node in grid_nodes(bounds, grid_spacing) {
         let value = f(grid_node);
         let center: egui::Pos2 = (DRAW_SCALE * grid_node).into();
         let size = (DRAW_SCALE * grid_spacing * value.abs() / max_abs) as f32;
@@ -147,6 +138,34 @@ pub fn draw_square_field(
 
         let rect = egui::Rect::from_center_size(center, egui::Vec2::splat(size));
         painter.rect_filled(rect, 0.0, color);
+    }
+}
+
+pub fn draw_vector_field(
+    painter: &egui::Painter,
+    grid_spacing: f64,
+    bounds: Rect<f64>,
+    mut f: impl FnMut(Point<f64>) -> Point<f64>,
+) {
+    let max_norm_squared = grid_nodes(bounds, grid_spacing)
+        .filter_map(|position| NotNan::new(f(position).norm_squared()).ok())
+        .max()
+        .unwrap()
+        .into_inner();
+
+    for grid_node in grid_nodes(bounds, grid_spacing) {
+        let u = f(grid_node);
+        if !u.is_finite() {
+            continue;
+        }
+
+        // let u = 2.0 * u / max_norm_squared;
+        let u = 0.5 * u;
+        let start = (DRAW_SCALE * grid_node).into();
+        let stop = (DRAW_SCALE * (grid_node + u)).into();
+
+        let stroke = egui::Stroke::new(0.5, egui::Color32::RED);
+        painter.line(vec![start, stop], stroke);
     }
 }
 
@@ -318,7 +337,7 @@ pub fn draw_simulation(
 
             draw_square_field(
                 painter,
-                0.25,
+                0.5,
                 world.simulation.grid.bounds.as_f64(),
                 |position| solid.distance_at(position),
             );
@@ -331,6 +350,17 @@ pub fn draw_simulation(
                     distance => format!("{distance:.1}"),
                 }
             });
+        }
+    }
+
+    if settings.distance_grad {
+        if let Some(solid) = &world.solid {
+            draw_vector_field(
+                painter,
+                0.5,
+                world.simulation.grid.bounds.as_f64(),
+                |position| solid.grad_at(position),
+            );
         }
     }
 }
