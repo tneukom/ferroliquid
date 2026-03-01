@@ -260,7 +260,7 @@ impl Grid {
         for side in self.sides.indices() {
             // Solid sides are defined
             if self.sides.passable[side] == 0.0 {
-                self.sides.defined[side] = 1.0;
+                self.sides.defined[side] = true;
             }
 
             let density = self.sides.weight[side].max(MIN_DENSITY);
@@ -352,7 +352,7 @@ impl Grid {
                 self.sides.velocity_div_free[side] =
                     self.sides.velocity_interpolated[side] + pressure_velocity;
             } else {
-                self.sides.velocity_div_free[side] = 0.0;
+                self.sides.velocity_div_free[side] = self.sides.velocity_interpolated[side];
             };
             self.sides.velocity_correction[side] =
                 self.sides.velocity_div_free[side] - self.sides.velocity_interpolated[side];

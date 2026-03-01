@@ -4,12 +4,12 @@ use crate::{
 };
 
 // 2*INF^2 should not overflow, 2^30 is more than enough
-const INF_DIST: i64 = 1073741824;
+pub const INF_DIST: i64 = 1073741824;
 
 pub fn nearest_from_obstacle(
-    mut obstacle: impl FnMut(Point<i64>) -> bool,
     bounds: Rect<i64>,
     radius: i64,
+    mut obstacle: impl FnMut(Point<i64>) -> bool,
 ) -> Field<Point<i64>> {
     let mut nearest_in_row_field = Field::filled(bounds, INF_DIST);
 
@@ -59,16 +59,14 @@ pub fn nearest_from_obstacle(
     nearest_field
 }
 
-pub fn nearest_from_obstacle_field(obstacle: &Field<bool>, radius: i64) -> Field<Point<i64>> {
-    nearest_from_obstacle(
-        |p| obstacle.get(p).copied().unwrap_or(false),
-        obstacle.bounds(),
-        radius,
-    )
+pub fn nearest_from_obstacle_field(radius: i64, obstacle: &Field<bool>) -> Field<Point<i64>> {
+    nearest_from_obstacle(obstacle.bounds(), radius, |p| {
+        obstacle.get(p).copied().unwrap_or(false)
+    })
 }
 
 pub fn distance_from_obstacle_field(obstacle: &Field<bool>, radius: i64) -> Field<f64> {
-    let nearest_field = nearest_from_obstacle_field(obstacle, radius);
+    let nearest_field = nearest_from_obstacle_field(radius, obstacle);
     nearest_field.map(|&nearest| {
         if nearest == Point(INF_DIST, INF_DIST) {
             f64::INFINITY
@@ -110,7 +108,7 @@ mod tests {
     }
 
     fn verify_distance_field_for_radius(obstacle: &Field<bool>, radius: i64) {
-        let nearest_field = nearest_from_obstacle_field(&obstacle, radius);
+        let nearest_field = nearest_from_obstacle_field(radius, &obstacle);
         assert_eq!(obstacle.bounds(), nearest_field.bounds());
 
         for p in nearest_field.bounds().iter_indices() {
@@ -138,7 +136,7 @@ mod tests {
         expected_nearest_field: &Field<Point<i64>>,
         radius: i64,
     ) {
-        let nearest_field = nearest_from_obstacle_field(obstacle, 1);
+        let nearest_field = nearest_from_obstacle_field(1, obstacle);
         assert_eq!(&nearest_field, expected_nearest_field);
     }
 

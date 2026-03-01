@@ -2,7 +2,7 @@ use crate::{
     event_trace::{MeasureDuration, TimingSection},
     field::Field,
     grid::{CellType, Grid},
-    interpolator::{interpolate_div_free_velocity, interpolate_div_free_velocity_bilinear},
+    interpolator::interpolate_div_free_velocity_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::{Side, SideField, Sides},
 };
@@ -179,32 +179,31 @@ impl Simulation {
     #[inline(always)]
     pub fn integration_step_runge_kutta_4(
         mut position: Point<f64>,
-        velocity: Point<f64>,
         sides: &Sides,
         dt: f64,
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
         let pos1 = position;
-        let k1 = interpolate_div_free_velocity(sides, pos1, velocity);
+        let k1 = interpolate_div_free_velocity_bilinear(sides, pos1);
 
         let pos2 = pos1 + 0.5 * dt * k1;
         if !bounds.contains(pos2) {
             return None;
         }
 
-        let k2 = interpolate_div_free_velocity(sides, pos2, velocity);
+        let k2 = interpolate_div_free_velocity_bilinear(sides, pos2);
         let pos3 = pos1 + 0.5 * dt * k2;
         if !bounds.contains(pos3) {
             return None;
         }
 
-        let k3 = interpolate_div_free_velocity(sides, pos3, velocity);
+        let k3 = interpolate_div_free_velocity_bilinear(sides, pos3);
         let pos4 = pos1 + dt * k3;
         if !bounds.contains(pos4) {
             return None;
         }
 
-        let k4 = interpolate_div_free_velocity(sides, pos4, velocity);
+        let k4 = interpolate_div_free_velocity_bilinear(sides, pos4);
 
         position = position + (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
 
@@ -217,14 +216,11 @@ impl Simulation {
     #[inline(always)]
     pub fn integration_step_euler(
         mut position: Point<f64>,
-        velocity: Point<f64>,
         sides: &Sides,
         dt: f64,
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
-        // let velocity =
-        //     interpolate_div_free_velocity(&self.grid.sides, position, velocity);
-        let velocity = interpolate_div_free_velocity_bilinear(sides, position, velocity);
+        let velocity = interpolate_div_free_velocity_bilinear(sides, position);
         debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
 
         position = position + dt * velocity;
@@ -234,39 +230,6 @@ impl Simulation {
         }
         Some(position)
     }
-
-    // #[inline(always)]
-    // pub fn integrate_particle_euler(
-    //     &self,
-    //     dt: f64,
-    //     steps: usize,
-    //     mut particle: Particle,
-    // ) -> Option<Particle> {
-    //     let bounds = self.grid.bounds.as_f64();
-    //     let inset_bounds = bounds.padded(-1.0);
-    //     let step_dt = dt / steps as f64;
-    //
-    //     // Perturb the velocity a tiny amount to dissolve clumps.
-    //     // random_velocity_c random in range [1 - 0.5 * random_velocity_strength, 1 + random_velocity_strength]
-    //     let random_velocity_strength = 0.02;
-    //     let random_velocity_c = 1.0 + (2.0 * fastrand::f64() - 1.0) * random_velocity_strength;
-    //
-    //     particle.previous_position = particle.position;
-    //     let mut position = particle.position;
-    //     // If velocity is not defined on the grid the velocity from the previous step is
-    //     // used.
-    //     let velocity = particle.velocity;
-    //
-    //     debug_assert!(bounds.contains(particle.position));
-    //
-    //     //Euler integration
-    //     for _ in 0..steps {
-    //         debug_assert!(bounds.contains(position));
-    //     }
-    //
-    //     particle.position = position;
-    //     Some(particle)
-    // }
 
     #[inline(never)]
     pub fn integrate(&mut self, dt: f64, steps: usize) {
@@ -288,12 +251,12 @@ impl Simulation {
                 let mut position = particle.position;
                 // If velocity is not defined on the grid the velocity from the previous step is
                 // used.
-                let velocity = particle.velocity;
+                // let velocity = particle.velocity;
 
                 // Perturb the velocity a tiny amount to dissolve clumps.
                 // let velocity =
                 //     velocity + 0.02 * velocity.norm() * Point(self.rng.f64(), self.rng.f64());
-                let velocity = velocity + 0.02 * Point(self.rng.f64(), self.rng.f64());
+                // let velocity = velocity + 0.02 * Point(self.rng.f64(), self.rng.f64());
 
                 debug_assert!(bounds.contains(particle.position));
 
@@ -301,7 +264,6 @@ impl Simulation {
                     debug_assert!(bounds.contains(position));
                     position = Self::integration_step_runge_kutta_4(
                         position,
-                        velocity,
                         &self.grid.sides,
                         step_dt,
                         inset_bounds,
@@ -424,6 +386,8 @@ impl Simulation {
         //     &self.grid.cells_type,
         //     &mut self.grid.sides.velocity_div_free,
         // );
+
+        self.grid.sides.extrapolate();
 
         // 2 steps at 60 fps (dt ~= 0.016), 1 step at 120 fps (dt ~= 0.083)
         let n_steps = if dt > 0.012 { 2 } else { 1 };

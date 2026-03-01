@@ -1,4 +1,5 @@
 use crate::{
+    distance_field::{INF_DIST, nearest_from_obstacle},
     field::{Field, RgbaField},
     math::{point::Point, rect::Rect},
 };
@@ -185,11 +186,11 @@ impl Debug for Side {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SideField<T> {
-    vertical: Field<T>,
-    horizontal: Field<T>,
+    pub vertical: Field<T>,
+    pub horizontal: Field<T>,
 }
 
-impl<T: Copy> SideField<T> {
+impl<T> SideField<T> {
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.vertical.iter().chain(self.horizontal.iter())
     }
@@ -226,15 +227,9 @@ impl<T: Copy> SideField<T> {
         self.vertical_inner_indices()
             .chain(self.horizontal_inner_indices())
     }
+}
 
-    // pub fn enumerate(&self) -> impl Iterator<Item = (Side, &T)> {
-    //     self.cells.enumerate().flat_map(|(cell, cell_sides)| {
-    //         cell_sides
-    //             .enumerate()
-    //             .map(move |(side_name, value)| (Side::new(cell, side_name), value))
-    //     })
-    // }
-
+impl<T: Copy> SideField<T> {
     pub fn filled_with(bounds: Rect<i64>, mut f: impl FnMut() -> T) -> Self {
         // width + 1
         let mut vertical_bounds = bounds;
@@ -259,6 +254,13 @@ impl<T: Copy> SideField<T> {
     pub fn fill(&mut self, value: T) {
         self.vertical.fill(value);
         self.horizontal.fill(value);
+    }
+
+    pub fn map<R>(&self, mut f: impl FnMut(&T) -> R) -> SideField<R> {
+        SideField {
+            vertical: self.vertical.map(&mut f),
+            horizontal: self.horizontal.map(&mut f),
+        }
     }
 }
 
@@ -328,7 +330,7 @@ pub struct Sides {
     pub velocity_correction: SideField<f64>,
 
     // TODO: Why not bool?
-    pub defined: SideField<f64>,
+    pub defined: SideField<bool>,
 
     /// Proportion of the side that is not blocked by solid
     pub passable: SideField<f64>,
@@ -341,7 +343,7 @@ impl Sides {
             velocity_div_free: SideField::filled(bounds, 0.0),
             velocity_correction: SideField::filled(bounds, 0.0),
             weight: SideField::filled(bounds, 0.0),
-            defined: SideField::filled(bounds, 0.0),
+            defined: SideField::filled(bounds, false),
             passable: SideField::filled(bounds, 1.0),
         }
     }
@@ -351,7 +353,7 @@ impl Sides {
         self.velocity_div_free.fill(0.0);
         self.velocity_correction.fill(0.0);
         self.weight.fill(0.0);
-        self.defined.fill(0.0);
+        self.defined.fill(false);
     }
 
     pub fn make_solid(&mut self, side: Side) {
@@ -364,7 +366,7 @@ impl Sides {
     }
 
     pub fn make_fluid(&mut self, side: Side) {
-        self.defined[side] = 1.0;
+        self.defined[side] = true;
     }
 
     pub fn indices(&self) -> impl Iterator<Item = Side> + use<> {
@@ -376,12 +378,35 @@ impl Sides {
     }
 
     pub fn get_div_free_velocity(&self, side: Side, default_velocity: f64) -> f64 {
-        self.defined[side] * self.velocity_div_free[side]
-            + (1.0 - self.defined[side]) * default_velocity
+        if self.defined[side] {
+            self.velocity_div_free[side]
+        } else {
+            default_velocity
+        }
     }
 
-    // template<CoordType COORD_TYPE>
-    // inline REAL get_div_free_velocity(Coord<COORD_TYPE> coord, REAL defaultVelocity) const {
-    // return defined[coord] * velocityDivFree[coord] + ((REAL)1.0 - defined[coord]) * defaultVelocity;
-    // }
+    fn extrapolate_from_nearest<T: Clone>(field: &mut Field<T>, nearest_field: &Field<Point<i64>>) {
+        assert_eq!(field.bounds(), nearest_field.bounds());
+
+        for index in field.indices() {
+            let nearest = nearest_field[index];
+            if nearest != Point(INF_DIST, INF_DIST) {
+                field[index] = field[index + nearest].clone()
+            }
+        }
+    }
+
+    /// Extrapolate divergence free velocities using distance field
+    pub fn extrapolate(&mut self) {
+        let vertical_nearest = nearest_from_obstacle(self.weight.vertical.bounds(), 5, |coord| {
+            self.weight.vertical[coord] > 0.0 && self.passable.vertical[coord] > 0.0
+        });
+        Self::extrapolate_from_nearest(&mut self.velocity_div_free.vertical, &vertical_nearest);
+
+        let horizontal_nearest =
+            nearest_from_obstacle(self.weight.horizontal.bounds(), 5, |coord| {
+                self.weight.horizontal[coord] > 0.0 && self.passable.horizontal[coord] > 0.0
+            });
+        Self::extrapolate_from_nearest(&mut self.velocity_div_free.horizontal, &horizontal_nearest);
+    }
 }

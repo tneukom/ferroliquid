@@ -24,6 +24,7 @@ pub struct SimulationDebugDrawSettings {
     grid: bool,
     cell_types: bool,
     density: bool,
+    side_weight: bool,
     defined: bool,
     smoothed_distance: bool,
     distance_grad: bool,
@@ -47,6 +48,7 @@ impl Default for SimulationDebugDrawSettings {
             grid: true,
             cell_types: false,
             density: false,
+            side_weight: false,
             defined: false,
             smoothed_distance: false,
             distance_grad: false,
@@ -76,6 +78,7 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.grid, "Grid");
     ui.checkbox(&mut settings.cell_types, "Cell Types");
     ui.checkbox(&mut settings.density, "Density");
+    ui.checkbox(&mut settings.side_weight, "Side Weight");
     ui.checkbox(&mut settings.defined, "Defined");
     ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
     ui.checkbox(&mut settings.distance_grad, "Distance Grad");
@@ -86,7 +89,12 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.solid, "Solid");
 }
 
-pub fn draw_side_field(painter: &egui::Painter, font: egui::FontId, field: &SideField<f64>) {
+pub fn draw_side_field<T>(
+    painter: &egui::Painter,
+    font: egui::FontId,
+    field: &SideField<T>,
+    mut show: impl FnMut(&T) -> String,
+) {
     for side in field.indices() {
         // Compute the world-space center of the side depending on orientation
         let world_pos = match side.orientation {
@@ -94,18 +102,22 @@ pub fn draw_side_field(painter: &egui::Painter, font: egui::FontId, field: &Side
             Orientation::Horizontal => side.index.as_f64() + Point(0.5, 0.0),
         };
 
-        let velocity = field[side];
+        // let velocity = field[side];
         // let velocity = self.simulation.grid.sides.boundary_constant[side];
-        let text = format!("{:.1}", velocity);
+        //let text = format!("{:.1}", velocity);
 
         painter.text(
             (DRAW_SCALE * world_pos).into(),
             egui::Align2::CENTER_CENTER,
-            text,
+            show(&field[side]),
             font.clone(),
             egui::Color32::from_rgb(0, 0, 0),
         );
     }
+}
+
+pub fn draw_side_float_field(painter: &egui::Painter, font: egui::FontId, field: &SideField<f64>) {
+    draw_side_field(painter, font, field, |value| format!("{:.1}", value))
 }
 
 /// Iterate over grid points in bounds, starting at bounds.low() with the given spacing.
@@ -315,7 +327,7 @@ pub fn draw_simulation(
     }
 
     if settings.velocity_interpolated {
-        draw_side_field(
+        draw_side_float_field(
             painter,
             font.clone(),
             &simulation.grid.sides.velocity_interpolated,
@@ -323,11 +335,11 @@ pub fn draw_simulation(
     }
 
     if settings.passable {
-        draw_side_field(painter, font.clone(), &simulation.grid.sides.passable);
+        draw_side_float_field(painter, font.clone(), &simulation.grid.sides.passable);
     }
 
     if settings.velocity_div_free {
-        draw_side_field(
+        draw_side_float_field(
             painter,
             font.clone(),
             &simulation.grid.sides.velocity_div_free,
@@ -335,7 +347,7 @@ pub fn draw_simulation(
     }
 
     if settings.velocity_correction {
-        draw_side_field(
+        draw_side_float_field(
             painter,
             font.clone(),
             &simulation.grid.sides.velocity_correction,
@@ -348,6 +360,10 @@ pub fn draw_simulation(
 
     if settings.density {
         draw_cell_field(painter, font.clone(), &simulation.grid.cells_density)
+    }
+
+    if settings.side_weight {
+        draw_side_float_field(painter, font.clone(), &simulation.grid.sides.weight)
     }
 
     if settings.divergence {
@@ -375,7 +391,18 @@ pub fn draw_simulation(
     }
 
     if settings.defined {
-        draw_side_field(painter, font.clone(), &simulation.grid.sides.defined);
+        draw_side_field(
+            painter,
+            font.clone(),
+            &simulation.grid.sides.defined,
+            |&defined| {
+                if defined {
+                    "Y".to_string()
+                } else {
+                    "N".to_string()
+                }
+            },
+        );
     }
 
     if settings.smoothed_distance {
