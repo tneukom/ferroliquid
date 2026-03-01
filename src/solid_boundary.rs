@@ -11,6 +11,8 @@ pub struct SolidBoundary {
     /// Size of cell in pixels
     pub cell_size: i64,
 
+    pub solid: Field<bool>,
+
     /// +- inf where undefined
     pub signed_distance: Field<f64>,
 
@@ -22,14 +24,15 @@ pub struct SolidBoundary {
 }
 
 impl SolidBoundary {
-    pub fn new(solid: &Field<bool>) -> Self {
+    pub fn new(solid: Field<bool>) -> Self {
         let cell_size = 4;
-        let signed_distance = signed_distance_field(solid, 10);
-        let kernel = gaussian_kernel(3, 1.0);
+        let signed_distance = signed_distance_field(&solid, 5);
+        let kernel = gaussian_kernel(6, 2.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
         Self {
             cell_size,
+            solid,
             signed_distance,
             smoothed_signed_distance,
             grad,

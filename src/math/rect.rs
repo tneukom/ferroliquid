@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
-    ops::{Add, Mul, Range, RangeInclusive, Sub},
+    ops::{Add, Div, Mul, Range, RangeInclusive, Sub},
 };
 
 ///  low
@@ -326,6 +326,19 @@ where
     fn mul(self, rhs: T) -> Self::Output {
         assert!(rhs > T::ZERO);
         Self::Output::new(self.x * rhs, self.y * rhs)
+    }
+}
+
+/// Right hand scalar div, panics if rhs <= 0
+impl<T> Div<T> for Rect<T>
+where
+    T: Div<Output = T> + Copy + PartialOrd + ConstZero,
+{
+    type Output = Rect<T>;
+
+    fn div(self, rhs: T) -> Self::Output {
+        assert!(rhs > T::ZERO);
+        Self::Output::new(self.x / rhs, self.y / rhs)
     }
 }
 
