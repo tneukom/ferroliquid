@@ -5,8 +5,6 @@ use crate::{
     sides::{Orientation, Side, SideField},
     world::World,
 };
-use egui::Rgba;
-use num_traits::real::Real;
 use ordered_float::NotNan;
 
 const DRAW_SCALE: f64 = 40.0;
@@ -154,11 +152,11 @@ pub fn draw_vector_field(
     bounds: Rect<f64>,
     mut f: impl FnMut(Point<f64>) -> Point<f64>,
 ) {
-    let max_norm_squared = grid_nodes(bounds, grid_spacing)
-        .filter_map(|position| NotNan::new(f(position).norm_squared()).ok())
-        .max()
-        .unwrap()
-        .into_inner();
+    // let max_norm_squared = grid_nodes(bounds, grid_spacing)
+    //     .filter_map(|position| NotNan::new(f(position).norm_squared()).ok())
+    //     .max()
+    //     .unwrap()
+    //     .into_inner();
 
     for grid_node in grid_nodes(bounds, grid_spacing) {
         let u = f(grid_node);

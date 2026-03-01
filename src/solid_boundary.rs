@@ -1,8 +1,6 @@
 use crate::{
-    distance_field::{DistanceField, signed_distance_field},
-    field::Field,
-    interpolator::interpolate_bilinear,
-    math::{generic::FloatNum, point::Point},
+    distance_field::signed_distance_from_obstacle_field, field::Field,
+    interpolator::interpolate_bilinear, math::point::Point,
 };
 
 /// Solid -> distance -> smoothed distance ->
@@ -26,7 +24,7 @@ pub struct SolidBoundary {
 impl SolidBoundary {
     pub fn new(solid: Field<bool>) -> Self {
         let cell_size = 4;
-        let signed_distance = signed_distance_field(&solid, 5);
+        let signed_distance = signed_distance_from_obstacle_field(&solid, 5);
         let kernel = gaussian_kernel(6, 2.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
