@@ -133,6 +133,10 @@ impl<T: Copy> Rgba<T> {
     pub const fn rgb(self) -> Rgb<T> {
         Rgb::new(self.r, self.g, self.b)
     }
+
+    pub const fn with_a(self, a: T) -> Self {
+        Self::new(self.r, self.g, self.b, a)
+    }
 }
 
 /// Generally considered to be in sRGB color space

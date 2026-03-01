@@ -3,7 +3,7 @@ use num_traits::{AsPrimitive, ConstZero};
 use serde::{Deserialize, Serialize};
 use std::{
     hash::{Hash, Hasher},
-    ops::{Add, Mul, Range, RangeInclusive, Sub},
+    ops::{Add, Div, Mul, Range, RangeInclusive, Sub},
 };
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -247,6 +247,19 @@ where
     fn mul(self, rhs: T) -> Self::Output {
         assert!(rhs > T::ZERO);
         Self::Output::new(self.low * rhs, self.high * rhs)
+    }
+}
+
+/// Right hand scalar div, panics if rhs <= 0
+impl<T> Div<T> for Interval<T>
+where
+    T: Div<Output = T> + Copy + PartialOrd + ConstZero,
+{
+    type Output = Interval<T>;
+
+    fn div(self, rhs: T) -> Self::Output {
+        assert!(rhs > T::ZERO);
+        Self::Output::new(self.low / rhs, self.high / rhs)
     }
 }
 

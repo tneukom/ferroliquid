@@ -1,10 +1,11 @@
 use crate::{
-    field::Field,
+    field::{Field, RgbaField},
     grid::CellType,
-    math::{point::Point, rect::Rect},
+    math::{point::Point, rect::Rect, rgba8::Rgba8},
     sides::{Orientation, Side, SideField},
     world::World,
 };
+use egui::Rgba;
 use num_traits::real::Real;
 use ordered_float::NotNan;
 
@@ -28,7 +29,8 @@ pub struct SimulationDebugDrawSettings {
     defined: bool,
     smoothed_distance: bool,
     distance_grad: bool,
-    highres_solid: bool,
+    distance_heaviside_step: bool,
+    solid: bool,
 }
 
 impl Default for SimulationDebugDrawSettings {
@@ -50,7 +52,8 @@ impl Default for SimulationDebugDrawSettings {
             defined: false,
             smoothed_distance: false,
             distance_grad: false,
-            highres_solid: false,
+            distance_heaviside_step: false,
+            solid: false,
         }
     }
 }
@@ -78,7 +81,11 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.defined, "Defined");
     ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
     ui.checkbox(&mut settings.distance_grad, "Distance Grad");
-    ui.checkbox(&mut settings.highres_solid, "Highres Solid");
+    ui.checkbox(
+        &mut settings.distance_heaviside_step,
+        "Heaviside Step Distance",
+    );
+    ui.checkbox(&mut settings.solid, "Solid");
 }
 
 pub fn draw_side_field(painter: &egui::Painter, font: egui::FontId, field: &SideField<f64>) {
@@ -167,6 +174,48 @@ pub fn draw_vector_field(
         let stroke = egui::Stroke::new(0.5, egui::Color32::RED);
         painter.line(vec![start, stop], stroke);
     }
+}
+
+pub fn draw_image(painter: &egui::Painter, bounds: Rect<f64>, image: &RgbaField) {
+    let egui_image = egui::ColorImage::from_rgba_unmultiplied(
+        [image.width() as usize, image.height() as usize],
+        image.as_u8_slice(),
+    );
+    let texture =
+        painter
+            .ctx()
+            .load_texture("highres_field", egui_image, egui::TextureOptions::NEAREST);
+
+    painter.image(
+        texture.id(),
+        (bounds * DRAW_SCALE).into(),
+        Rect::UNIT.into(),
+        egui::Color32::WHITE,
+    );
+}
+
+pub fn draw_highres_field_step(
+    painter: &egui::Painter,
+    grid_spacing: f64,
+    bounds: Rect<f64>,
+    mut f: impl FnMut(Point<f64>) -> f64,
+) {
+    // TODO: Some kind of CellGrid class (nodes in cells)
+    let indices_size = (bounds.size() / grid_spacing).floor().as_i64();
+    let image_bounds = Rect::low_size(Point::ZERO, indices_size + Point(1, 1));
+
+    let image = RgbaField::from_map(image_bounds, |index| {
+        let grid_node = bounds.low() + index.as_f64() * grid_spacing;
+        let value = f(grid_node);
+        if value < 0.0 {
+            Rgba8::new(255, 0, 0, 128)
+        } else {
+            Rgba8::new(0, 0, 255, 128)
+        }
+    });
+
+    let image_world_bounds = Rect::low_size(bounds.low(), indices_size.as_f64() * grid_spacing);
+    draw_image(painter, image_world_bounds, &image);
 }
 
 pub fn draw_cell_texts(
@@ -360,6 +409,36 @@ pub fn draw_simulation(
                 0.5,
                 world.simulation.grid.bounds.as_f64(),
                 |position| solid.grad_at(position),
+            );
+        }
+    }
+
+    if settings.distance_heaviside_step {
+        if let Some(solid) = &world.solid {
+            draw_highres_field_step(
+                painter,
+                0.125,
+                world.simulation.grid.bounds.as_f64(),
+                |position| solid.distance_at(position),
+            );
+        }
+    }
+
+    if settings.solid {
+        if let Some(solid) = &world.solid {
+            let solid_image = solid.solid.map(|&solid| {
+                if solid {
+                    Rgba8::RED.with_a(128)
+                } else {
+                    Rgba8::BLACK.with_a(128)
+                }
+            });
+
+            // TODO: There's a slight offset between solid_image and distance_heaviside_step.
+            draw_image(
+                painter,
+                solid_image.bounds().as_f64() / solid.cell_size as f64,
+                &solid_image,
             );
         }
     }
