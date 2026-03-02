@@ -18,6 +18,7 @@ pub struct SimulationDebugDrawSettings {
     divergence: bool,
     velocity_div_free: bool,
     velocity_correction: bool,
+    velocity_boundary_corrected: bool,
     passable: bool,
     divergence_corrected: bool,
     pressure: bool,
@@ -42,6 +43,7 @@ impl Default for SimulationDebugDrawSettings {
             divergence: false,
             velocity_div_free: false,
             velocity_correction: false,
+            velocity_boundary_corrected: false,
             passable: false,
             divergence_corrected: false,
             pressure: false,
@@ -72,6 +74,10 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.divergence, "Divergence");
     ui.checkbox(&mut settings.velocity_div_free, "Velocity Div Free");
     ui.checkbox(&mut settings.velocity_correction, "Velocity Correction");
+    ui.checkbox(
+        &mut settings.velocity_boundary_corrected,
+        "Velocity Boundary Corrected",
+    );
     ui.checkbox(&mut settings.passable, "Passable");
     ui.checkbox(&mut settings.divergence_corrected, "Divergence Corrected");
     ui.checkbox(&mut settings.pressure, "Pressure");
@@ -447,6 +453,15 @@ pub fn draw_simulation(
                 |position| solid.distance_at(position),
             );
         }
+    }
+
+    if settings.velocity_boundary_corrected {
+        draw_vector_field(
+            painter,
+            0.25,
+            world.simulation.grid.bounds.padded(-1).as_f64(),
+            |position| 0.025 * simulation.velocity_boundary_corrected(position),
+        )
     }
 
     if settings.solid {
