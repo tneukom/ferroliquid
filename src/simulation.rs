@@ -185,7 +185,8 @@ impl Simulation {
         }
     }
 
-    fn interpolate_velocity_div_free(&self, position: Point<f64>) -> Point<f64> {
+    /// Divergence free velocity with solid boundary condition correction.
+    pub fn velocity_boundary_corrected(&self, position: Point<f64>) -> Point<f64> {
         let velocity = interpolate_div_free_velocity_bilinear(&self.grid.sides, position);
         if let Some(solid) = &self.solid {
             solid.correct_velocity(position, velocity)
@@ -202,26 +203,26 @@ impl Simulation {
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
         let pos1 = position;
-        let k1 = self.interpolate_velocity_div_free(pos1);
+        let k1 = self.velocity_boundary_corrected(pos1);
 
         let pos2 = pos1 + 0.5 * dt * k1;
         if !bounds.contains(pos2) {
             return None;
         }
 
-        let k2 = self.interpolate_velocity_div_free(pos2);
+        let k2 = self.velocity_boundary_corrected(pos2);
         let pos3 = pos1 + 0.5 * dt * k2;
         if !bounds.contains(pos3) {
             return None;
         }
 
-        let k3 = self.interpolate_velocity_div_free(pos3);
+        let k3 = self.velocity_boundary_corrected(pos3);
         let pos4 = pos1 + dt * k3;
         if !bounds.contains(pos4) {
             return None;
         }
 
-        let k4 = self.interpolate_velocity_div_free(pos4);
+        let k4 = self.velocity_boundary_corrected(pos4);
 
         position = position + (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
 
