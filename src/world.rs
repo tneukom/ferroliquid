@@ -6,7 +6,6 @@ use crate::{
     math::{point::Point, rect::Rect, rgba8::Rgba},
     outflow::Outflow,
     simulation::{Particle, Simulation, SimulationSettings},
-    solid_boundary::SolidBoundary,
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
@@ -32,9 +31,6 @@ pub struct World {
 
     #[serde(default)]
     pub outflows: SlotMap<OutflowKey, Outflow>,
-
-    #[serde(skip)]
-    pub solid: Option<SolidBoundary>,
 
     pub settings: SimulationSettings,
 }
@@ -108,7 +104,6 @@ impl World {
             inflows,
             outflows: SlotMap::with_key(),
             forces,
-            solid: None,
             settings,
         }
     }
@@ -175,7 +170,6 @@ impl World {
             inflows: save_world.inflows,
             outflows: save_world.outflows,
             settings: save_world.settings,
-            solid: None,
         }
     }
 

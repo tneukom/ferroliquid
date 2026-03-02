@@ -5,6 +5,7 @@ use crate::{
     interpolator::interpolate_div_free_velocity_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::{Side, SideField, Sides},
+    solid_boundary::SolidBoundary,
 };
 use fastrand::Rng;
 use serde::{Deserialize, Serialize};
@@ -88,9 +89,16 @@ impl Default for SimulationSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Simulation {
     pub i_step: usize,
+
     pub grid: Grid,
+
     pub particles: Vec<Particle>,
+
+    #[serde(skip)]
+    pub solid: Option<SolidBoundary>,
+
     pub time: f64,
+
     #[serde(skip, default)]
     pub rng: Rng,
 }
@@ -103,6 +111,7 @@ impl Simulation {
             i_step: 0,
             grid: Grid::new(bounds),
             particles: Vec::new(),
+            solid: None,
             time: 0.0,
             rng: Rng::with_seed(345073457), // Random keyboard bashing seed!
         }
@@ -176,34 +185,43 @@ impl Simulation {
         }
     }
 
+    fn interpolate_velocity_div_free(&self, position: Point<f64>) -> Point<f64> {
+        let velocity = interpolate_div_free_velocity_bilinear(&self.grid.sides, position);
+        if let Some(solid) = &self.solid {
+            solid.correct_velocity(position, velocity)
+        } else {
+            velocity
+        }
+    }
+
     #[inline(always)]
     pub fn integration_step_runge_kutta_4(
+        &self,
         mut position: Point<f64>,
-        sides: &Sides,
         dt: f64,
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
         let pos1 = position;
-        let k1 = interpolate_div_free_velocity_bilinear(sides, pos1);
+        let k1 = self.interpolate_velocity_div_free(pos1);
 
         let pos2 = pos1 + 0.5 * dt * k1;
         if !bounds.contains(pos2) {
             return None;
         }
 
-        let k2 = interpolate_div_free_velocity_bilinear(sides, pos2);
+        let k2 = self.interpolate_velocity_div_free(pos2);
         let pos3 = pos1 + 0.5 * dt * k2;
         if !bounds.contains(pos3) {
             return None;
         }
 
-        let k3 = interpolate_div_free_velocity_bilinear(sides, pos3);
+        let k3 = self.interpolate_velocity_div_free(pos3);
         let pos4 = pos1 + dt * k3;
         if !bounds.contains(pos4) {
             return None;
         }
 
-        let k4 = interpolate_div_free_velocity_bilinear(sides, pos4);
+        let k4 = self.interpolate_velocity_div_free(pos4);
 
         position = position + (1.0 / 6.0) * dt * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
 
@@ -262,12 +280,8 @@ impl Simulation {
 
                 for _ in 0..steps {
                     debug_assert!(bounds.contains(position));
-                    position = Self::integration_step_runge_kutta_4(
-                        position,
-                        &self.grid.sides,
-                        step_dt,
-                        inset_bounds,
-                    )?;
+                    position =
+                        self.integration_step_runge_kutta_4(position, step_dt, inset_bounds)?;
                 }
 
                 particle.position = position;
