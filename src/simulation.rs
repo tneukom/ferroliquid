@@ -305,77 +305,6 @@ impl Simulation {
             .sort_by_key(|particle| particle.position.as_i64())
     }
 
-    fn fixup_corner_densities(
-        cell_types: &Field<CellType>,
-        cell_density: &mut Field<f64>,
-        settings: &SimulationSettings,
-    ) {
-        for cell_coord in cell_types.bounds().padded(-1).iter_indices() {
-            let solid_neighbors = [
-                cell_types[cell_coord.up()] == CellType::Solid,
-                cell_types[cell_coord.left()] == CellType::Solid,
-                cell_types[cell_coord.down()] == CellType::Solid,
-                cell_types[cell_coord.right()] == CellType::Solid,
-            ];
-
-            let is_corner = match solid_neighbors {
-                [true, true, false, false] => true,
-                [false, true, true, false] => true,
-                [false, false, true, true] => true,
-                [true, false, false, true] => true,
-                _ => false,
-            };
-
-            if is_corner {
-                cell_density[cell_coord] = settings.target_density;
-            }
-        }
-    }
-
-    // Fix side velocities of corners. We treat corners as diagonal half blocks.
-    fn fixup_corners_velocities(cell_types: &Field<CellType>, velocities: &mut SideField<f64>) {
-        for cell_coord in cell_types.bounds().padded(-1).iter_indices() {
-            let solid_neighbors = [
-                cell_types[cell_coord.up()] == CellType::Solid,
-                cell_types[cell_coord.left()] == CellType::Solid,
-                cell_types[cell_coord.down()] == CellType::Solid,
-                cell_types[cell_coord.right()] == CellType::Solid,
-            ];
-
-            match solid_neighbors {
-                [true, true, false, false] => {
-                    // top left corner
-                    velocities[Side::top_side(cell_coord)] =
-                        velocities[Side::bottom_side(cell_coord)];
-                    velocities[Side::left_side(cell_coord)] =
-                        velocities[Side::right_side(cell_coord)];
-                }
-                [false, true, true, false] => {
-                    // left bottom corner
-                    velocities[Side::left_side(cell_coord)] =
-                        velocities[Side::right_side(cell_coord)];
-                    velocities[Side::bottom_side(cell_coord)] =
-                        velocities[Side::top_side(cell_coord)];
-                }
-                [false, false, true, true] => {
-                    // bottom right corner
-                    velocities[Side::bottom_side(cell_coord)] =
-                        velocities[Side::top_side(cell_coord)];
-                    velocities[Side::right_side(cell_coord)] =
-                        velocities[Side::left_side(cell_coord)];
-                }
-                [true, false, false, true] => {
-                    // right top corner
-                    velocities[Side::right_side(cell_coord)] =
-                        velocities[Side::left_side(cell_coord)];
-                    velocities[Side::top_side(cell_coord)] =
-                        velocities[Side::bottom_side(cell_coord)];
-                }
-                _ => {}
-            };
-        }
-    }
-
     #[inline(never)]
     pub fn step(&mut self, dt: f64, settings: &SimulationSettings) {
         let _span = tracy_client::span!("step");
@@ -386,21 +315,10 @@ impl Simulation {
             .grid
             .insert_particles(std::mem::take(&mut self.particles), settings);
 
-        // Self::fixup_corner_densities(
-        //     &self.grid.cells_type,
-        //     &mut self.grid.cells_density,
-        //     settings,
-        // );
-
         self.grid.solve_pressure(settings);
 
         //Rebuild particles
         self.interpolate_particle_velocities_from_grid(dt, settings);
-
-        // Self::fixup_corners_velocities(
-        //     &self.grid.cells_type,
-        //     &mut self.grid.sides.velocity_div_free,
-        // );
 
         self.grid.sides.extrapolate();
 
