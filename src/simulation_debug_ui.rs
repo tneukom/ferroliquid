@@ -406,7 +406,7 @@ pub fn draw_simulation(
     }
 
     if settings.smoothed_distance {
-        if let Some(solid) = &world.solid {
+        if let Some(solid) = &simulation.solid {
             // draw_cell_field(painter, font, &solid.signed_distance);
 
             draw_square_field(
@@ -428,7 +428,7 @@ pub fn draw_simulation(
     }
 
     if settings.distance_grad {
-        if let Some(solid) = &world.solid {
+        if let Some(solid) = &simulation.solid {
             draw_vector_field(
                 painter,
                 0.5,
@@ -439,7 +439,7 @@ pub fn draw_simulation(
     }
 
     if settings.distance_heaviside_step {
-        if let Some(solid) = &world.solid {
+        if let Some(solid) = &simulation.solid {
             draw_highres_field_step(
                 painter,
                 0.125,
@@ -450,7 +450,7 @@ pub fn draw_simulation(
     }
 
     if settings.solid {
-        if let Some(solid) = &world.solid {
+        if let Some(solid) = &simulation.solid {
             let solid_image = solid.solid.map(|&solid| {
                 if solid {
                     Rgba8::RED.with_a(128)

@@ -134,7 +134,7 @@ impl EguiApp {
         world.simulation.grid.sides.passable = passable;
         world.simulation.grid.make_solid_from_bitmap(&solid_bitmap);
         let solid = solid_bitmap.map(|rgba| rgba.a > 128);
-        world.solid = Some(SolidBoundary::new(solid));
+        world.simulation.solid = Some(SolidBoundary::new(solid));
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 

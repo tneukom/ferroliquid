@@ -1,6 +1,8 @@
 use crate::{
-    distance_field::signed_distance_from_obstacle_field, field::Field,
-    interpolator::interpolate_bilinear, math::point::Point,
+    distance_field::signed_distance_from_obstacle_field,
+    field::Field,
+    interpolator::interpolate_bilinear,
+    math::{generic::Dot, point::Point},
 };
 
 /// Solid -> distance -> smoothed distance ->
@@ -61,6 +63,33 @@ impl SolidBoundary {
                 Some(&grad) => grad,
             },
         )
+    }
+
+    /// corrected_velocity = velocity if |d| > 1
+    /// <corrected_velocity, grad> = d * <velocity, grad> otherwise
+    pub fn correct_velocity(&self, position: Point<f64>, velocity: Point<f64>) -> Point<f64> {
+        let signed_distance = self.distance_at(position);
+        // Far away from the solid signed_distance is NaN
+        if !signed_distance.is_finite() || signed_distance.abs() > 1.0 {
+            return velocity;
+        }
+
+        // grad is close to one
+        let grad = self.grad_at(position).normalized();
+
+        if signed_distance > 0.0 {
+            // We want <corrected_velocity, grad> = d * <velocity, grad>
+            // <velocity + (d - 1) * <velocity, grad> * grad, grad>
+            // = <velocity, grad> + (d - 1) * <velocity, grad>
+            // = d * <velocity, grad>
+            velocity + (signed_distance - 1.0) * velocity.dot(grad) * grad
+        } else {
+            // We want <corrected_velocity, grad> = -d
+            // <velocity - (d + <velocity, grad>) * grad, grad>
+            // = <velocity, grad> - <velocity, grad> - d
+            // = -d
+            velocity - (signed_distance + velocity.dot(grad)) * grad
+        }
     }
 }
 

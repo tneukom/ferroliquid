@@ -41,5 +41,6 @@ pub fn interpolate_div_free_velocity_bilinear(sides: &Sides, position: Point<f64
     let y = interpolate_bilinear(position, Point(0.5, 0.0), |coord| {
         sides.velocity_div_free.horizontal[coord]
     });
+
     Point(x, y)
 }
