@@ -27,10 +27,9 @@ pub struct SolidBoundary {
 impl SolidBoundary {
     pub fn new(solid: Field<bool>) -> Self {
         let cell_size = 4;
-        let radius = cell_size * solid.width().max(solid.height());
 
         let instant = Instant::now();
-        let signed_distance = signed_distance_from_obstacle_field(&solid, radius);
+        let signed_distance = signed_distance_from_obstacle_field(&solid);
         let elapsed = instant.elapsed();
         println!(
             "Time to calculate signed distance: {}",
@@ -93,7 +92,7 @@ impl SolidBoundary {
     pub fn correct_velocity(&self, position: Point<f64>, velocity: Point<f64>) -> Point<f64> {
         let signed_distance = self.smoothed_distance_at(position);
         // Far away from the solid signed_distance is NaN
-        if !signed_distance.is_finite() || signed_distance.abs() > 1.0 {
+        if signed_distance.abs() > 1.0 {
             return velocity;
         }
 
@@ -137,21 +136,14 @@ pub fn convolve_1d(field: &Field<f64>, kernel: &[f64], direction: Point<i64>) ->
         let mut total = 0.0;
         let mut weight = 0.0;
         for r in -radius..=radius {
-            if let Some(&value) = field.get(index + r * direction)
-                && f64::is_finite(value)
-            {
+            if let Some(&value) = field.get(index + r * direction) {
                 let k = kernel[(r + radius) as usize];
                 total += k * value;
                 weight += k;
             }
         }
 
-        if weight < 1e-10 {
-            // We want to keep +- inf
-            field[index]
-        } else {
-            total / weight
-        }
+        total / weight
     })
 }
 
