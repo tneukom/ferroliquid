@@ -1,5 +1,5 @@
 use crate::{
-    distance_field::{INF_DIST, nearest_from_obstacle},
+    distance_field::nearest_from_obstacle,
     field::{Field, RgbaField},
     math::{point::Point, rect::Rect},
 };
@@ -392,23 +392,22 @@ impl Sides {
 
         for index in field.indices() {
             let nearest = nearest_field[index];
-            if nearest != Point(INF_DIST, INF_DIST) {
-                field[index] = field[index + nearest].clone()
-            }
+            field[index] = field[index + nearest].clone()
         }
     }
 
     /// Extrapolate divergence free velocities using distance field
     pub fn extrapolate(&mut self) {
-        let vertical_nearest = nearest_from_obstacle(self.weight.vertical.bounds(), 5, |coord| {
+        let vertical_obstacle = Field::from_map(self.weight.vertical.bounds(), |coord| {
             self.weight.vertical[coord] > 0.0 && self.passable.vertical[coord] > 0.0
         });
+        let vertical_nearest = nearest_from_obstacle(&vertical_obstacle);
         Self::extrapolate_from_nearest(&mut self.velocity_div_free.vertical, &vertical_nearest);
 
-        let horizontal_nearest =
-            nearest_from_obstacle(self.weight.horizontal.bounds(), 5, |coord| {
-                self.weight.horizontal[coord] > 0.0 && self.passable.horizontal[coord] > 0.0
-            });
+        let horizontal_obstacle = Field::from_map(self.weight.horizontal.bounds(), |coord| {
+            self.weight.horizontal[coord] > 0.0 && self.passable.horizontal[coord] > 0.0
+        });
+        let horizontal_nearest = nearest_from_obstacle(&horizontal_obstacle);
         Self::extrapolate_from_nearest(&mut self.velocity_div_free.horizontal, &horizontal_nearest);
     }
 }

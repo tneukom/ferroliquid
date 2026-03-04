@@ -1,10 +1,9 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
-    field::Field,
-    grid::{CellType, Grid},
+    grid::Grid,
     interpolator::interpolate_div_free_velocity_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
-    sides::{Side, SideField, Sides},
+    sides::{Side, Sides},
     solid_boundary::SolidBoundary,
 };
 use fastrand::Rng;
