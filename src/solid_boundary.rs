@@ -4,6 +4,7 @@ use crate::{
     interpolator::interpolate_bilinear,
     math::{generic::Dot, point::Point},
 };
+use std::time::Instant;
 
 /// Solid -> distance -> smoothed distance ->
 #[derive(Debug, Clone)]
@@ -26,7 +27,16 @@ pub struct SolidBoundary {
 impl SolidBoundary {
     pub fn new(solid: Field<bool>) -> Self {
         let cell_size = 4;
-        let signed_distance = signed_distance_from_obstacle_field(&solid, 5);
+        let radius = cell_size * solid.width().max(solid.height());
+
+        let instant = Instant::now();
+        let signed_distance = signed_distance_from_obstacle_field(&solid, radius);
+        let elapsed = instant.elapsed();
+        println!(
+            "Time to calculate signed distance: {}",
+            elapsed.as_secs_f64()
+        );
+
         let kernel = gaussian_kernel(6, 2.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
@@ -45,8 +55,21 @@ impl SolidBoundary {
         interpolate_bilinear(
             position * self.cell_size as f64,
             Point::ZERO,
+            |index| match self.signed_distance.get(index) {
+                None => f64::INFINITY,
+                Some(distance) => distance / self.cell_size as f64,
+            },
+        )
+    }
+
+    pub fn smoothed_distance_at(&self, position: Point<f64>) -> f64 {
+        debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
+
+        interpolate_bilinear(
+            position * self.cell_size as f64,
+            Point::ZERO,
             |index| match self.smoothed_signed_distance.get(index) {
-                None => f64::NAN,
+                None => f64::INFINITY,
                 Some(distance) => distance / self.cell_size as f64,
             },
         )
@@ -68,7 +91,7 @@ impl SolidBoundary {
     /// corrected_velocity = velocity if |d| > 1
     /// <corrected_velocity, grad> = d * <velocity, grad> otherwise
     pub fn correct_velocity(&self, position: Point<f64>, velocity: Point<f64>) -> Point<f64> {
-        let signed_distance = self.distance_at(position);
+        let signed_distance = self.smoothed_distance_at(position);
         // Far away from the solid signed_distance is NaN
         if !signed_distance.is_finite() || signed_distance.abs() > 1.0 {
             return velocity;
@@ -123,7 +146,12 @@ pub fn convolve_1d(field: &Field<f64>, kernel: &[f64], direction: Point<i64>) ->
             }
         }
 
-        total / weight
+        if weight < 1e-10 {
+            // We want to keep +- inf
+            field[index]
+        } else {
+            total / weight
+        }
     })
 }
 

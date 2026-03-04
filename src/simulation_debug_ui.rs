@@ -27,6 +27,7 @@ pub struct SimulationDebugDrawSettings {
     density: bool,
     side_weight: bool,
     defined: bool,
+    distance: bool,
     smoothed_distance: bool,
     distance_grad: bool,
     distance_heaviside_step: bool,
@@ -52,6 +53,7 @@ impl Default for SimulationDebugDrawSettings {
             density: false,
             side_weight: false,
             defined: false,
+            distance: false,
             smoothed_distance: false,
             distance_grad: false,
             distance_heaviside_step: false,
@@ -86,6 +88,7 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.density, "Density");
     ui.checkbox(&mut settings.side_weight, "Side Weight");
     ui.checkbox(&mut settings.defined, "Defined");
+    ui.checkbox(&mut settings.distance, "Distance");
     ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
     ui.checkbox(&mut settings.distance_grad, "Distance Grad");
     ui.checkbox(
@@ -411,6 +414,24 @@ pub fn draw_simulation(
         );
     }
 
+    if settings.distance {
+        if let Some(solid) = &simulation.solid {
+            draw_cell_texts(
+                painter,
+                font.clone(),
+                world.simulation.grid.bounds,
+                |index| {
+                    let distance = solid.distance_at(index.as_f64() + Point(0.5, 0.5));
+                    match distance {
+                        f64::INFINITY => "∞".to_string(),
+                        f64::NEG_INFINITY => "-∞".to_string(),
+                        distance => format!("{distance:.1}"),
+                    }
+                },
+            );
+        }
+    }
+
     if settings.smoothed_distance {
         if let Some(solid) = &simulation.solid {
             // draw_cell_field(painter, font, &solid.signed_distance);
@@ -419,17 +440,22 @@ pub fn draw_simulation(
                 painter,
                 0.5,
                 world.simulation.grid.bounds.as_f64(),
-                |position| solid.distance_at(position),
+                |position| solid.smoothed_distance_at(position),
             );
 
-            draw_cell_texts(painter, font, world.simulation.grid.bounds, |index| {
-                let distance = solid.distance_at(index.as_f64() + Point(0.5, 0.5));
-                match distance {
-                    f64::INFINITY => "∞".to_string(),
-                    f64::NEG_INFINITY => "-∞".to_string(),
-                    distance => format!("{distance:.1}"),
-                }
-            });
+            draw_cell_texts(
+                painter,
+                font.clone(),
+                world.simulation.grid.bounds,
+                |index| {
+                    let distance = solid.smoothed_distance_at(index.as_f64() + Point(0.5, 0.5));
+                    match distance {
+                        f64::INFINITY => "∞".to_string(),
+                        f64::NEG_INFINITY => "-∞".to_string(),
+                        distance => format!("{distance:.1}"),
+                    }
+                },
+            );
         }
     }
 
@@ -450,7 +476,7 @@ pub fn draw_simulation(
                 painter,
                 0.125,
                 world.simulation.grid.bounds.as_f64(),
-                |position| solid.distance_at(position),
+                |position| solid.smoothed_distance_at(position),
             );
         }
     }
