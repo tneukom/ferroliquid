@@ -290,6 +290,8 @@ impl<T> IndexMut<Side> for SideField<T> {
     }
 }
 
+// pub fn passable_from_signed_distance()
+
 pub fn passable_from_bitmap(bounds: Rect<i64>, bitmap: &RgbaField) -> SideField<f64> {
     assert_eq!(bitmap.size().x % bounds.size().x, 0);
     let resolution = bitmap.size().x / bounds.size().x;
