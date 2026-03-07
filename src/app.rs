@@ -33,6 +33,7 @@ use egui::AtomExt;
 use glow::HasContext;
 use log::warn;
 use std::{
+    collections::VecDeque,
     fs,
     io::{BufReader, BufWriter, Cursor},
     sync::{Arc, Mutex, mpsc},
@@ -110,6 +111,10 @@ pub struct EguiApp {
     step_timestamp: Option<f64>,
     selected: Selected,
 
+    history: VecDeque<World>,
+    record_history: bool,
+    history_current: usize,
+
     tool: Tool,
 
     // For async load file in WASM
@@ -172,6 +177,9 @@ impl EguiApp {
             gl,
             selected: Selected::None,
             tool: Tool::Pointer,
+            history: VecDeque::new(),
+            record_history: false,
+            history_current: 0,
             channel_sender,
             channel_receiver,
         };
@@ -348,6 +356,17 @@ impl EguiApp {
         // let dt = dt.min(1.0 / 30.0);
 
         self.world.step(dt);
+
+        if self.record_history {
+            // Clear history after current index
+            self.history.truncate(self.history_current + 1);
+
+            self.history.push_back(self.world.clone());
+            while self.history.len() > 64 {
+                self.history.pop_front();
+            }
+            self.history_current = self.history.len() - 1;
+        }
 
         self.step_timestamp = Some(timestamp);
     }
@@ -533,6 +552,14 @@ impl EguiApp {
 
             self.simulation_debug_window.window_toggle(ui, &self.world);
         });
+
+        // History slider
+        ui.checkbox(&mut self.record_history, "Record History");
+        let history_slider =
+            egui::Slider::new(&mut self.history_current, 0..=self.history.len() - 1);
+        if ui.add(history_slider).changed() {
+            self.world = self.history[self.history_current].clone();
+        }
 
         // Put debug ui at the bottom of the left side panel
         // let bottom_panel =
