@@ -1,9 +1,9 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
     grid::Grid,
-    interpolator::interpolate_div_free_velocity_bilinear,
+    interpolator::interpolate_sides_bilinear,
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
-    sides::{Side, Sides},
+    sides::Sides,
     solid_boundary::SolidBoundary,
 };
 use fastrand::Rng;
@@ -144,34 +144,21 @@ impl Simulation {
         };
 
         for particle in &mut self.particles {
-            let floored_pos = particle.position.floor();
-            let coord = floored_pos.as_i64();
-
-            let fractional_pos = particle.position - floored_pos;
-
-            let top_coeff = 1.0 - fractional_pos.y;
-            let bottom_coeff = fractional_pos.y;
-            let left_coeff = 1.0 - fractional_pos.x;
-            let right_coeff = fractional_pos.x;
-
-            let velocity_correction = Point(
-                self.grid.sides.velocity_correction[Side::left_side(coord)] * left_coeff
-                    + self.grid.sides.velocity_correction[Side::right_side(coord)] * right_coeff,
-                self.grid.sides.velocity_correction[Side::top_side(coord)] * top_coeff
-                    + self.grid.sides.velocity_correction[Side::bottom_side(coord)] * bottom_coeff,
+            let velocity_interpolated = interpolate_sides_bilinear(
+                &self.grid.sides.velocity_interpolated,
+                particle.position,
             );
-
-            let velocity_interpolated = Point(
-                self.grid.sides.velocity_interpolated[Side::left_side(coord)] * left_coeff
-                    + self.grid.sides.velocity_interpolated[Side::right_side(coord)] * right_coeff,
-                self.grid.sides.velocity_interpolated[Side::top_side(coord)] * top_coeff
-                    + self.grid.sides.velocity_interpolated[Side::bottom_side(coord)]
-                        * bottom_coeff,
-            );
+            let velocity_div_free =
+                interpolate_sides_bilinear(&self.grid.sides.velocity_div_free, particle.position);
+            let velocity_correction = velocity_div_free - velocity_interpolated;
 
             particle.velocity = (1.0 - alpha) * particle.velocity
                 + alpha * velocity_interpolated
                 + velocity_correction;
+
+            if let Some(solid) = &self.solid {
+                particle.velocity = solid.correct_velocity(particle.position, particle.velocity);
+            }
         }
     }
 
@@ -186,7 +173,7 @@ impl Simulation {
 
     /// Divergence free velocity with solid boundary condition correction.
     pub fn velocity_boundary_corrected(&self, position: Point<f64>) -> Point<f64> {
-        let velocity = interpolate_div_free_velocity_bilinear(&self.grid.sides, position);
+        let velocity = interpolate_sides_bilinear(&self.grid.sides.velocity_div_free, position);
         if let Some(solid) = &self.solid {
             solid.correct_velocity(position, velocity)
         } else {
@@ -238,7 +225,7 @@ impl Simulation {
         dt: f64,
         bounds: Rect<f64>,
     ) -> Option<Point<f64>> {
-        let velocity = interpolate_div_free_velocity_bilinear(sides, position);
+        let velocity = interpolate_sides_bilinear(&sides.velocity_div_free, position);
         debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
 
         position = position + dt * velocity;
