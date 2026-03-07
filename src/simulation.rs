@@ -85,7 +85,7 @@ impl Default for SimulationSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Simulation {
     pub i_step: usize,
 
@@ -93,12 +93,10 @@ pub struct Simulation {
 
     pub particles: Vec<Particle>,
 
-    #[serde(skip)]
-    pub solid: Option<SolidBoundary>,
+    pub solid_boundary: SolidBoundary,
 
     pub time: f64,
 
-    #[serde(skip, default)]
     pub rng: Rng,
 }
 
@@ -110,7 +108,7 @@ impl Simulation {
             i_step: 0,
             grid: Grid::new(bounds),
             particles: Vec::new(),
-            solid: None,
+            solid_boundary: SolidBoundary::empty(bounds),
             time: 0.0,
             rng: Rng::with_seed(345073457), // Random keyboard bashing seed!
         }
@@ -156,9 +154,9 @@ impl Simulation {
                 + alpha * velocity_interpolated
                 + velocity_correction;
 
-            if let Some(solid) = &self.solid {
-                particle.velocity = solid.correct_velocity(particle.position, particle.velocity);
-            }
+            particle.velocity = self
+                .solid_boundary
+                .correct_velocity(particle.position, particle.velocity);
         }
     }
 
@@ -174,11 +172,7 @@ impl Simulation {
     /// Divergence free velocity with solid boundary condition correction.
     pub fn velocity_boundary_corrected(&self, position: Point<f64>) -> Point<f64> {
         let velocity = interpolate_sides_bilinear(&self.grid.sides.velocity_div_free, position);
-        if let Some(solid) = &self.solid {
-            solid.correct_velocity(position, velocity)
-        } else {
-            velocity
-        }
+        self.solid_boundary.correct_velocity(position, velocity)
     }
 
     #[inline(always)]
