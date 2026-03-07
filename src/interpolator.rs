@@ -8,17 +8,12 @@ where
     lower * (1.0 - s) + upper * s
 }
 
-pub fn interpolate_bilinear<T>(
-    position: Point<f64>,
-    grid_offset: Point<f64>,
-    mut f: impl FnMut(Point<i64>) -> T,
-) -> T
+pub fn interpolate_bilinear<T>(position: Point<f64>, mut f: impl FnMut(Point<i64>) -> T) -> T
 where
     T: Add<Output = T> + Mul<f64, Output = T>,
 {
-    let offset_position = position - grid_offset;
-    let coord = offset_position.as_i64();
-    let fractional = offset_position - coord.as_f64();
+    let coord = position.as_i64();
+    let fractional = position - coord.as_f64();
 
     let left_top = f(Point(coord.x, coord.y));
     let left_bottom = f(Point(coord.x, coord.y + 1));
@@ -35,10 +30,10 @@ where
 pub fn interpolate_div_free_velocity_bilinear(sides: &Sides, position: Point<f64>) -> Point<f64> {
     debug_assert!(position.x >= 0.5 && position.y >= 0.5);
 
-    let x = interpolate_bilinear(position, Point(0.0, 0.5), |coord| {
+    let x = interpolate_bilinear(position - Point(0.0, 0.5), |coord| {
         sides.velocity_div_free.vertical[coord]
     });
-    let y = interpolate_bilinear(position, Point(0.5, 0.0), |coord| {
+    let y = interpolate_bilinear(position - Point(0.5, 0.0), |coord| {
         sides.velocity_div_free.horizontal[coord]
     });
 

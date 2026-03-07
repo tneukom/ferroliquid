@@ -23,7 +23,6 @@ use crate::{
     piecewise_linear::PiecewiseLinear,
     radial_force::{GravityFunction, PiecewiseLinearRadialFunction, RadialForce},
     render_debug_ui::RenderDebugUi,
-    sides::passable_from_bitmap,
     simulation_debug_ui::SimulationDebugWindow,
     solid_boundary::SolidBoundary,
     utils::monotonic_time,
@@ -130,11 +129,14 @@ impl EguiApp {
         let bounds = Rect::low_size(Point::ZERO, Point(40, 40));
         let mut world = World::new(bounds);
         let solid_bitmap = RgbaField::load_from_memory(include_bytes!("solid.png")).unwrap();
-        let passable = passable_from_bitmap(world.bounds(), &solid_bitmap);
-        world.simulation.grid.sides.passable = passable;
-        world.simulation.grid.make_solid_from_bitmap(&solid_bitmap);
+
         let solid = solid_bitmap.map(|rgba| rgba.a > 128);
-        world.simulation.solid = Some(SolidBoundary::new(solid));
+        let solid_boundary = SolidBoundary::new(solid);
+        solid_boundary.passable_and_solid(
+            &mut world.simulation.grid.sides.passable,
+            &mut world.simulation.grid.cells_type,
+        );
+        world.simulation.solid = Some(solid_boundary);
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 

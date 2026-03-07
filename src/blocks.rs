@@ -1,6 +1,5 @@
 use crate::{
     field::{Field, RgbaField},
-    grid::Grid,
     math::{point::Point, rect::Rect, rgba8::Rgba8},
 };
 use ahash::HashMap;
@@ -121,24 +120,5 @@ impl Blocks {
 
     pub fn is_solid(&self, coord: Point<i64>) -> bool {
         self.blocks[coord.div_euclid(2)].is_some()
-    }
-
-    pub fn assign_simulation_grid(&mut self, grid: &mut Grid) {
-        grid.clear_solid();
-        for (block_coord, block) in self.blocks.enumerate() {
-            let Some(block) = block else {
-                continue;
-            };
-
-            let block_cells = block.kind.cells();
-            for y in 0usize..2 {
-                for x in 0usize..2 {
-                    let cell_coord = 2 * block_coord + Point(x as i64, y as i64);
-                    if block_cells[y][x] {
-                        grid.make_solid(cell_coord);
-                    }
-                }
-            }
-        }
     }
 }
