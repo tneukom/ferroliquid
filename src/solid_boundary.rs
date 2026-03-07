@@ -1,9 +1,12 @@
 use crate::{
     distance_field::signed_distance_from_obstacle_field,
     field::Field,
+    grid::CellType,
     interpolator::interpolate_bilinear,
-    math::{generic::Dot, point::Point},
+    math::{generic::Dot, point::Point, rect::Rect},
+    sides::{Side, SideField},
 };
+use itertools::Itertools;
 use std::time::Instant;
 
 /// Solid -> distance -> smoothed distance ->
@@ -11,6 +14,8 @@ use std::time::Instant;
 pub struct SolidBoundary {
     /// Size of cell in pixels
     pub cell_size: i64,
+
+    pub bounds: Rect<i64>,
 
     pub solid: Field<bool>,
 
@@ -25,8 +30,16 @@ pub struct SolidBoundary {
 }
 
 impl SolidBoundary {
+    // Pixel centers are at (0.5, 0.5)
+    const GRID_OFFSET: Point<f64> = Point(0.5, 0.5);
+
     pub fn new(solid: Field<bool>) -> Self {
         let cell_size = 4;
+        assert_eq!(solid.width() % cell_size, 0);
+        assert_eq!(solid.height() % cell_size, 0);
+        assert_eq!(solid.low(), Point::ZERO);
+
+        let bounds = solid.bounds() / cell_size;
 
         let instant = Instant::now();
         let signed_distance = signed_distance_from_obstacle_field(&solid);
@@ -41,6 +54,7 @@ impl SolidBoundary {
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
         Self {
             cell_size,
+            bounds,
             solid,
             signed_distance,
             smoothed_signed_distance,
@@ -48,14 +62,17 @@ impl SolidBoundary {
         }
     }
 
+    fn out_of_bounds_distance(&self) -> f64 {
+        (self.bounds.width() + self.bounds.height()) as f64
+    }
+
     pub fn distance_at(&self, position: Point<f64>) -> f64 {
         debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
 
         interpolate_bilinear(
-            position * self.cell_size as f64,
-            Point::ZERO,
+            position * self.cell_size as f64 - Self::GRID_OFFSET,
             |index| match self.signed_distance.get(index) {
-                None => f64::INFINITY,
+                None => self.out_of_bounds_distance(),
                 Some(distance) => distance / self.cell_size as f64,
             },
         )
@@ -65,10 +82,9 @@ impl SolidBoundary {
         debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
 
         interpolate_bilinear(
-            position * self.cell_size as f64,
-            Point::ZERO,
+            position * self.cell_size as f64 - Self::GRID_OFFSET,
             |index| match self.smoothed_signed_distance.get(index) {
-                None => f64::INFINITY,
+                None => self.out_of_bounds_distance(),
                 Some(distance) => distance / self.cell_size as f64,
             },
         )
@@ -78,8 +94,7 @@ impl SolidBoundary {
         debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
 
         interpolate_bilinear(
-            position * self.cell_size as f64,
-            Point::ZERO,
+            position * self.cell_size as f64 - Self::GRID_OFFSET,
             |index| match self.grad.get(index) {
                 None => Point::ZERO,
                 Some(&grad) => grad,
@@ -111,6 +126,56 @@ impl SolidBoundary {
             // = <velocity, grad> - <velocity, grad> - d
             // = -d
             velocity - (signed_distance + velocity.dot(grad)) * grad
+        }
+    }
+
+    pub fn passable_and_solid(
+        &self,
+        passable: &mut SideField<f64>,
+        cell_type: &mut Field<CellType>,
+    ) {
+        for side in passable.indices() {
+            let start_corner = side.start_corner().as_f64();
+            let stop_corner = side.stop_corner().as_f64();
+
+            let n_steps = 5;
+            let steps = (0..=n_steps).map(|i| {
+                let position =
+                    start_corner + (i as f64 / n_steps as f64) * (stop_corner - start_corner);
+                self.smoothed_distance_at(position)
+            });
+
+            passable[side] = steps
+                .tuple_windows()
+                .map(|(step_lhs, step_rhs)| {
+                    let fraction = if step_lhs <= 0.0 && step_rhs <= 0.0 {
+                        0.0
+                    } else if step_lhs >= 0.0 && step_rhs >= 0.0 {
+                        1.0
+                    } else {
+                        // Solve step_lhs + t * (step_rhs - step_lhs) = 0
+                        let t = -step_lhs / (step_rhs - step_lhs);
+                        if step_lhs > 0.0 { t } else { 1.0 - t }
+                    };
+                    debug_assert!(fraction.is_finite());
+                    fraction / n_steps as f64
+                })
+                .sum();
+        }
+
+        let mut solid_field = Field::filled(self.bounds, false);
+        for coord in solid_field.indices() {
+            let n_passable_sides = Side::sides(coord)
+                .into_iter()
+                .filter(|&side| passable[side] > 0.5)
+                .count();
+            // Cells with only one passable side are treated as solid.
+            if n_passable_sides <= 1 {
+                cell_type[coord] = CellType::Solid;
+                for side in Side::sides(coord) {
+                    passable[side] = 0.0;
+                }
+            }
         }
     }
 }

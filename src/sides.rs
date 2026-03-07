@@ -1,9 +1,10 @@
 use crate::{
     distance_field::nearest_from_obstacle,
-    field::{Field, RgbaField},
+    field::Field,
     math::{point::Point, rect::Rect},
+    solid_boundary::SolidBoundary,
 };
-use itertools::Either;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -119,41 +120,17 @@ impl Side {
         }
     }
 
-    /// ┌──┐┌──┐┌──┐┌──┐
-    /// │L0││L1││L2││L3│
-    /// └──┘└──┘└──┘└──┘
-    /// ───────────────► Side
-    /// ┌──┐┌──┐┌──┐┌──┐
-    /// │R0││R1││R2││R3│
-    /// └──┘└──┘└──┘└──┘
-    ///
-    /// ┌───────┐
-    /// │Left   │
-    /// │Cell   │
-    /// ├─┬─┬─┬─┤
-    /// ├─┼─┼─┼─┤
-    /// ├─┴─┴─┴─┤
-    /// │Right  │
-    /// │Cell   │
-    /// └───────┘
-    /// Returns (L0, R0), (L1, R1), ...
-    pub fn adjacent_pixels(
-        self,
-        resolution: i64,
-    ) -> impl Iterator<Item = (Point<i64>, Point<i64>)> {
-        debug_assert!(resolution > 0);
-        if self.orientation == Orientation::Horizontal {
-            let start_x = resolution * self.index.x;
-            let stop_x = resolution * (self.index.x + 1);
-            let y = resolution * self.index.y;
-            let iter = (start_x..stop_x).map(move |x| (Point(x, y - 1), Point(x, y)));
-            Either::Left(iter)
-        } else {
-            let start_y = resolution * self.index.y;
-            let stop_y = resolution * (self.index.y + 1);
-            let x = resolution * self.index.x;
-            let iter = (start_y..stop_y).map(move |y| (Point(x - 1, y), Point(x, y)));
-            Either::Right(iter)
+    pub fn start_corner(self) -> Point<i64> {
+        match self.orientation {
+            Orientation::Vertical => self.index,
+            Orientation::Horizontal => self.index,
+        }
+    }
+
+    pub fn stop_corner(self) -> Point<i64> {
+        match self.orientation {
+            Orientation::Vertical => self.index.down(),
+            Orientation::Horizontal => self.index.right(),
         }
     }
 }
@@ -290,37 +267,6 @@ impl<T> IndexMut<Side> for SideField<T> {
     }
 }
 
-// pub fn passable_from_signed_distance()
-
-pub fn passable_from_bitmap(bounds: Rect<i64>, bitmap: &RgbaField) -> SideField<f64> {
-    assert_eq!(bitmap.size().x % bounds.size().x, 0);
-    let resolution = bitmap.size().x / bounds.size().x;
-    assert_eq!(bounds * resolution, bitmap.bounds());
-
-    let is_passable = |pixel: Point<i64>| {
-        if let Some(color) = bitmap.get(pixel) {
-            color.a < 128
-        } else {
-            true
-        }
-    };
-
-    let mut passable = SideField::filled(bounds, 0.0);
-    for side in passable.indices() {
-        let mut passable_count = 0;
-        let mut total = 0;
-        for (left_pixel, right_pixel) in side.adjacent_pixels(resolution) {
-            total += 1;
-            if is_passable(left_pixel) && is_passable(right_pixel) {
-                passable_count += 1;
-            }
-        }
-        passable[side] = passable_count as f64 / total as f64;
-    }
-
-    passable
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sides {
     pub velocity_interpolated: SideField<f64>,
@@ -356,15 +302,6 @@ impl Sides {
         self.velocity_correction.fill(0.0);
         self.weight.fill(0.0);
         self.defined.fill(false);
-    }
-
-    pub fn make_solid(&mut self, side: Side) {
-        self.passable[side] = 0.0;
-    }
-
-    /// Clear boundary condition on all sides
-    pub fn clear_solid(&mut self) {
-        self.passable.fill(1.0);
     }
 
     pub fn make_fluid(&mut self, side: Side) {

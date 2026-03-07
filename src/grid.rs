@@ -1,6 +1,6 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
-    field::{Field, RgbaField},
+    field::Field,
     math::{point::Point, rect::Rect},
     sides::{Direction, Side, Sides},
     simulation::{Particle, SimulationSettings},
@@ -46,39 +46,6 @@ impl Grid {
             sides: Sides::new(bounds),
             fluid_cells: Vec::new(),
             bounds,
-        }
-    }
-
-    pub fn clear_solid(&mut self) {
-        self.cells_type.fill(CellType::Air);
-        self.sides.clear_solid();
-    }
-
-    pub fn make_solid(&mut self, coord: Point<i64>) {
-        self.cells_type[coord] = CellType::Solid;
-        // for side in Side::sides(coord) {
-        //     self.sides.make_solid(side);
-        // }
-    }
-
-    pub fn make_solid_from_bitmap(&mut self, bitmap: &RgbaField) {
-        assert_eq!(bitmap.size().x % self.bounds.size().x, 0);
-        let resolution = bitmap.size().x / self.bounds.size().x;
-        assert_eq!(self.bounds * resolution, bitmap.bounds());
-
-        for cell_coord in self.bounds.iter_indices() {
-            let pixel_bounds = Rect::low_size(cell_coord, Point::ONE) * resolution;
-            let mut solid_pixel_count = 0;
-            for pixel in pixel_bounds.iter_indices() {
-                let rgba = bitmap[pixel];
-                if rgba.a > 128 {
-                    solid_pixel_count += 1;
-                }
-            }
-
-            if solid_pixel_count >= resolution * resolution {
-                self.make_solid(cell_coord);
-            }
         }
     }
 
