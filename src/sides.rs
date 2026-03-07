@@ -2,9 +2,7 @@ use crate::{
     distance_field::nearest_from_obstacle,
     field::Field,
     math::{point::Point, rect::Rect},
-    solid_boundary::SolidBoundary,
 };
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},

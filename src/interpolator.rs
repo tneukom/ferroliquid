@@ -1,4 +1,4 @@
-use crate::{math::point::Point, sides::Sides};
+use crate::{math::point::Point, sides::SideField};
 use std::ops::{Add, Mul};
 
 pub fn interpolate_linear<T>(lower: T, upper: T, s: f64) -> T
@@ -27,15 +27,11 @@ where
     )
 }
 
-pub fn interpolate_div_free_velocity_bilinear(sides: &Sides, position: Point<f64>) -> Point<f64> {
+pub fn interpolate_sides_bilinear(sides: &SideField<f64>, position: Point<f64>) -> Point<f64> {
     debug_assert!(position.x >= 0.5 && position.y >= 0.5);
 
-    let x = interpolate_bilinear(position - Point(0.0, 0.5), |coord| {
-        sides.velocity_div_free.vertical[coord]
-    });
-    let y = interpolate_bilinear(position - Point(0.5, 0.0), |coord| {
-        sides.velocity_div_free.horizontal[coord]
-    });
+    let x = interpolate_bilinear(position - Point(0.0, 0.5), |coord| sides.vertical[coord]);
+    let y = interpolate_bilinear(position - Point(0.5, 0.0), |coord| sides.horizontal[coord]);
 
     Point(x, y)
 }

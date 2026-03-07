@@ -163,8 +163,7 @@ impl SolidBoundary {
                 .sum();
         }
 
-        let mut solid_field = Field::filled(self.bounds, false);
-        for coord in solid_field.indices() {
+        for coord in cell_type.indices() {
             let n_passable_sides = Side::sides(coord)
                 .into_iter()
                 .filter(|&side| passable[side] > 0.5)
