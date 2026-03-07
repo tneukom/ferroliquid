@@ -5,7 +5,6 @@ use crate::{
     painting::{
         advect_painter::AdvectPainter,
         blit_painter::BlitPainter,
-        block_painter::BlockPainter,
         debug_painter::DebugPainter,
         gl_framebuffer::GlFramebuffer,
         gl_texture::{Filter, GlTexture, TextureFormat, Wrap},
@@ -51,8 +50,6 @@ pub struct SimulationPainter {
     pub water_texture: GlTexture,
     pub water_framebuffer: GlFramebuffer,
     pub water_painter: WaterPainter,
-
-    pub block_painter: BlockPainter,
 
     pub blit_painter: BlitPainter,
 
@@ -116,8 +113,6 @@ impl SimulationPainter {
         let water_framebuffer = GlFramebuffer::with_color_attachments(gl, &[&water_texture]);
         let water_painter = WaterPainter::new(gl);
 
-        let block_painter = BlockPainter::new(gl);
-
         let blit_painter = BlitPainter::new(gl);
 
         let background_texture = {
@@ -159,7 +154,6 @@ impl SimulationPainter {
             color_framebuffer_scratch,
             advect_painter,
             inflow_painter,
-            block_painter,
             blit_painter,
             background_texture,
             debug_painter,

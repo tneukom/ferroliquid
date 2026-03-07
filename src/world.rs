@@ -1,11 +1,16 @@
 use crate::{
-    blocks::Blocks,
     event_trace::{Event, trace_event},
+    field::RgbaField,
     forces::{AnyForce, UniformForce},
     inflow::{Inflow, InflowPattern, InflowStats},
-    math::{point::Point, rect::Rect, rgba8::Rgba},
+    math::{
+        point::Point,
+        rect::Rect,
+        rgba8::{Rgba, Rgba8},
+    },
     outflow::Outflow,
     simulation::{Particle, Simulation, SimulationSettings},
+    solid_boundary::SolidBoundary,
 };
 use serde::{Deserialize, Serialize};
 use slotmap::SlotMap;
@@ -18,18 +23,16 @@ slotmap::new_key_type! { pub struct ForceKey; }
 slotmap::new_key_type! { pub struct InflowKey; }
 slotmap::new_key_type! { pub struct OutflowKey; }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct World {
     pub simulation: Simulation,
-    pub blocks: Blocks,
 
-    #[serde(default)]
+    pub solid: RgbaField,
+
     pub forces: SlotMap<ForceKey, AnyForce>,
 
-    #[serde(default)]
     pub inflows: SlotMap<InflowKey, Inflow>,
 
-    #[serde(default)]
     pub outflows: SlotMap<OutflowKey, Outflow>,
 
     pub settings: SimulationSettings,
@@ -49,25 +52,7 @@ impl Energy {
 
 impl World {
     pub fn new(bounds: Rect<i64>) -> Self {
-        // Blocks use 4 cells
-        assert_eq!(bounds.width() % 2, 0);
-        assert_eq!(bounds.height() % 2, 0);
-
-        let block_bounds = Rect::low_size(Point::ZERO, bounds.size() / 2);
         let simulation = Simulation::new(bounds);
-        let blocks = Blocks::new(block_bounds);
-
-        // Solid walls
-        // for x in wall_bounds.left()..wall_bounds.right() {
-        //     walls.make_solid(Point(x, wall_bounds.bottom() - 1));
-        // }
-        // for y in wall_bounds.top() + 10..wall_bounds.bottom() {
-        //     walls.make_solid(Point(wall_bounds.left() + 3, y));
-        //     walls.make_solid(Point(wall_bounds.right() - 4, y));
-        // }
-        // walls.make_solid(Point(20, 20));
-        //
-        // simulation.grid.assign_solid_from_walls(&walls);
 
         let mut inflows = SlotMap::with_key();
         inflows.insert(Inflow {
@@ -83,8 +68,6 @@ impl World {
             on: true,
         });
 
-        // let gravity = PlacedForce::new(Gravity::default(), Point(10.0, 10.0));
-        // forces.insert(gravity);
         let mut forces: SlotMap<ForceKey, AnyForce> = SlotMap::with_key();
 
         let uniform = UniformForce {
@@ -95,16 +78,15 @@ impl World {
 
         let settings = SimulationSettings::default();
 
-        // For debugging
-        // simulation.fill(Point(20, 20), Point(0.0, 120.0), &settings);
+        let solid = RgbaField::filled(bounds * 4, Rgba8::TRANSPARENT);
 
         Self {
             simulation,
-            blocks,
             inflows,
             outflows: SlotMap::with_key(),
             forces,
             settings,
+            solid,
         }
     }
 
@@ -147,29 +129,39 @@ impl World {
     }
 
     pub fn to_save_world(&self) -> SaveWorld {
+        let solid_base64_png_url = self.solid.encode_base64_url_png();
         SaveWorld {
             bounds: self.bounds(),
             save_particles: SaveParticles::from_particles(&self.simulation.particles),
-            blocks: self.blocks.clone(),
             forces: self.forces.clone(),
             inflows: self.inflows.clone(),
             outflows: self.outflows.clone(),
             settings: self.settings.clone(),
             color_jpeg: None,
             color_jpeg_base64_url: None,
+            solid_png_base64_url: Some(solid_base64_png_url),
         }
     }
 
     pub fn from_save_world(save_world: SaveWorld) -> Self {
+        let solid = if let Some(solid_png_bas64_url) = save_world.solid_png_base64_url {
+            RgbaField::decode_base64_url_png(&solid_png_bas64_url)
+                .ok()
+                .unwrap()
+        } else {
+            RgbaField::filled(save_world.bounds * 4, Rgba8::TRANSPARENT)
+        };
+
         let mut simulation = Simulation::new(save_world.bounds);
         simulation.particles = save_world.save_particles.to_particles();
+
         Self {
             simulation,
-            blocks: save_world.blocks,
             forces: save_world.forces,
             inflows: save_world.inflows,
             outflows: save_world.outflows,
             settings: save_world.settings,
+            solid,
         }
     }
 
@@ -188,6 +180,12 @@ impl World {
         }
 
         Energy { kinetic, potential }
+    }
+
+    /// Must be called after `self.solid` has changed to update simulation.solid_boundary
+    pub fn update_solid_boundary(&mut self) {
+        let solid = self.solid.map(|color| color.a > 128);
+        self.simulation.solid_boundary = SolidBoundary::new(self.bounds(), &solid);
     }
 }
 
@@ -238,7 +236,6 @@ impl SaveParticles {
 pub struct SaveWorld {
     pub bounds: Rect<i64>,
     pub save_particles: SaveParticles,
-    pub blocks: Blocks,
 
     #[serde(default)]
     pub forces: SlotMap<ForceKey, AnyForce>,
@@ -252,6 +249,9 @@ pub struct SaveWorld {
     pub settings: SimulationSettings,
     pub color_jpeg: Option<Vec<u8>>,
     pub color_jpeg_base64_url: Option<String>,
+
+    #[serde(default)]
+    pub solid_png_base64_url: Option<String>,
 }
 
 impl SaveWorld {

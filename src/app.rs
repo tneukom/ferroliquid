@@ -1,18 +1,12 @@
 use crate::{
-    blocks::{Block, BlockKind, BlockPalette},
     demos::Demo,
     event_trace::{ProfilerWindow, trace_begin_frame},
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
-    line_drawing::slope_draw_thin_line,
-    math::{
-        affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect,
-        rgba8::Rgba8,
-    },
+    math::{affine_map::AffineMap, matrix2::Matrix2, point::Point, rect::Rect, rgba8::Rgba8},
     outflow::Outflow,
     painting::{
-        block_painter::BlockPaintingMode,
         debug_painter::DebugPainterStyle,
         gl_texture::GlTexture,
         particle_painter::ParticlePainterSettings,
@@ -42,36 +36,14 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
     Pointer,
-    Block(Option<BlockKind>),
 }
 
 impl Tool {
-    pub const ALL: [Self; 7] = [
-        Self::Pointer,
-        Self::Block(Some(BlockKind::Square)),
-        Self::Block(Some(BlockKind::L)),
-        Self::Block(Some(BlockKind::L90)),
-        Self::Block(Some(BlockKind::L180)),
-        Self::Block(Some(BlockKind::L270)),
-        Self::Block(None),
-    ];
+    pub const ALL: [Self; 1] = [Self::Pointer];
 
     pub fn egui_icon(self) -> egui::ImageSource<'static> {
         match self {
             Self::Pointer => egui::include_image!("icons/pointer.png"),
-            Self::Block(Some(BlockKind::Square)) => egui::include_image!("icons/block_square.png"),
-            Self::Block(Some(BlockKind::L)) => egui::include_image!("icons/block_l.png"),
-            Self::Block(Some(BlockKind::L90)) => egui::include_image!("icons/block_l90.png"),
-            Self::Block(Some(BlockKind::L180)) => egui::include_image!("icons/block_l180.png"),
-            Self::Block(Some(BlockKind::L270)) => egui::include_image!("icons/block_l270.png"),
-            Self::Block(None) => egui::include_image!("icons/eraser.png"),
-        }
-    }
-
-    pub fn is_block(self) -> bool {
-        match self {
-            Tool::Pointer => false,
-            Tool::Block(_) => true,
         }
     }
 }
@@ -131,17 +103,17 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
-        let bounds = Rect::low_size(Point::ZERO, Point(40, 40));
+        let bounds = Rect::low_size(Point::ZERO, Point(120, 100));
         let mut world = World::new(bounds);
         let solid_bitmap = RgbaField::load_from_memory(include_bytes!("solid.png")).unwrap();
 
         let solid = solid_bitmap.map(|rgba| rgba.a > 128);
-        let solid_boundary = SolidBoundary::new(solid);
+        let solid_boundary = SolidBoundary::new(bounds, &solid);
         solid_boundary.passable_and_solid(
             &mut world.simulation.grid.sides.passable,
             &mut world.simulation.grid.cells_type,
         );
-        world.simulation.solid = Some(solid_boundary);
+        world.simulation.solid_boundary = solid_boundary;
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
 
@@ -574,13 +546,10 @@ impl EguiApp {
         let settings = self.simulation_painter_settings.clone();
         // let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
 
-        // TODO: Don't clone
-        let blocks = self.world.blocks.clone();
-
         let paint_callback = {
             egui_glow::CallbackFn::new(move |info, painter| {
                 let gl = painter.gl().as_ref();
-                let mut simulation_painter = simulation_painter.lock().unwrap();
+                let simulation_painter = simulation_painter.lock().unwrap();
 
                 let viewport: Rect<f64> = info.viewport.into();
                 let pixel_viewport: Rect<i32> =
@@ -601,12 +570,6 @@ impl EguiApp {
                         true,
                     );
 
-                    simulation_painter.block_painter.draw(
-                        gl,
-                        &blocks,
-                        BlockPaintingMode::BackgroundBrush,
-                    );
-
                     simulation_painter.water_painter.draw(
                         gl,
                         &simulation_painter.hsmoothed_distance_texture,
@@ -617,16 +580,6 @@ impl EguiApp {
                     // simulation_painter
                     //     .particle_painter
                     //     .draw_particle_dots(gl, simulation_bounds);
-
-                    simulation_painter
-                        .block_painter
-                        .draw(gl, &blocks, BlockPaintingMode::Pen);
-
-                    simulation_painter.block_painter.draw(
-                        gl,
-                        &blocks,
-                        BlockPaintingMode::ForegroundBrush,
-                    );
 
                     // WebGL canvas created by eframe has default settings for alpha=true and
                     // premultipliedAlpha=true, see:
@@ -640,11 +593,7 @@ impl EguiApp {
             })
         };
 
-        let sense = if self.tool.is_block() {
-            egui::Sense::click_and_drag()
-        } else {
-            egui::Sense::empty()
-        };
+        let sense = egui::Sense::empty();
 
         // Calculate size that fits available space while keeping aspect ratio
         let simulation_size = self.world.bounds().size().as_f64();
@@ -664,39 +613,39 @@ impl EguiApp {
         };
 
         // Calculate the actual cell size based on the scaled rect
-        let cell_size = egui_rect.width() as f64 / simulation_size.x;
+        // let cell_size = egui_rect.width() as f64 / simulation_size.x;
 
         // Interact with the centered rect
-        let response = ui.interact(egui_rect, ui.id().with("simulation"), sense);
+        // let response = ui.interact(egui_rect, ui.id().with("simulation"), sense);
 
-        if response.is_pointer_button_down_on()
-            && let Some(pointer_pos) = response.interact_pointer_pos()
-        {
-            let Tool::Block(block_kind) = self.tool else {
-                unreachable!();
-            };
-
-            // Draw blocks line from previous to current drag position
-            let drag_current: Point<f64> = (pointer_pos - egui_rect.left_top()).into();
-            let drag_delta: Point<f64> = response.drag_delta().into();
-            let drag_previous = drag_current - drag_delta;
-
-            // Two simulation cells per block
-            let simulation_drag_previous = drag_previous / (2.0 * cell_size);
-            let simulation_drag_current = drag_current / (2.0 * cell_size);
-            let arrow = Arrow::new(
-                simulation_drag_previous.floor().as_i64(),
-                simulation_drag_current.floor().as_i64(),
-            );
-
-            for coord in slope_draw_thin_line(arrow) {
-                if self.world.blocks.bounds().contains_index(coord) {
-                    let block = block_kind
-                        .map(|block_kind| Block::new(block_kind, BlockPalette::BlueGreen));
-                    self.world.blocks.set(coord, block);
-                }
-            }
-        }
+        // if response.is_pointer_button_down_on()
+        //     && let Some(pointer_pos) = response.interact_pointer_pos()
+        // {
+        //     let Tool::Block(block_kind) = self.tool else {
+        //         unreachable!();
+        //     };
+        //
+        //     // Draw blocks line from previous to current drag position
+        //     let drag_current: Point<f64> = (pointer_pos - egui_rect.left_top()).into();
+        //     let drag_delta: Point<f64> = response.drag_delta().into();
+        //     let drag_previous = drag_current - drag_delta;
+        //
+        //     // Two simulation cells per block
+        //     let simulation_drag_previous = drag_previous / (2.0 * cell_size);
+        //     let simulation_drag_current = drag_current / (2.0 * cell_size);
+        //     let arrow = Arrow::new(
+        //         simulation_drag_previous.floor().as_i64(),
+        //         simulation_drag_current.floor().as_i64(),
+        //     );
+        //
+        //     for coord in slope_draw_thin_line(arrow) {
+        //         if self.world.blocks.bounds().contains_index(coord) {
+        //             let block = block_kind
+        //                 .map(|block_kind| Block::new(block_kind, BlockPalette::BlueGreen));
+        //             self.world.blocks.set(coord, block);
+        //         }
+        //     }
+        // }
 
         let callback = egui::PaintCallback {
             rect: egui_rect,

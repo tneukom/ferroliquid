@@ -17,8 +17,6 @@ pub struct SolidBoundary {
 
     pub bounds: Rect<i64>,
 
-    pub solid: Field<bool>,
-
     /// +- inf where undefined
     pub signed_distance: Field<f64>,
 
@@ -33,13 +31,13 @@ impl SolidBoundary {
     // Pixel centers are at (0.5, 0.5)
     const GRID_OFFSET: Point<f64> = Point(0.5, 0.5);
 
-    pub fn new(solid: Field<bool>) -> Self {
-        let cell_size = 4;
-        assert_eq!(solid.width() % cell_size, 0);
-        assert_eq!(solid.height() % cell_size, 0);
+    pub fn new(simulation_bounds: Rect<i64>, solid: &Field<bool>) -> Self {
+        assert_eq!(solid.width() % simulation_bounds.width(), 0);
+        assert_eq!(solid.height() % simulation_bounds.height(), 0);
         assert_eq!(solid.low(), Point::ZERO);
 
-        let bounds = solid.bounds() / cell_size;
+        let cell_size = solid.width() / simulation_bounds.width();
+        assert_eq!(cell_size, solid.height() / simulation_bounds.height());
 
         let instant = Instant::now();
         let signed_distance = signed_distance_from_obstacle_field(&solid);
@@ -54,12 +52,16 @@ impl SolidBoundary {
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
         Self {
             cell_size,
-            bounds,
-            solid,
+            bounds: simulation_bounds,
             signed_distance,
             smoothed_signed_distance,
             grad,
         }
+    }
+
+    pub fn empty(simulation_bounds: Rect<i64>) -> Self {
+        let solid = Field::filled(simulation_bounds * 4, false);
+        Self::new(simulation_bounds, &solid)
     }
 
     fn out_of_bounds_distance(&self) -> f64 {

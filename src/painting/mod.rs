@@ -1,6 +1,5 @@
 pub(crate) mod advect_painter;
 pub(crate) mod blit_painter;
-pub(crate) mod block_painter;
 pub(crate) mod debug_painter;
 pub(crate) mod effect_painter;
 pub(crate) mod gl_buffer;

@@ -415,70 +415,66 @@ pub fn draw_simulation(
     }
 
     if settings.distance {
-        if let Some(solid) = &simulation.solid {
-            draw_cell_texts(
-                painter,
-                font.clone(),
-                world.simulation.grid.bounds,
-                |index| {
-                    let distance = solid.distance_at(index.as_f64() + Point(0.5, 0.5));
-                    match distance {
-                        f64::INFINITY => "∞".to_string(),
-                        f64::NEG_INFINITY => "-∞".to_string(),
-                        distance => format!("{distance:.1}"),
-                    }
-                },
-            );
-        }
+        draw_cell_texts(
+            painter,
+            font.clone(),
+            world.simulation.grid.bounds,
+            |index| {
+                let distance = simulation
+                    .solid_boundary
+                    .distance_at(index.as_f64() + Point(0.5, 0.5));
+                match distance {
+                    f64::INFINITY => "∞".to_string(),
+                    f64::NEG_INFINITY => "-∞".to_string(),
+                    distance => format!("{distance:.1}"),
+                }
+            },
+        );
     }
 
     if settings.smoothed_distance {
-        if let Some(solid) = &simulation.solid {
-            // draw_cell_field(painter, font, &solid.signed_distance);
+        // draw_cell_field(painter, font, &solid.signed_distance);
 
-            draw_square_field(
-                painter,
-                0.5,
-                world.simulation.grid.bounds.as_f64(),
-                |position| solid.smoothed_distance_at(position),
-            );
+        draw_square_field(
+            painter,
+            0.5,
+            world.simulation.grid.bounds.as_f64(),
+            |position| simulation.solid_boundary.smoothed_distance_at(position),
+        );
 
-            draw_cell_texts(
-                painter,
-                font.clone(),
-                world.simulation.grid.bounds,
-                |index| {
-                    let distance = solid.smoothed_distance_at(index.as_f64() + Point(0.5, 0.5));
-                    match distance {
-                        f64::INFINITY => "∞".to_string(),
-                        f64::NEG_INFINITY => "-∞".to_string(),
-                        distance => format!("{distance:.1}"),
-                    }
-                },
-            );
-        }
+        draw_cell_texts(
+            painter,
+            font.clone(),
+            world.simulation.grid.bounds,
+            |index| {
+                let distance = simulation
+                    .solid_boundary
+                    .smoothed_distance_at(index.as_f64() + Point(0.5, 0.5));
+                match distance {
+                    f64::INFINITY => "∞".to_string(),
+                    f64::NEG_INFINITY => "-∞".to_string(),
+                    distance => format!("{distance:.1}"),
+                }
+            },
+        );
     }
 
     if settings.distance_grad {
-        if let Some(solid) = &simulation.solid {
-            draw_vector_field(
-                painter,
-                0.5,
-                world.simulation.grid.bounds.as_f64(),
-                |position| solid.grad_at(position),
-            );
-        }
+        draw_vector_field(
+            painter,
+            0.5,
+            world.simulation.grid.bounds.as_f64(),
+            |position| simulation.solid_boundary.grad_at(position),
+        );
     }
 
     if settings.distance_heaviside_step {
-        if let Some(solid) = &simulation.solid {
-            draw_highres_field_step(
-                painter,
-                0.125,
-                world.simulation.grid.bounds.as_f64(),
-                |position| solid.smoothed_distance_at(position),
-            );
-        }
+        draw_highres_field_step(
+            painter,
+            0.125,
+            world.simulation.grid.bounds.as_f64(),
+            |position| simulation.solid_boundary.smoothed_distance_at(position),
+        );
     }
 
     if settings.velocity_boundary_corrected {
@@ -491,22 +487,8 @@ pub fn draw_simulation(
     }
 
     if settings.solid {
-        if let Some(solid) = &simulation.solid {
-            let solid_image = solid.solid.map(|&solid| {
-                if solid {
-                    Rgba8::RED.with_a(128)
-                } else {
-                    Rgba8::BLACK.with_a(128)
-                }
-            });
-
-            // TODO: There's a slight offset between solid_image and distance_heaviside_step.
-            draw_image(
-                painter,
-                solid_image.bounds().as_f64() / solid.cell_size as f64,
-                &solid_image,
-            );
-        }
+        // TODO: There's a slight offset between solid_image and distance_heaviside_step.
+        draw_image(painter, world.bounds().as_f64(), &world.solid);
     }
 }
 
