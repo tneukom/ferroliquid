@@ -2,6 +2,7 @@ use crate::{
     math::rect::Rect,
     painting::{
         blit_painter::BlitPainter,
+        distance_field_painter::DistanceFieldPainter,
         gl_texture::{Filter, GlTexture, TextureFormat, Wrap},
     },
     world::World,
@@ -10,9 +11,11 @@ use crate::{
 pub struct SolidPainter {
     pub blit_painter: BlitPainter,
 
+    pub distance_field_painter: DistanceFieldPainter,
+
     pub solid_texture: GlTexture,
 
-    pub solid_signed_distance_texture: GlTexture,
+    pub signed_distance_texture: GlTexture,
 }
 
 impl SolidPainter {
@@ -34,10 +37,13 @@ impl SolidPainter {
 
         let blit_painter = BlitPainter::new(gl);
 
+        let distance_field_painter = DistanceFieldPainter::new(gl);
+
         Self {
             solid_texture,
-            solid_signed_distance_texture,
+            signed_distance_texture: solid_signed_distance_texture,
             blit_painter,
+            distance_field_painter,
         }
     }
 
@@ -52,11 +58,35 @@ impl SolidPainter {
             .smoothed_signed_distance
             .map(|&value| value as f32)
             .flip_rows();
-        self.solid_signed_distance_texture
-            .texture_sub_image_whole_field(gl, TextureFormat::RGBA16F, &f32_solid_signed_distance);
+
+        // let signed_distance_field = &world.simulation.solid_boundary.smoothed_signed_distance;
+        // self.signed_distance_texture = GlTexture::empty(
+        //     gl,
+        //     signed_distance_field.width(),
+        //     signed_distance_field.height(),
+        //     TextureFormat::R16F,
+        //     Filter::Linear,
+        //     Wrap::ClampToEdge,
+        // )
+
+        // TODO: Why is texture_sub_image_whole_field not working?
+        self.signed_distance_texture.texture_image_field(
+            gl,
+            TextureFormat::R16F,
+            &f32_solid_signed_distance,
+        );
+
+        // self.signed_distance_texture.texture_sub_image_whole_field(
+        //     gl,
+        //     TextureFormat::R16F,
+        //     &f32_solid_signed_distance,
+        // );
     }
 
     pub unsafe fn paint<'a>(&self, gl: &glow::Context) {
-        self.blit_painter.draw(gl, &self.solid_texture, true);
+        // self.blit_painter.draw(gl, &self.solid_texture, true);
+
+        self.distance_field_painter
+            .draw(gl, &self.signed_distance_texture);
     }
 }
