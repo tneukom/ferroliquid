@@ -271,6 +271,12 @@ impl<T: Clone> Field<T> {
     pub fn fill(&mut self, value: T) {
         self.elems.fill(value)
     }
+
+    pub fn flip_rows(&self) -> Self {
+        Self::from_map(self.bounds, |coord| {
+            self[Point(coord.x, self.bounds.bottom() - coord.y - 1)].clone()
+        })
+    }
 }
 
 impl<T: Default> Field<T> {
