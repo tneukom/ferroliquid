@@ -237,7 +237,7 @@ impl GlTexture {
         gl.generate_mipmap(glow::TEXTURE_2D);
     }
 
-    pub unsafe fn texture_sub_image_as_bytes<T: Pod>(
+    pub unsafe fn texture_sub_image_field<T: GlPrimitive + Pod>(
         &mut self,
         gl: &glow::Context,
         format: TextureFormat,
@@ -245,6 +245,7 @@ impl GlTexture {
         texture_rect: Rect<i64>,
         field: &Field<T>,
     ) {
+        assert_eq!(T::GL_PRIMITIVE, format.data_type());
         assert_eq!(bitmap_rect.size(), texture_rect.size());
         if bitmap_rect.is_empty() {
             return;
@@ -270,6 +271,21 @@ impl GlTexture {
         );
         check_gl_error(gl);
         gl.pixel_store_i32(glow::UNPACK_ROW_LENGTH, 0);
+    }
+
+    pub unsafe fn texture_sub_image_whole_field<T: GlPrimitive + Pod>(
+        &mut self,
+        gl: &glow::Context,
+        format: TextureFormat,
+        field: &Field<T>,
+    ) {
+        self.texture_sub_image_field(
+            gl,
+            format,
+            field.bounds(),
+            Rect::low_size(Point::ZERO, self.size()),
+            field,
+        );
     }
 
     /// Affine map from bitmap coordinates (0,0 at top left) to Gltexture coordinates.

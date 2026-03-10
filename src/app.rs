@@ -12,6 +12,7 @@ use crate::{
         particle_painter::ParticlePainterSettings,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
         smoothing_painter::SmoothPainterSettings,
+        solid_painter::SolidPainter,
         water_painter::WaterPainterSettings,
     },
     piecewise_linear::PiecewiseLinear,
@@ -79,6 +80,8 @@ pub struct EguiApp {
     simulation_painter_settings: SimulationPainterSettings,
     scene_rect: egui::Rect,
 
+    solid_painter: Arc<Mutex<SolidPainter>>,
+
     run: bool,
     step_timestamp: Option<f64>,
     selected: Selected,
@@ -105,9 +108,9 @@ impl EguiApp {
 
         let bounds = Rect::low_size(Point::ZERO, Point(120, 100));
         let mut world = World::new(bounds);
-        let solid_bitmap = RgbaField::load_from_memory(include_bytes!("solid.png")).unwrap();
+        world.solid = RgbaField::load_from_memory(include_bytes!("solid.png")).unwrap();
 
-        let solid = solid_bitmap.map(|rgba| rgba.a > 128);
+        let solid = world.solid.map(|color| color.a > 128);
         let solid_boundary = SolidBoundary::new(bounds, &solid);
         solid_boundary.passable_and_solid(
             &mut world.simulation.grid.sides.passable,
@@ -116,6 +119,8 @@ impl EguiApp {
         world.simulation.solid_boundary = solid_boundary;
 
         let simulation_painter = SimulationPainter::new(&gl, bounds);
+        let mut solid_painter = SolidPainter::new(&gl, world.solid.bounds());
+        solid_painter.update(&gl, &world);
 
         let simulation_painter_settings = SimulationPainterSettings {
             particles: ParticlePainterSettings {
@@ -146,6 +151,7 @@ impl EguiApp {
             run: false,
             step_timestamp: None,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
+            solid_painter: Arc::new(Mutex::new(solid_painter)),
             gl,
             selected: Selected::None,
             tool: Tool::Pointer,
@@ -156,8 +162,6 @@ impl EguiApp {
             channel_receiver,
         };
 
-        // app.load_demo(&Demo::GRAVITY_NEAT);
-        // app.run = true;
         app
     }
 
@@ -528,7 +532,7 @@ impl EguiApp {
         // History slider
         ui.checkbox(&mut self.record_history, "Record History");
         let history_slider =
-            egui::Slider::new(&mut self.history_current, 0..=self.history.len() - 1);
+            egui::Slider::new(&mut self.history_current, 0..=self.history.len().max(1) - 1);
         if ui.add(history_slider).changed() {
             self.world = self.history[self.history_current].clone();
         }
@@ -543,6 +547,7 @@ impl EguiApp {
 
     pub fn simulation_ui(&mut self, ui: &mut egui::Ui) -> egui::Rect {
         let simulation_painter = self.simulation_painter.clone();
+        let solid_painter = self.solid_painter.clone();
         let settings = self.simulation_painter_settings.clone();
         // let simulation_bounds = self.world.simulation.grid.bounds.as_f64();
 
@@ -550,6 +555,7 @@ impl EguiApp {
             egui_glow::CallbackFn::new(move |info, painter| {
                 let gl = painter.gl().as_ref();
                 let simulation_painter = simulation_painter.lock().unwrap();
+                let solid_painter = solid_painter.lock().unwrap();
 
                 let viewport: Rect<f64> = info.viewport.into();
                 let pixel_viewport: Rect<i32> =
@@ -576,6 +582,8 @@ impl EguiApp {
                         &simulation_painter.color_texture,
                         &settings.water,
                     );
+
+                    solid_painter.paint(gl);
 
                     // simulation_painter
                     //     .particle_painter
