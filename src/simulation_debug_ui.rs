@@ -498,7 +498,6 @@ pub fn debug_simulation_scene_ui(
     world: &World,
     settings: &SimulationDebugDrawSettings,
 ) {
-    let copy_scene_rect = *scene_rect;
     egui::Scene::new()
         .zoom_range(0.25..=4.0)
         .show(ui, scene_rect, |ui| {
@@ -506,7 +505,6 @@ pub fn debug_simulation_scene_ui(
 
             let (_response, painter) = ui.allocate_painter(size.into(), egui::Sense::click());
 
-            println!("scene_rect: {}", copy_scene_rect);
             draw_simulation(world, &painter, settings);
         });
 }

@@ -47,7 +47,7 @@ impl SolidBoundary {
             elapsed.as_secs_f64()
         );
 
-        let kernel = gaussian_kernel(6, 2.0);
+        let kernel = gaussian_kernel(6, 3.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
         Self {
