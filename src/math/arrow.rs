@@ -3,8 +3,8 @@ use super::{
     rect::{Rect, RectBounds},
 };
 use crate::math::generic::{Dot, FloatNum, Num, SignedNum};
-use num_traits::{AsPrimitive, clamp, real::Real};
-use std::{clone::Clone, fmt::Debug};
+use num_traits::{AsPrimitive, ConstZero, clamp, real::Real};
+use std::{clone::Clone, fmt::Debug, ops::Mul};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct Arrow<T> {
@@ -148,5 +148,18 @@ impl<T: AsPrimitive<f32>> Arrow<T> {
 impl<T: AsPrimitive<i64>> Arrow<T> {
     pub fn as_i64(self) -> Arrow<i64> {
         self.cwise_as()
+    }
+}
+
+/// Right hand scalar mul
+impl<T> Mul<T> for Arrow<T>
+where
+    T: Mul<Output = T> + Copy + PartialOrd + ConstZero,
+{
+    type Output = Arrow<T>;
+
+    fn mul(self, rhs: T) -> Self::Output {
+        assert!(rhs > T::ZERO);
+        Self::Output::new(self.a * rhs, self.b * rhs)
     }
 }
