@@ -18,7 +18,7 @@ impl DistanceFieldPainter {
         self.effect_painter.setup_draw(gl);
 
         gl.enable(glow::BLEND);
-        gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
+        gl.blend_func(glow::ONE, glow::ONE_MINUS_SRC_ALPHA);
         gl.blend_equation(glow::FUNC_ADD);
 
         gl.active_texture(glow::TEXTURE0);
