@@ -186,6 +186,10 @@ impl World {
     pub fn update_solid_boundary(&mut self) {
         let solid = self.solid.map(|color| color.a > 128);
         self.simulation.solid_boundary = SolidBoundary::new(self.bounds(), &solid);
+        self.simulation.solid_boundary.passable_and_solid(
+            &mut self.simulation.grid.sides.passable,
+            &mut self.simulation.grid.cells_type,
+        );
     }
 }
 

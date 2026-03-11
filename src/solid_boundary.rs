@@ -176,6 +176,8 @@ impl SolidBoundary {
                 for side in Side::sides(coord) {
                     passable[side] = 0.0;
                 }
+            } else {
+                cell_type[coord] = CellType::Air;
             }
         }
     }

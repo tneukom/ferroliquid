@@ -4,7 +4,11 @@ use crate::{
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
-    math::{affine_map::AffineMap, matrix2::Matrix2, point::Point, rect::Rect, rgba8::Rgba8},
+    line_drawing::draw_line,
+    math::{
+        affine_map::AffineMap, arrow::Arrow, matrix2::Matrix2, point::Point, rect::Rect,
+        rgba8::Rgba8,
+    },
     outflow::Outflow,
     painting::{
         debug_painter::DebugPainterStyle,
@@ -37,14 +41,18 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tool {
     Pointer,
+    Brush,
+    Eraser,
 }
 
 impl Tool {
-    pub const ALL: [Self; 1] = [Self::Pointer];
+    pub const ALL: [Self; 3] = [Self::Pointer, Self::Brush, Self::Eraser];
 
     pub fn egui_icon(self) -> egui::ImageSource<'static> {
         match self {
             Self::Pointer => egui::include_image!("icons/pointer.png"),
+            Self::Brush => egui::include_image!("icons/brush.png"),
+            Self::Eraser => egui::include_image!("icons/eraser.png"),
         }
     }
 }
@@ -601,7 +609,10 @@ impl EguiApp {
             })
         };
 
-        let sense = egui::Sense::empty();
+        let sense = match self.tool {
+            Tool::Brush | Tool::Eraser => egui::Sense::click_and_drag(),
+            _ => egui::Sense::empty(),
+        };
 
         // Calculate size that fits available space while keeping aspect ratio
         let simulation_size = self.world.bounds().size().as_f64();
@@ -621,39 +632,43 @@ impl EguiApp {
         };
 
         // Calculate the actual cell size based on the scaled rect
-        // let cell_size = egui_rect.width() as f64 / simulation_size.x;
+        let cell_size = egui_rect.width() as f64 / simulation_size.x;
 
         // Interact with the centered rect
-        // let response = ui.interact(egui_rect, ui.id().with("simulation"), sense);
+        let response = ui.interact(egui_rect, ui.id().with("simulation"), sense);
 
-        // if response.is_pointer_button_down_on()
-        //     && let Some(pointer_pos) = response.interact_pointer_pos()
-        // {
-        //     let Tool::Block(block_kind) = self.tool else {
-        //         unreachable!();
-        //     };
-        //
-        //     // Draw blocks line from previous to current drag position
-        //     let drag_current: Point<f64> = (pointer_pos - egui_rect.left_top()).into();
-        //     let drag_delta: Point<f64> = response.drag_delta().into();
-        //     let drag_previous = drag_current - drag_delta;
-        //
-        //     // Two simulation cells per block
-        //     let simulation_drag_previous = drag_previous / (2.0 * cell_size);
-        //     let simulation_drag_current = drag_current / (2.0 * cell_size);
-        //     let arrow = Arrow::new(
-        //         simulation_drag_previous.floor().as_i64(),
-        //         simulation_drag_current.floor().as_i64(),
-        //     );
-        //
-        //     for coord in slope_draw_thin_line(arrow) {
-        //         if self.world.blocks.bounds().contains_index(coord) {
-        //             let block = block_kind
-        //                 .map(|block_kind| Block::new(block_kind, BlockPalette::BlueGreen));
-        //             self.world.blocks.set(coord, block);
-        //         }
-        //     }
-        // }
+        if response.is_pointer_button_down_on()
+            && let Some(pointer_pos) = response.interact_pointer_pos()
+        {
+            // Draw blocks line from previous to current drag position
+            let drag_current: Point<f64> = (pointer_pos - egui_rect.left_top()).into();
+            let drag_delta: Point<f64> = response.drag_delta().into();
+            let drag_previous = drag_current - drag_delta;
+
+            // Two simulation cells per block
+            let simulation_drag_arrow = Arrow::new(drag_previous, drag_current)
+                * (self.world.simulation.solid_boundary.cell_size as f64 / cell_size);
+
+            let brush_color = match self.tool {
+                Tool::Pointer => unreachable!(),
+                Tool::Brush => Rgba8::BLACK,
+                Tool::Eraser => Rgba8::TRANSPARENT,
+            };
+
+            for coord in draw_line(simulation_drag_arrow, 6.0) {
+                if let Some(color) = self.world.solid.get_mut(coord) {
+                    *color = brush_color;
+                }
+            }
+
+            self.world.update_solid_boundary();
+            unsafe {
+                self.solid_painter
+                    .lock()
+                    .unwrap()
+                    .update(&self.gl, &self.world);
+            }
+        }
 
         let callback = egui::PaintCallback {
             rect: egui_rect,
