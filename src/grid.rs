@@ -49,11 +49,7 @@ impl Grid {
         }
     }
 
-    pub fn insert_particle(
-        &mut self,
-        mut particle: Particle,
-        try_correction: bool,
-    ) -> Option<Particle> {
+    pub fn insert_particle(&mut self, mut particle: Particle) -> Option<Particle> {
         if !self.inner_bounds.as_f64().contains(particle.position) {
             return None;
         }
@@ -62,23 +58,6 @@ impl Grid {
 
         let coord = particle.position.as_i64();
         let cell_type = self.cells_type[coord];
-
-        // Particles that are inside a solid cell are projected out or die
-        if cell_type == CellType::Solid {
-            if !try_correction {
-                return None;
-            }
-
-            let Some(corrected_pos) = self.project_outside_solid(particle.position) else {
-                // Failed, let particle die
-                return None;
-            };
-
-            particle.position = corrected_pos;
-
-            // Insert particle with corrected position, with try_correction off
-            return self.insert_particle(particle, false);
-        }
 
         // Interpolate vertical sides velocities
         {
@@ -176,7 +155,7 @@ impl Grid {
 
         let particles = particles
             .into_iter()
-            .filter_map(|particle| self.insert_particle(particle, true))
+            .filter_map(|particle| self.insert_particle(particle))
             .collect();
 
         //Collect fluid cells
@@ -340,132 +319,5 @@ impl Grid {
 
         self.sides.clear();
         self.fluid_cells.clear();
-    }
-
-    /// Returns whether pos was successfully projected out of solid
-    /// TODO: Pfui!
-    pub fn project_outside_solid(&self, mut pos: Point<f64>) -> Option<Point<f64>> {
-        //Returns if successfull
-        const EPSILON: f64 = 0.05;
-
-        let floored = pos.floor();
-        let coord = floored.as_i64();
-        let delta = pos - floored;
-
-        if delta.x <= 0.5 && delta.y <= 0.5 {
-            //Top left quad
-            if delta.x <= delta.y {
-                //Left side first
-                if self.cells_type[coord.left()] != CellType::Solid {
-                    pos.x = floored.x - EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.up()] != CellType::Solid {
-                    pos.y = floored.y - EPSILON;
-                    return Some(pos);
-                }
-            }
-            if delta.x > delta.y {
-                //Top side first
-                if self.cells_type[coord.up()] != CellType::Solid {
-                    pos.y = floored.y - EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.left()] != CellType::Solid {
-                    pos.x = floored.x - EPSILON;
-                    return Some(pos);
-                }
-            }
-            if self.cells_type[coord.left().up()] != CellType::Solid {
-                pos = Point(floored.x - EPSILON, floored.y - EPSILON);
-                return Some(pos);
-            }
-        } else if delta.x > 0.5 && delta.y <= 0.5 {
-            //Top right quad
-            if 1.0 - delta.x <= delta.y {
-                //Right side first
-                if self.cells_type[coord.right()] != CellType::Solid {
-                    pos.x = floored.x + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.up()] != CellType::Solid {
-                    pos.y = floored.y - EPSILON;
-                    return Some(pos);
-                }
-            }
-            if 1.0 - delta.x > delta.y {
-                //Top side first
-                if self.cells_type[coord.up()] != CellType::Solid {
-                    pos.y = floored.y - EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.right()] != CellType::Solid {
-                    pos.x = floored.x + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-            }
-            if self.cells_type[coord.right().up()] != CellType::Solid {
-                pos = Point(floored.x + 1.0 + EPSILON, floored.y - EPSILON);
-                return Some(pos);
-            }
-        } else if delta.x <= 0.5 && delta.y > 0.5 {
-            //Bottom left quad
-            if delta.x <= 1.0 - delta.y {
-                //Left side first
-                if self.cells_type[coord.left()] != CellType::Solid {
-                    pos.x = floored.x - EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.down()] != CellType::Solid {
-                    pos.y = floored.y + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-            }
-            if delta.x > 1.0 - delta.y {
-                //Bottom side first
-                if self.cells_type[coord.down()] != CellType::Solid {
-                    pos.y = floored.y + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.left()] != CellType::Solid {
-                    pos.x = floored.x - EPSILON;
-                    return Some(pos);
-                }
-            }
-            if self.cells_type[coord.left().down()] != CellType::Solid {
-                pos = Point(floored.x - EPSILON, floored.y + 1.0 + EPSILON);
-                return Some(pos);
-            }
-        } else {
-            //Bottom right quad
-            if 1.0 - delta.x <= 1.0 - delta.y {
-                //Right side first
-                if self.cells_type[coord.right()] != CellType::Solid {
-                    pos.x = floored.x + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.down()] != CellType::Solid {
-                    pos.y = floored.y + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-            }
-            if 1.0 - delta.x > 1.0 - delta.y {
-                //Bottom side first
-                if self.cells_type[coord.down()] != CellType::Solid {
-                    pos.y = floored.y + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-                if self.cells_type[coord.right()] != CellType::Solid {
-                    pos.x = floored.x + 1.0 + EPSILON;
-                    return Some(pos);
-                }
-            }
-            if self.cells_type[coord.right().down()] != CellType::Solid {
-                pos = Point(floored.x + 1.0 + EPSILON, floored.y + 1.0 + EPSILON);
-                return Some(pos);
-            }
-        }
-
-        None
     }
 }
