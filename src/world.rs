@@ -155,14 +155,17 @@ impl World {
         let mut simulation = Simulation::new(save_world.bounds);
         simulation.particles = save_world.save_particles.to_particles();
 
-        Self {
+        let mut world = Self {
             simulation,
             forces: save_world.forces,
             inflows: save_world.inflows,
             outflows: save_world.outflows,
             settings: save_world.settings,
             solid,
-        }
+        };
+        world.update_solid_boundary();
+
+        world
     }
 
     pub fn energy(&self) -> Energy {
