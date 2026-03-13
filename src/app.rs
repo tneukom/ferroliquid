@@ -309,11 +309,22 @@ impl EguiApp {
         self.selected_manipulator_ui(ui);
 
         let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
-        if ui.button((trash_icon, "Clear particles")).clicked() {
+        if ui.button((trash_icon.clone(), "Clear Particles")).clicked() {
             self.world.simulation.particles.clear();
             let mut simulation_painter = self.simulation_painter.lock().unwrap();
             unsafe {
                 simulation_painter.clear_water_color(&self.gl, Rgba8::BLACK);
+            }
+        }
+
+        if ui.button((trash_icon, "Clear Solid")).clicked() {
+            self.world.solid.fill(Rgba8::TRANSPARENT);
+            self.world.update_solid_boundary();
+            unsafe {
+                self.solid_painter
+                    .lock()
+                    .unwrap()
+                    .update(&self.gl, &self.world);
             }
         }
     }
@@ -382,6 +393,12 @@ impl EguiApp {
 
         self.world = World::from_save_world(save_world);
         self.selected = Selected::None;
+        unsafe {
+            self.solid_painter
+                .lock()
+                .unwrap()
+                .update(&self.gl, &self.world);
+        }
     }
 
     pub fn load_demo(&mut self, demo: &Demo) {
