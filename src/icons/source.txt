@@ -1,6 +1,7 @@
 Best!
 https://lucide.dev/icons
 ISC License
+Stroke width: 1px
 
 
 https://tabler-icons.io/

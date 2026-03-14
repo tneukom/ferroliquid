@@ -108,26 +108,32 @@ impl SolidBoundary {
     /// <corrected_velocity, grad> = d * <velocity, grad> otherwise
     pub fn correct_velocity(&self, position: Point<f64>, velocity: Point<f64>) -> Point<f64> {
         let signed_distance = self.smoothed_distance_at(position);
-        // Far away from the solid signed_distance is NaN
-        if signed_distance.abs() > 1.0 {
-            return velocity;
-        }
 
         // grad is close to one
         let grad = self.grad_at(position).normalized();
+        let dot = velocity.dot(grad);
 
-        if signed_distance > 0.0 {
-            // We want <corrected_velocity, grad> = d * <velocity, grad>
-            // <velocity + (d - 1) * <velocity, grad> * grad, grad>
-            // = <velocity, grad> + (d - 1) * <velocity, grad>
-            // = d * <velocity, grad>
-            velocity + (signed_distance - 1.0) * velocity.dot(grad) * grad
+        if signed_distance > 1.0 {
+            velocity
+        } else if signed_distance > 0.0 {
+            if dot > 0.0 {
+                // velocity is in the opposite direction of the solid
+                velocity
+            } else {
+                // Outside the solid
+                // We want <corrected_velocity, grad> = d * <velocity, grad>
+                // <velocity + (d - 1) * <velocity, grad> * grad, grad>
+                // = <velocity, grad> + (d - 1) * <velocity, grad>
+                // = d * <velocity, grad>
+                velocity + (signed_distance - 1.0) * dot * grad
+            }
         } else {
+            // Inside the solid
             // We want <corrected_velocity, grad> = -d
             // <velocity - (d + <velocity, grad>) * grad, grad>
             // = <velocity, grad> - <velocity, grad> - d
             // = -d
-            velocity - (signed_distance + velocity.dot(grad)) * grad
+            velocity - (signed_distance + dot) * grad
         }
     }
 
@@ -168,7 +174,7 @@ impl SolidBoundary {
         for coord in cell_type.indices() {
             let n_passable_sides = Side::sides(coord)
                 .into_iter()
-                .filter(|&side| passable[side] > 0.5)
+                .filter(|&side| passable[side] > 0.25)
                 .count();
             // Cells with only one passable side are treated as solid.
             if n_passable_sides <= 1 {

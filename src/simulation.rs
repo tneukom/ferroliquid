@@ -248,6 +248,12 @@ impl Simulation {
             .filter_map(|mut particle| {
                 particle.previous_position = particle.position;
                 let mut position = particle.position;
+                // Perturb position slightly to avoid clumps.
+                position += 0.01 * 2.0 * Point(self.rng.f64() - 0.5, self.rng.f64() - 0.5);
+                // let velocity =
+                //     velocity + 0.02 * velocity.norm() * Point(self.rng.f64(), self.rng.f64());
+                // let velocity = velocity + 0.02 * Point(self.rng.f64(), self.rng.f64());
+
                 // If velocity is not defined on the grid the velocity from the previous step is
                 // used.
                 // let velocity = particle.velocity;
