@@ -137,6 +137,19 @@ impl<T: SignedNum> Point<T> {
         [self.left(), self.down(), self.right(), self.up()]
     }
 
+    pub fn neighbors8(self) -> [Self; 8] {
+        [
+            self.left(),
+            self.left().down(),
+            self.down(),
+            self.right().down(),
+            self.right(),
+            self.right().up(),
+            self.up(),
+            self.left().up(),
+        ]
+    }
+
     pub fn neighbor(self, direction: Direction) -> Self {
         match direction {
             Direction::Up => self.up(),

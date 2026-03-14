@@ -158,6 +158,57 @@ impl Grid {
             .filter_map(|particle| self.insert_particle(particle))
             .collect();
 
+        // Fill air bubbles
+        for coord in self.inner_bounds.iter_indices() {
+            // if partially solid and has fluid neighbors make fluid
+            if self.cells_type[coord] == CellType::Air {
+                // All cells of 4-neighborhood are fluid or solid
+                // let is_bubble = coord.neighbors().into_iter().all(|neighbor| {
+                //     let neighbor_cell_type = self.cells_type[neighbor];
+                //     neighbor_cell_type == CellType::Fluid || neighbor_cell_type == CellType::Solid
+                // });
+
+                // At least 6 cell of 8-neighborhood are fluid or solid
+                let is_bubble = coord
+                    .neighbors8()
+                    .into_iter()
+                    .filter(|&neighbor| {
+                        let neighbor_cell_type = self.cells_type[neighbor];
+                        neighbor_cell_type == CellType::Fluid
+                            || neighbor_cell_type == CellType::Solid
+                    })
+                    .count()
+                    >= 6;
+
+                if is_bubble {
+                    self.cells_type[coord] = CellType::Fluid;
+                }
+
+                // let all_fluid_neighbors = coord
+                //     .neighbors()
+                //     .into_iter()
+                //     .all(|neighbor| self.cells_type[neighbor] == CellType::Fluid);
+                //
+                // if all_fluid_neighbors {
+                //     self.cells_type[coord] = CellType::Fluid;
+                //     continue;
+                // }
+
+                // let has_fluid_neighbor = coord
+                //     .neighbors()
+                //     .into_iter()
+                //     .any(|neighbor| self.cells_type[neighbor] == CellType::Fluid);
+                //
+                // let is_partially_solid = Side::sides(coord)
+                //     .into_iter()
+                //     .any(|side| self.sides.passable[side] < 1.0);
+                //
+                // if has_fluid_neighbor && is_partially_solid {
+                //     self.cells_type[coord] = CellType::Fluid;
+                // }
+            }
+        }
+
         //Collect fluid cells
         for c in self.inner_bounds.iter_indices() {
             let cell_type = self.cells_type[c];
@@ -186,7 +237,7 @@ impl Grid {
             }
         }
 
-        //Fix cell density at boundary to settings.target_density
+        // Fix cell density at boundary to settings.target_density
         for &coord in &self.fluid_cells {
             if self.cells_type[coord] == CellType::Fluid {
                 let is_border = coord
@@ -200,7 +251,7 @@ impl Grid {
             }
         }
 
-        //Divide accumulated side velocities by side density
+        // Divide accumulated side velocities by side density
         const MIN_DENSITY: f64 = 0.0001;
 
         for side in self.sides.indices() {
