@@ -275,8 +275,6 @@ pub struct Sides {
     pub velocity_div_free: SideField<f64>,
     pub velocity_correction: SideField<f64>,
 
-    pub defined: SideField<bool>,
-
     /// Proportion of the side that is not blocked by solid
     pub passable: SideField<f64>,
 }
@@ -288,7 +286,6 @@ impl Sides {
             velocity_div_free: SideField::filled(bounds, 0.0),
             velocity_correction: SideField::filled(bounds, 0.0),
             weight: SideField::filled(bounds, 0.0),
-            defined: SideField::filled(bounds, false),
             passable: SideField::filled(bounds, 1.0),
         }
     }
@@ -298,11 +295,6 @@ impl Sides {
         self.velocity_div_free.fill(0.0);
         self.velocity_correction.fill(0.0);
         self.weight.fill(0.0);
-        self.defined.fill(false);
-    }
-
-    pub fn make_fluid(&mut self, side: Side) {
-        self.defined[side] = true;
     }
 
     pub fn indices(&self) -> impl Iterator<Item = Side> + use<> {
@@ -311,14 +303,6 @@ impl Sides {
 
     pub fn inner_indices(&self) -> impl Iterator<Item = Side> + use<> {
         self.velocity_interpolated.inner_indices()
-    }
-
-    pub fn get_div_free_velocity(&self, side: Side, default_velocity: f64) -> f64 {
-        if self.defined[side] {
-            self.velocity_div_free[side]
-        } else {
-            default_velocity
-        }
     }
 
     fn extrapolate_from_nearest<T: Clone>(field: &mut Field<T>, nearest_field: &Field<Point<i64>>) {

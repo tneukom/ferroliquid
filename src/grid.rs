@@ -49,7 +49,7 @@ impl Grid {
         }
     }
 
-    pub fn insert_particle(&mut self, mut particle: Particle) -> Option<Particle> {
+    pub fn insert_particle(&mut self, particle: Particle) -> Option<Particle> {
         if !self.inner_bounds.as_f64().contains(particle.position) {
             return None;
         }
@@ -194,11 +194,6 @@ impl Grid {
             if cell_type == CellType::Fluid {
                 self.cells_fluid_index[c] = self.fluid_cells.len();
                 self.fluid_cells.push(c);
-
-                self.sides.make_fluid(Side::top_side(c));
-                self.sides.make_fluid(Side::bottom_side(c));
-                self.sides.make_fluid(Side::left_side(c));
-                self.sides.make_fluid(Side::right_side(c));
             } else if cell_type == CellType::Solid {
                 // Density of each particle is distributed over the four nearest cells. Solid cells
                 // should contribute the same as a fluid cell.
@@ -232,11 +227,6 @@ impl Grid {
         const MIN_DENSITY: f64 = 0.0001;
 
         for side in self.sides.indices() {
-            // Solid sides are defined
-            if self.sides.passable[side] == 0.0 {
-                self.sides.defined[side] = true;
-            }
-
             let density = self.sides.weight[side].max(MIN_DENSITY);
             self.sides.velocity_interpolated[side] /= density;
         }

@@ -101,8 +101,6 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    const PADDING: usize = 1;
-
     pub fn new(bounds: Rect<i64>) -> Self {
         Self {
             i_step: 0,

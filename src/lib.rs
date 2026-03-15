@@ -10,7 +10,6 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub mod app;
-pub(crate) mod camera;
 pub(crate) mod coordinate_frame;
 pub(crate) mod demos;
 pub(crate) mod distance_field;
