@@ -309,8 +309,11 @@ impl Sides {
         assert_eq!(field.bounds(), nearest_field.bounds());
 
         for index in field.indices() {
-            let nearest = nearest_field[index];
-            field[index] = field[index + nearest].clone()
+            let nearest_index = index + nearest_field[index];
+            // nearest_field can be (INF, INF) everywhere
+            if let Some(nearest) = field.get(nearest_index) {
+                field[index] = nearest.clone();
+            }
         }
     }
 
