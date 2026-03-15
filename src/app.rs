@@ -12,6 +12,7 @@ use crate::{
     outflow::Outflow,
     painting::{
         debug_painter::DebugPainterStyle,
+        gl_garbage::gl_gc,
         gl_texture::GlTexture,
         particle_painter::ParticlePainterSettings,
         simulation_painter::{SimulationPainter, SimulationPainterSettings},
@@ -86,7 +87,6 @@ pub struct EguiApp {
 
     simulation_painter: Arc<Mutex<SimulationPainter>>,
     simulation_painter_settings: SimulationPainterSettings,
-    scene_rect: egui::Rect,
 
     solid_painter: Arc<Mutex<SolidPainter>>,
 
@@ -152,10 +152,9 @@ impl EguiApp {
         let app = Self {
             world,
             simulation_debug_window: SimulationDebugWindow::new(),
-            render_debug_ui: RenderDebugUi::new(&gl),
+            render_debug_ui: RenderDebugUi::new(),
             profiler_window: ProfilerWindow::new(),
             simulation_painter_settings,
-            scene_rect: egui::Rect::ZERO,
             run: false,
             step_timestamp: None,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
@@ -845,6 +844,10 @@ impl eframe::App for EguiApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.central_panel_ui(ui);
         });
+
+        unsafe {
+            gl_gc(&self.gl);
+        }
 
         // self.view
         //     .handle_input(&mut self.view_input, &mut self.view_settings);

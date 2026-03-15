@@ -2,7 +2,7 @@ use crate::{
     field::{Field, RgbaField},
     grid::CellType,
     math::{point::Point, rect::Rect, rgba8::Rgba8},
-    sides::{Orientation, Side, SideField},
+    sides::{Orientation, SideField},
     world::World,
 };
 use ordered_float::NotNan;
@@ -26,7 +26,6 @@ pub struct SimulationDebugDrawSettings {
     cell_types: bool,
     density: bool,
     side_weight: bool,
-    defined: bool,
     distance: bool,
     smoothed_distance: bool,
     distance_grad: bool,
@@ -52,7 +51,6 @@ impl Default for SimulationDebugDrawSettings {
             cell_types: false,
             density: false,
             side_weight: false,
-            defined: false,
             distance: false,
             smoothed_distance: false,
             distance_grad: false,
@@ -87,7 +85,6 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.cell_types, "Cell Types");
     ui.checkbox(&mut settings.density, "Density");
     ui.checkbox(&mut settings.side_weight, "Side Weight");
-    ui.checkbox(&mut settings.defined, "Defined");
     ui.checkbox(&mut settings.distance, "Distance");
     ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
     ui.checkbox(&mut settings.distance_grad, "Distance Grad");
@@ -377,16 +374,6 @@ pub fn draw_simulation(
                 format!("{div:.1}")
             },
         )
-    }
-
-    if settings.defined {
-        draw_side_field(painter, font.clone(), &sides.defined, |&defined| {
-            if defined {
-                "Y".to_string()
-            } else {
-                "N".to_string()
-            }
-        });
     }
 
     if settings.distance {

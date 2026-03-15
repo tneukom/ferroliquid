@@ -8,8 +8,6 @@ use cached::proc_macro::cached;
 use egui::{AtomExt, IntoAtoms};
 use itertools::Itertools;
 
-const COLOR_BUTTON_MARGIN: f32 = 2.0;
-
 fn rgba_field_egui_texture(ui: &mut egui::Ui, rgba_field: &RgbaField) -> egui::TextureHandle {
     let image = egui::ColorImage::from_rgba_unmultiplied(
         [rgba_field.width() as usize, rgba_field.height() as usize],

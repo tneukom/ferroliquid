@@ -1,9 +1,6 @@
 use crate::{
     app::TextureWindowOptions,
-    painting::{
-        blit_painter::BlitPainter, debug_painter::DebugPainterStyle,
-        simulation_painter::SimulationPainter,
-    },
+    painting::{debug_painter::DebugPainterStyle, simulation_painter::SimulationPainter},
     widgets::choice_buttons,
 };
 use std::sync::{Arc, Mutex};
@@ -62,15 +59,11 @@ impl Textures {
 
 pub struct RenderDebugUi {
     textures: Textures,
-    blit_painter: Arc<BlitPainter>,
 }
 
 impl RenderDebugUi {
-    pub unsafe fn new(gl: &glow::Context) -> Self {
-        let blit_painter = BlitPainter::new(gl);
-
+    pub unsafe fn new() -> Self {
         Self {
-            blit_painter: Arc::new(blit_painter),
             textures: Textures::new(),
         }
     }
