@@ -129,11 +129,12 @@ impl SolidBoundary {
             }
         } else {
             // Inside the solid
-            // We want <corrected_velocity, grad> = -d
-            // <velocity - (d + <velocity, grad>) * grad, grad>
-            // = <velocity, grad> - <velocity, grad> - d
+            // We want <corrected_velocity, grad> = -k * d
+            // <velocity - (k * d + <velocity, grad>) * grad, grad>
+            // = <velocity, grad> - <velocity, grad> - k * d
             // = -d
-            velocity - (signed_distance + dot) * grad
+            let k = 50.0;
+            velocity - (k * signed_distance + dot) * grad
         }
     }
 
@@ -174,7 +175,7 @@ impl SolidBoundary {
         for coord in cell_type.indices() {
             let n_passable_sides = Side::sides(coord)
                 .into_iter()
-                .filter(|&side| passable[side] > 0.25)
+                .filter(|&side| passable[side] > 0.1)
                 .count();
             // Cells with only one passable side are treated as solid.
             if n_passable_sides <= 1 {
