@@ -183,29 +183,6 @@ impl Grid {
                 if is_bubble {
                     self.cells_type[coord] = CellType::Fluid;
                 }
-
-                // let all_fluid_neighbors = coord
-                //     .neighbors()
-                //     .into_iter()
-                //     .all(|neighbor| self.cells_type[neighbor] == CellType::Fluid);
-                //
-                // if all_fluid_neighbors {
-                //     self.cells_type[coord] = CellType::Fluid;
-                //     continue;
-                // }
-
-                // let has_fluid_neighbor = coord
-                //     .neighbors()
-                //     .into_iter()
-                //     .any(|neighbor| self.cells_type[neighbor] == CellType::Fluid);
-                //
-                // let is_partially_solid = Side::sides(coord)
-                //     .into_iter()
-                //     .any(|side| self.sides.passable[side] < 1.0);
-                //
-                // if has_fluid_neighbor && is_partially_solid {
-                //     self.cells_type[coord] = CellType::Fluid;
-                // }
             }
         }
 
@@ -271,9 +248,6 @@ impl Grid {
     pub fn solve(&mut self, settings: &SimulationSettings) -> Vec<f64> {
         let mut solver = Solver::new(self.fluid_cells.len());
 
-        let u = &self.sides.velocity_interpolated;
-        let passable = &self.sides.passable;
-
         // Set up system of linear equations A*pressure = -b where b is the divergence plus a
         // density correction term.
         // A * pressure
@@ -293,13 +267,11 @@ impl Grid {
             let cell_fluid_index = self.cells_fluid_index[c];
             let row = &mut solver.rows[cell_fluid_index];
 
-            let density_correction = self.cells_density[c] - settings.target_density;
-
             // flow from outside pressure: div (passable * grad p)
             for direction in Direction::ALL {
                 let to_coord = c.neighbor(direction);
 
-                let passable = passable[Side::side(c, direction)];
+                let passable = self.sides.passable[Side::side(c, direction)];
 
                 // flow from outside pressure in "direction" = -l[side(c, direction)] * p[neighbor(c, direction)]
                 // cells of type AIR have pressure = 0 and sides of type SOLID have l = 0
@@ -314,12 +286,11 @@ impl Grid {
 
             row.diagonal += 0.00005;
 
-            // solver.b = div (passable * u)
-            solver.b[cell_fluid_index] = passable[Side::right_side(c)] * u[Side::right_side(c)]
-                - passable[Side::left_side(c)] * u[Side::left_side(c)]
-                + passable[Side::bottom_side(c)] * u[Side::bottom_side(c)]
-                - passable[Side::top_side(c)] * u[Side::top_side(c)]
-                - density_correction * settings.density_correction_strength;
+            // solver.b = div (passable * u) + density correction
+            let density_correction = settings.target_density - self.cells_density[c];
+            solver.b[cell_fluid_index] =
+                self.sides.divergence(&self.sides.velocity_interpolated, c)
+                    + density_correction * settings.density_correction_strength;
         }
 
         solver.calc_preconditioner();
