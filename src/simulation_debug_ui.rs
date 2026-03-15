@@ -111,10 +111,6 @@ pub fn draw_side_field<T>(
             Orientation::Horizontal => side.index.as_f64() + Point(0.5, 0.0),
         };
 
-        // let velocity = field[side];
-        // let velocity = self.simulation.grid.sides.boundary_constant[side];
-        //let text = format!("{:.1}", velocity);
-
         painter.text(
             (DRAW_SCALE * world_pos).into(),
             egui::Align2::CENTER_CENTER,
@@ -281,11 +277,6 @@ pub fn draw_grid(painter: &egui::Painter, bounds: Rect<i64>) {
     }
 }
 
-pub fn divergence(u: &SideField<f64>, coord: Point<i64>) -> f64 {
-    -u[Side::left_side(coord)] + u[Side::right_side(coord)] - u[Side::top_side(coord)]
-        + u[Side::bottom_side(coord)]
-}
-
 pub fn draw_simulation(
     world: &World,
     painter: &egui::Painter,
@@ -293,6 +284,7 @@ pub fn draw_simulation(
 ) {
     // ui_rect = ui_rect.translate(egui::Vec2::splat(10.0));
     let simulation = &world.simulation;
+    let sides = &simulation.grid.sides;
 
     let font = egui::FontId::new(9.0, egui::FontFamily::Monospace);
 
@@ -336,31 +328,19 @@ pub fn draw_simulation(
     }
 
     if settings.velocity_interpolated {
-        draw_side_float_field(
-            painter,
-            font.clone(),
-            &simulation.grid.sides.velocity_interpolated,
-        );
+        draw_side_float_field(painter, font.clone(), &sides.velocity_interpolated);
     }
 
     if settings.passable {
-        draw_side_float_field(painter, font.clone(), &simulation.grid.sides.passable);
+        draw_side_float_field(painter, font.clone(), &sides.passable);
     }
 
     if settings.velocity_div_free {
-        draw_side_float_field(
-            painter,
-            font.clone(),
-            &simulation.grid.sides.velocity_div_free,
-        );
+        draw_side_float_field(painter, font.clone(), &sides.velocity_div_free);
     }
 
     if settings.velocity_correction {
-        draw_side_float_field(
-            painter,
-            font.clone(),
-            &simulation.grid.sides.velocity_correction,
-        );
+        draw_side_float_field(painter, font.clone(), &sides.velocity_correction);
     }
 
     if settings.pressure {
@@ -372,7 +352,7 @@ pub fn draw_simulation(
     }
 
     if settings.side_weight {
-        draw_side_float_field(painter, font.clone(), &simulation.grid.sides.weight)
+        draw_side_float_field(painter, font.clone(), &sides.weight)
     }
 
     if settings.divergence {
@@ -381,7 +361,7 @@ pub fn draw_simulation(
             font.clone(),
             simulation.grid.cells_pressure.bounds().padded(-1),
             |coord| {
-                let div = divergence(&simulation.grid.sides.velocity_interpolated, coord);
+                let div = sides.divergence(&sides.velocity_interpolated, coord);
                 format!("{div:.1}")
             },
         )
@@ -393,25 +373,20 @@ pub fn draw_simulation(
             font.clone(),
             simulation.grid.cells_pressure.bounds().padded(-1),
             |coord| {
-                let div = divergence(&simulation.grid.sides.velocity_div_free, coord);
+                let div = sides.divergence(&sides.velocity_div_free, coord);
                 format!("{div:.1}")
             },
         )
     }
 
     if settings.defined {
-        draw_side_field(
-            painter,
-            font.clone(),
-            &simulation.grid.sides.defined,
-            |&defined| {
-                if defined {
-                    "Y".to_string()
-                } else {
-                    "N".to_string()
-                }
-            },
-        );
+        draw_side_field(painter, font.clone(), &sides.defined, |&defined| {
+            if defined {
+                "Y".to_string()
+            } else {
+                "N".to_string()
+            }
+        });
     }
 
     if settings.distance {

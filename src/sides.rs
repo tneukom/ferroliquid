@@ -275,7 +275,6 @@ pub struct Sides {
     pub velocity_div_free: SideField<f64>,
     pub velocity_correction: SideField<f64>,
 
-    // TODO: Why not bool?
     pub defined: SideField<bool>,
 
     /// Proportion of the side that is not blocked by solid
@@ -344,5 +343,12 @@ impl Sides {
         });
         let horizontal_nearest = nearest_from_obstacle(&horizontal_obstacle);
         Self::extrapolate_from_nearest(&mut self.velocity_div_free.horizontal, &horizontal_nearest);
+    }
+
+    pub fn divergence(&self, velocity: &SideField<f64>, coord: Point<i64>) -> f64 {
+        self.passable[Side::right_side(coord)] * velocity[Side::right_side(coord)]
+            - self.passable[Side::left_side(coord)] * velocity[Side::left_side(coord)]
+            + self.passable[Side::bottom_side(coord)] * velocity[Side::bottom_side(coord)]
+            - self.passable[Side::top_side(coord)] * velocity[Side::top_side(coord)]
     }
 }
