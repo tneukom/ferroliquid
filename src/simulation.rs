@@ -295,6 +295,16 @@ impl Simulation {
 
         self.grid.clear();
 
+        // Copy solid density into density
+        for (density, &solid_density) in self
+            .grid
+            .cells_density
+            .iter_mut()
+            .zip(self.grid.cells_solid_density.iter())
+        {
+            *density = settings.target_density * solid_density;
+        }
+
         self.particles = self
             .grid
             .insert_particles(std::mem::take(&mut self.particles), settings);

@@ -1,7 +1,7 @@
 use crate::{
     distance_field::signed_distance_from_obstacle_field,
     field::Field,
-    grid::CellType,
+    grid::{CellType, bilinear_weights},
     interpolator::interpolate_bilinear,
     math::{generic::Dot, point::Point, rect::Rect},
     sides::{Side, SideField},
@@ -185,6 +185,27 @@ impl SolidBoundary {
                 }
             } else {
                 cell_type[coord] = CellType::Air;
+            }
+        }
+    }
+
+    /// Interpolate density for simulation grid using bilinear kernel
+    pub fn density(&self, density: &mut Field<f64>) {
+        density.fill(0.0);
+
+        for (coord, &signed_distance) in self.smoothed_signed_distance.enumerate() {
+            if signed_distance > 0.0 {
+                // outside of solid
+                continue;
+            }
+
+            // Center of the distance field coord in simulation coordinates.
+            let position = (1.0 / self.cell_size as f64) * (coord.as_f64() + Self::GRID_OFFSET);
+            // Density field has grid offset (0.5, 0.5)
+            for (coord, weight) in bilinear_weights(position, Point(0.5, 0.5)) {
+                if let Some(density) = density.get_mut(coord) {
+                    *density += weight / (self.cell_size * self.cell_size) as f64;
+                }
             }
         }
     }

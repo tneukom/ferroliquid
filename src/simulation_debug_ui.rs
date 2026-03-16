@@ -25,6 +25,7 @@ pub struct SimulationDebugDrawSettings {
     grid: bool,
     cell_types: bool,
     density: bool,
+    solid_density: bool,
     side_weight: bool,
     distance: bool,
     smoothed_distance: bool,
@@ -50,6 +51,7 @@ impl Default for SimulationDebugDrawSettings {
             grid: true,
             cell_types: false,
             density: false,
+            solid_density: false,
             side_weight: false,
             distance: false,
             smoothed_distance: false,
@@ -84,6 +86,7 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.grid, "Grid");
     ui.checkbox(&mut settings.cell_types, "Cell Types");
     ui.checkbox(&mut settings.density, "Density");
+    ui.checkbox(&mut settings.solid_density, "Solid Density");
     ui.checkbox(&mut settings.side_weight, "Side Weight");
     ui.checkbox(&mut settings.distance, "Distance");
     ui.checkbox(&mut settings.smoothed_distance, "Smoothed Distance");
@@ -346,6 +349,10 @@ pub fn draw_simulation(
 
     if settings.density {
         draw_cell_field(painter, font.clone(), &simulation.grid.cells_density)
+    }
+
+    if settings.solid_density {
+        draw_cell_field(painter, font.clone(), &simulation.grid.cells_solid_density)
     }
 
     if settings.side_weight {

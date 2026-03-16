@@ -193,6 +193,10 @@ impl World {
             &mut self.simulation.grid.sides.passable,
             &mut self.simulation.grid.cells_type,
         );
+
+        self.simulation
+            .solid_boundary
+            .density(&mut self.simulation.grid.cells_solid_density);
     }
 }
 
