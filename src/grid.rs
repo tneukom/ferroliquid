@@ -21,6 +21,7 @@ pub struct Grid {
 
     pub bounds: Rect<i64>,
     pub cells_density: Field<f64>,
+    pub cells_solid_density: Field<f64>,
     pub cells_particle_count: Field<usize>,
     pub cells_type: Field<CellType>,
 
@@ -38,6 +39,7 @@ impl Grid {
         Self {
             inner_bounds: bounds.padded(-1),
             cells_density: Field::filled(bounds, 0.0),
+            cells_solid_density: Field::filled(bounds, 0.0),
             cells_particle_count: Field::filled(bounds, 0),
             cells_type: Field::filled(bounds, CellType::Air),
             cells_fluid_index: Field::filled(bounds, 0),
@@ -59,81 +61,22 @@ impl Grid {
         let coord = particle.position.as_i64();
         let cell_type = self.cells_type[coord];
 
-        // Interpolate vertical sides velocities
-        {
-            // Vertical side centers are at (0.0, 0.5) offsets
-            let offset_position = particle.position - Point(0.0, 0.5);
-            let coord = offset_position.as_i64();
-            let fractional = offset_position - coord.as_f64();
-
-            let left_top_side = Side::vertical(coord);
-            let left_bottom_side = left_top_side.down();
-            let right_top_side = left_top_side.right();
-            let right_bottom_side = left_bottom_side.right();
-
-            self.sides.velocity_interpolated[left_top_side] +=
-                (1.0 - fractional.x) * (1.0 - fractional.y) * particle.velocity.x;
-            self.sides.weight[left_top_side] += (1.0 - fractional.x) * (1.0 - fractional.y);
-
-            self.sides.velocity_interpolated[left_bottom_side] +=
-                (1.0 - fractional.x) * fractional.y * particle.velocity.x;
-            self.sides.weight[left_bottom_side] += (1.0 - fractional.x) * fractional.y;
-
-            self.sides.velocity_interpolated[right_top_side] +=
-                fractional.x * (1.0 - fractional.y) * particle.velocity.x;
-            self.sides.weight[right_top_side] += fractional.x * (1.0 - fractional.y);
-
-            self.sides.velocity_interpolated[right_bottom_side] +=
-                fractional.x * fractional.y * particle.velocity.x;
-            self.sides.weight[right_bottom_side] += fractional.x * fractional.y;
+        // Interpolate vertical sides velocities, centers are at (0.0, 0.5) offsets.
+        for (coord, weight) in bilinear_weights(particle.position, Point(0.0, 0.5)) {
+            self.sides.velocity_interpolated[Side::vertical(coord)] += weight * particle.velocity.x;
+            self.sides.weight[Side::vertical(coord)] += weight;
         }
 
-        // Interpolate horizontal sides velocities
-        // TODO: Make interpolation generic
-        {
-            // Horizontal sides are at (0.5, 0.0) offsets
-            let offset_position = particle.position - Point(0.5, 0.0);
-            let coord = offset_position.as_i64();
-            let fractional = offset_position - coord.as_f64();
-
-            let left_top_side = Side::horizontal(coord);
-            let left_bottom_side = left_top_side.down();
-            let right_top_side = left_top_side.right();
-            let right_bottom_side = left_bottom_side.right();
-
-            self.sides.velocity_interpolated[left_top_side] +=
-                (1.0 - fractional.x) * (1.0 - fractional.y) * particle.velocity.y;
-            self.sides.weight[left_top_side] += (1.0 - fractional.x) * (1.0 - fractional.y);
-
-            self.sides.velocity_interpolated[left_bottom_side] +=
-                (1.0 - fractional.x) * fractional.y * particle.velocity.y;
-            self.sides.weight[left_bottom_side] += (1.0 - fractional.x) * fractional.y;
-
-            self.sides.velocity_interpolated[right_top_side] +=
-                fractional.x * (1.0 - fractional.y) * particle.velocity.y;
-            self.sides.weight[right_top_side] += fractional.x * (1.0 - fractional.y);
-
-            self.sides.velocity_interpolated[right_bottom_side] +=
-                fractional.x * fractional.y * particle.velocity.y;
-            self.sides.weight[right_bottom_side] += fractional.x * fractional.y;
+        // Interpolate horizontal sides velocities, centers are at (0.5, 0.0) offsets.
+        for (coord, weight) in bilinear_weights(particle.position, Point(0.5, 0.0)) {
+            self.sides.velocity_interpolated[Side::horizontal(coord)] +=
+                weight * particle.velocity.y;
+            self.sides.weight[Side::horizontal(coord)] += weight;
         }
 
-        //Interpolate cell densities
-        {
-            // Cell centers are at (0.5, 0.5) offsets
-            let offset_position = particle.position - Point(0.5, 0.5);
-            let coord = offset_position.as_i64();
-            let fractional = offset_position - coord.as_f64();
-
-            let left_top_cell = coord;
-            let left_bottom_cell = left_top_cell.down();
-            let right_top_cell = left_top_cell.right();
-            let right_bottom_cell = left_bottom_cell.right();
-
-            self.cells_density[left_top_cell] += (1.0 - fractional.x) * (1.0 - fractional.y);
-            self.cells_density[left_bottom_cell] += (1.0 - fractional.x) * fractional.y;
-            self.cells_density[right_top_cell] += fractional.x * (1.0 - fractional.y);
-            self.cells_density[right_bottom_cell] += fractional.x * fractional.y;
+        // Interpolate cell densities, centers are at (0.5, 0.5) offsets.
+        for (coord, weight) in bilinear_weights(particle.position, Point(0.5, 0.5)) {
+            self.cells_density[coord] += weight;
         }
 
         if cell_type == CellType::Air {
@@ -186,7 +129,7 @@ impl Grid {
             }
         }
 
-        //Collect fluid cells
+        // Collect fluid cells
         for c in self.inner_bounds.iter_indices() {
             let cell_type = self.cells_type[c];
 
@@ -194,28 +137,20 @@ impl Grid {
             if cell_type == CellType::Fluid {
                 self.cells_fluid_index[c] = self.fluid_cells.len();
                 self.fluid_cells.push(c);
-            } else if cell_type == CellType::Solid {
-                // Density of each particle is distributed over the four nearest cells. Solid cells
-                // should contribute the same as a fluid cell.
-                self.cells_density[c.left()] += 3.0 / 32.0 * settings.target_density;
-                self.cells_density[c.up()] += 3.0 / 32.0 * settings.target_density;
-                self.cells_density[c.down()] += 3.0 / 32.0 * settings.target_density;
-                self.cells_density[c.right()] += 3.0 / 32.0 * settings.target_density;
-
-                self.cells_density[c.up().left()] += 1.0 / 64.0 * settings.target_density;
-                self.cells_density[c.up().right()] += 1.0 / 64.0 * settings.target_density;
-                self.cells_density[c.down().left()] += 1.0 / 64.0 * settings.target_density;
-                self.cells_density[c.down().right()] += 1.0 / 64.0 * settings.target_density;
             }
         }
 
-        // Fix cell density at boundary to settings.target_density
+        // Fix cell density next to air or solid cells to settings.target_density.
         for &coord in &self.fluid_cells {
             if self.cells_type[coord] == CellType::Fluid {
-                let is_border = coord
-                    .neighbors()
-                    .into_iter()
-                    .any(|neighbor| self.cells_type[neighbor] == CellType::Air);
+                let is_border = coord.neighbors().into_iter().any(|neighbor| {
+                    let neighbor_cell_type = self.cells_type[neighbor];
+                    // Less particle clumping up around solid boundary, but siphon doesn't work
+                    // neighbor_cell_type == CellType::Air || neighbor_cell_type == CellType::Solid
+
+                    neighbor_cell_type == CellType::Air
+                });
+
                 if is_border {
                     self.cells_density[coord] = settings.target_density;
                     self.cells_is_boundary[coord] = true;
@@ -332,4 +267,17 @@ impl Grid {
         self.sides.clear();
         self.fluid_cells.clear();
     }
+}
+
+pub fn bilinear_weights(position: Point<f64>, grid_offset: Point<f64>) -> [(Point<i64>, f64); 4] {
+    let offset_position = position - grid_offset;
+    let coord = offset_position.as_i64();
+    let fractional = offset_position - coord.as_f64();
+
+    [
+        (coord, (1.0 - fractional.x) * (1.0 - fractional.y)),
+        (coord.down(), (1.0 - fractional.x) * fractional.y),
+        (coord.right(), fractional.x * (1.0 - fractional.y)),
+        (coord.down().right(), fractional.x * fractional.y),
+    ]
 }
