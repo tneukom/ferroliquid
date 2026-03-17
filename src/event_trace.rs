@@ -9,6 +9,8 @@ pub enum TimingSection {
     Integration,
     SolvePressure,
     PrepareGrid,
+    UpdateFinalVelocity,
+    Step,
 }
 
 #[derive(Clone, Copy, From)]
@@ -242,6 +244,8 @@ impl ProfilerWindow {
             TimingSection::PrepareGrid,
             TimingSection::SolvePressure,
             TimingSection::Integration,
+            TimingSection::UpdateFinalVelocity,
+            TimingSection::Step,
         ] {
             let bars: Vec<egui_plot::Bar> = self
                 .frame_profiles

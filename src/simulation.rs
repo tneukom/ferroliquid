@@ -1,7 +1,7 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
     grid::Grid,
-    interpolator::interpolate_sides_bilinear,
+    interpolator::{interpolate_bilinear, interpolate_sides_bilinear},
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
     sides::Sides,
     solid_boundary::SolidBoundary,
@@ -154,7 +154,7 @@ impl Simulation {
 
             particle.velocity = self
                 .solid_boundary
-                .correct_velocity(particle.position, particle.velocity);
+                .correct_velocity_at(particle.position, particle.velocity);
         }
     }
 
@@ -169,8 +169,8 @@ impl Simulation {
 
     /// Divergence free velocity with solid boundary condition correction.
     pub fn velocity_boundary_corrected(&self, position: Point<f64>) -> Point<f64> {
-        let velocity = interpolate_sides_bilinear(&self.grid.sides.velocity_div_free, position);
-        self.solid_boundary.correct_velocity(position, velocity)
+        // final_velocity has twice the resolution
+        interpolate_bilinear(2.0 * position, |coord| self.grid.final_velocity[coord])
     }
 
     #[inline(always)]
@@ -210,23 +210,23 @@ impl Simulation {
         Some(position)
     }
 
-    #[inline(always)]
-    pub fn integration_step_euler(
-        mut position: Point<f64>,
-        sides: &Sides,
-        dt: f64,
-        bounds: Rect<f64>,
-    ) -> Option<Point<f64>> {
-        let velocity = interpolate_sides_bilinear(&sides.velocity_div_free, position);
-        debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
-
-        position = position + dt * velocity;
-
-        if !bounds.contains(position) {
-            return None;
-        }
-        Some(position)
-    }
+    // #[inline(always)]
+    // pub fn integration_step_euler(
+    //     mut position: Point<f64>,
+    //     sides: &Sides,
+    //     dt: f64,
+    //     bounds: Rect<f64>,
+    // ) -> Option<Point<f64>> {
+    //     let velocity = interpolate_sides_bilinear(&sides.velocity_div_free, position);
+    //     debug_assert!(velocity.x.is_finite() && velocity.y.is_finite());
+    //
+    //     position = position + dt * velocity;
+    //
+    //     if !bounds.contains(position) {
+    //         return None;
+    //     }
+    //     Some(position)
+    // }
 
     #[inline(never)]
     pub fn integrate(&mut self, dt: f64, steps: usize) {
@@ -292,6 +292,7 @@ impl Simulation {
     #[inline(never)]
     pub fn step(&mut self, dt: f64, settings: &SimulationSettings) {
         let _span = tracy_client::span!("step");
+        let _duration = MeasureDuration::new(TimingSection::Step);
 
         self.grid.clear();
 
@@ -315,6 +316,8 @@ impl Simulation {
         self.interpolate_particle_velocities_from_grid(dt, settings);
 
         self.grid.sides.extrapolate();
+
+        self.grid.update_final_velocity(&self.solid_boundary);
 
         // 2 steps at 60 fps (dt ~= 0.016), 1 step at 120 fps (dt ~= 0.083)
         let n_steps = if dt > 0.012 { 2 } else { 1 };

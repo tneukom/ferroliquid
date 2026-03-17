@@ -1,9 +1,11 @@
 use crate::{
     event_trace::{MeasureDuration, TimingSection},
     field::Field,
+    interpolator::interpolate_sides_bilinear,
     math::{point::Point, rect::Rect},
     sides::{Direction, Side, Sides},
     simulation::{Particle, SimulationSettings},
+    solid_boundary::SolidBoundary,
     solver::Solver,
 };
 use serde::{Deserialize, Serialize};
@@ -32,10 +34,15 @@ pub struct Grid {
     pub cells_pressure: Field<f64>,
     pub sides: Sides,
     pub fluid_cells: Vec<Point<i64>>,
+
+    /// Twice the resolution
+    pub final_velocity: Field<Point<f64>>,
 }
 
 impl Grid {
     pub fn new(bounds: Rect<i64>) -> Self {
+        assert_eq!(bounds.low(), Point::ZERO);
+
         Self {
             inner_bounds: bounds.padded(-1),
             cells_density: Field::filled(bounds, 0.0),
@@ -47,6 +54,7 @@ impl Grid {
             cells_pressure: Field::filled(bounds, 0.0),
             sides: Sides::new(bounds),
             fluid_cells: Vec::new(),
+            final_velocity: Field::filled(bounds * 2, Point::ZERO),
             bounds,
         }
     }
@@ -257,6 +265,7 @@ impl Grid {
         self.cells_particle_count.fill(0);
         self.cells_fluid_index.fill(0);
         self.cells_is_boundary.fill(false);
+        self.final_velocity.fill(Point::ZERO);
 
         for cell_type in self.cells_type.iter_mut() {
             if *cell_type != CellType::Solid {
@@ -266,6 +275,24 @@ impl Grid {
 
         self.sides.clear();
         self.fluid_cells.clear();
+    }
+
+    pub fn update_final_velocity(&mut self, solid_boundary: &SolidBoundary) {
+        let _duration = MeasureDuration::new(TimingSection::UpdateFinalVelocity);
+
+        // TODO: Fast bilinear interpolation of side velocities onto regular grid
+
+        let inner_bounds = self.final_velocity.bounds().padded(-2);
+        for coord in inner_bounds.iter_indices() {
+            let position = 0.5 * coord.as_f64();
+            let velocity = interpolate_sides_bilinear(&self.sides.velocity_div_free, position);
+            let signed_distance = solid_boundary.resampled_signed_distance[coord];
+            let signed_distance_grad = solid_boundary.resampled_grad[coord];
+            let velocity =
+                SolidBoundary::correct_velocity(signed_distance, signed_distance_grad, velocity);
+
+            self.final_velocity[coord] = velocity;
+        }
     }
 }
 
