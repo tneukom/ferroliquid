@@ -25,6 +25,12 @@ pub struct SolidBoundary {
     /// Gradient of smoothed_distance by doing central difference, padding of 1 where it's zero
     /// because we cannot calculate the central difference there.
     pub grad: Field<Point<f64>>,
+
+    /// Normalized gradient sampled at twice the simulation grid resolution.
+    pub resampled_grad: Field<Point<f64>>,
+
+    /// Smoothed signed sampled at twice the simulation grid resolution.
+    pub resampled_signed_distance: Field<f64>,
 }
 
 impl SolidBoundary {
@@ -50,12 +56,34 @@ impl SolidBoundary {
         let kernel = gaussian_kernel(6, 3.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
         let grad = grad_central_difference(&smoothed_signed_distance, 1.0);
+
+        let mut resampled_grad = Field::filled(simulation_bounds * 2, Point::ZERO);
+        for coord in resampled_grad.bounds().padded(-1).iter_indices() {
+            let position = 0.5 * coord.as_f64();
+            let grad =
+                interpolate_bilinear(position * cell_size as f64 - Self::GRID_OFFSET, |coord| {
+                    grad[coord] / cell_size as f64
+                });
+            resampled_grad[coord] = grad.normalized();
+        }
+
+        let mut resampled_signed_distance = Field::filled(simulation_bounds * 2, 0.0);
+        for coord in resampled_signed_distance.bounds().padded(-1).iter_indices() {
+            let position = 0.5 * coord.as_f64();
+            resampled_signed_distance[coord] =
+                interpolate_bilinear(position * cell_size as f64 - Self::GRID_OFFSET, |coord| {
+                    smoothed_signed_distance[coord] / cell_size as f64
+                })
+        }
+
         Self {
             cell_size,
             bounds: simulation_bounds,
             signed_distance,
             smoothed_signed_distance,
             grad,
+            resampled_grad,
+            resampled_signed_distance,
         }
     }
 
@@ -104,13 +132,12 @@ impl SolidBoundary {
         )
     }
 
-    /// corrected_velocity = velocity if |d| > 1
-    /// <corrected_velocity, grad> = d * <velocity, grad> otherwise
-    pub fn correct_velocity(&self, position: Point<f64>, velocity: Point<f64>) -> Point<f64> {
-        let signed_distance = self.smoothed_distance_at(position);
-
-        // grad is close to one
-        let grad = self.grad_at(position).normalized();
+    /// grad must be normalized
+    pub fn correct_velocity(
+        signed_distance: f64,
+        grad: Point<f64>,
+        velocity: Point<f64>,
+    ) -> Point<f64> {
         let dot = velocity.dot(grad);
 
         if signed_distance > 1.0 {
@@ -136,6 +163,14 @@ impl SolidBoundary {
             let k = 50.0;
             velocity - (k * signed_distance + dot) * grad
         }
+    }
+
+    /// corrected_velocity = velocity if |d| > 1
+    /// <corrected_velocity, grad> = d * <velocity, grad> otherwise
+    pub fn correct_velocity_at(&self, position: Point<f64>, velocity: Point<f64>) -> Point<f64> {
+        let signed_distance = self.smoothed_distance_at(position);
+        let grad = self.grad_at(position).normalized();
+        Self::correct_velocity(signed_distance, grad, velocity)
     }
 
     pub fn passable_and_solid(
