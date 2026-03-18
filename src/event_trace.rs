@@ -10,6 +10,7 @@ pub enum TimingSection {
     SolvePressure,
     PrepareGrid,
     UpdateFinalVelocity,
+    InterpolateParticleVelocities,
     Step,
 }
 
@@ -97,8 +98,11 @@ struct FrameProfile {
 }
 
 impl FrameProfile {
-    pub fn total(&self) -> f64 {
-        self.durations.values().sum()
+    pub fn remaining_duration(&self) -> f64 {
+        let total: f64 = self.durations.values().sum();
+        // total = step + prepare + solve + ...
+        // remainder = step - prepare - solve - ... = 2 * step - total
+        2.0 * self.durations[TimingSection::Step] - total
     }
 }
 
@@ -125,6 +129,35 @@ impl ReflectEnum for ProfileTab {
             Self::Energy => "Energy",
             Self::ParticleCount => "Particle Count",
         }
+    }
+}
+
+struct StackedBarChart {
+    pub bar_spacing: f64,
+    pub bar_width: f64,
+    pub charts: Vec<egui_plot::BarChart>,
+}
+
+impl StackedBarChart {
+    pub fn bars(&self, values: impl IntoIterator<Item = f64>) -> Vec<egui_plot::Bar> {
+        values
+            .into_iter()
+            .enumerate()
+            .map(|(i, value)| {
+                egui_plot::Bar::new(i as f64 * self.bar_spacing, value).stroke(egui::Stroke::NONE)
+            })
+            .collect()
+    }
+
+    pub fn stack(&mut self, title: impl Into<String>, values: impl IntoIterator<Item = f64>) {
+        let bars = self.bars(values);
+        let mut bar_chart = egui_plot::BarChart::new(title, bars).width(self.bar_width);
+
+        if let Some(previous_bar_chart) = self.charts.last() {
+            bar_chart = bar_chart.stack_on(&[previous_bar_chart]);
+        }
+
+        self.charts.push(bar_chart);
     }
 }
 
@@ -235,35 +268,54 @@ impl ProfilerWindow {
 
     pub fn timing_plot_ui(&mut self, ui: &mut egui::Ui) {
         let delta_x = 1.0;
-        let width = 1.0;
 
-        let mut bar_charts = Vec::new();
+        let mut stacked_bar_chart = StackedBarChart {
+            bar_width: 1.0,
+            bar_spacing: 1.0,
+            charts: Vec::new(),
+        };
 
-        // One bar chart for each section, stacked
-        for section in [
-            TimingSection::PrepareGrid,
-            TimingSection::SolvePressure,
-            TimingSection::Integration,
-            TimingSection::UpdateFinalVelocity,
-            TimingSection::Step,
-        ] {
-            let bars: Vec<egui_plot::Bar> = self
-                .frame_profiles
+        stacked_bar_chart.stack(
+            "Prepare Grid",
+            self.frame_profiles
                 .iter()
-                .enumerate()
-                .map(|(i, frame)| {
-                    let duration = frame.durations[section];
-                    egui_plot::Bar::new(i as f64 * delta_x, duration).stroke(egui::Stroke::NONE)
-                })
-                .collect();
-            let mut bar_chart = egui_plot::BarChart::new(section.to_string(), bars).width(width);
+                .map(|frame| frame.durations[TimingSection::PrepareGrid]),
+        );
 
-            if let Some(previous_bar_chart) = bar_charts.last() {
-                bar_chart = bar_chart.stack_on(&[previous_bar_chart]);
-            }
+        stacked_bar_chart.stack(
+            "Solve Pressure",
+            self.frame_profiles
+                .iter()
+                .map(|frame| frame.durations[TimingSection::SolvePressure]),
+        );
 
-            bar_charts.push(bar_chart);
-        }
+        stacked_bar_chart.stack(
+            "Interpolate Particle Velocities",
+            self.frame_profiles
+                .iter()
+                .map(|frame| frame.durations[TimingSection::InterpolateParticleVelocities]),
+        );
+
+        stacked_bar_chart.stack(
+            "Update Final Velocity",
+            self.frame_profiles
+                .iter()
+                .map(|frame| frame.durations[TimingSection::UpdateFinalVelocity]),
+        );
+
+        stacked_bar_chart.stack(
+            "Integration",
+            self.frame_profiles
+                .iter()
+                .map(|frame| frame.durations[TimingSection::Integration]),
+        );
+
+        stacked_bar_chart.stack(
+            "Remainder",
+            self.frame_profiles
+                .iter()
+                .map(|frame| frame.remaining_duration()),
+        );
 
         // Line chart for the whole frame duration
         let line_points: Vec<_> = self
@@ -282,7 +334,7 @@ impl ProfilerWindow {
             .include_y(0.0)
             .include_y(0.015)
             .show(ui, |plot_ui| {
-                for bar_char in bar_charts {
+                for bar_char in stacked_bar_chart.charts {
                     plot_ui.bar_chart(bar_char);
                 }
                 plot_ui.line(line);
