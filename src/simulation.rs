@@ -3,7 +3,6 @@ use crate::{
     grid::Grid,
     interpolator::{interpolate_bilinear, interpolate_sides_bilinear},
     math::{parallelogram::Parallelogram, point::Point, rect::Rect},
-    sides::Sides,
     solid_boundary::SolidBoundary,
 };
 use fastrand::Rng;
@@ -119,6 +118,7 @@ impl Simulation {
         settings: &SimulationSettings,
     ) {
         let _span = tracy_client::span!("interpolate_particle_velocities_from_grid");
+        let _duration = MeasureDuration::new(TimingSection::InterpolateParticleVelocities);
 
         // Compute alpha for dt from alpha for 120Hz in settings
         // (1 - normalized_alpha)^(1/normalized_dt) = (1 - alpha)^(1/dt)
