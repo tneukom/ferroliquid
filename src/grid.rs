@@ -272,7 +272,7 @@ impl Grid {
 
         // TODO: Fast bilinear interpolation of side velocities onto regular grid
 
-        let inner_bounds = self.final_velocity.bounds().padded(-2);
+        let inner_bounds = self.final_velocity.bounds().padded(-1);
         for coord in inner_bounds.iter_indices() {
             let position = 0.5 * coord.as_f64();
             let velocity = interpolate_sides_bilinear(&self.sides.velocity_div_free, position);
