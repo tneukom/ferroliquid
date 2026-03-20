@@ -407,14 +407,14 @@ pub fn draw_simulation(
         draw_square_field(
             painter,
             0.5,
-            world.simulation.grid.bounds.as_f64(),
+            world.simulation.grid.inner_bounds.as_f64(),
             |position| simulation.solid_boundary.smoothed_distance_at(position),
         );
 
         draw_cell_texts(
             painter,
             font.clone(),
-            world.simulation.grid.bounds,
+            world.simulation.grid.inner_bounds,
             |index| {
                 let distance = simulation
                     .solid_boundary
@@ -432,7 +432,7 @@ pub fn draw_simulation(
         draw_vector_field(
             painter,
             0.5,
-            world.simulation.grid.bounds.as_f64(),
+            world.simulation.grid.inner_bounds.as_f64(),
             |position| simulation.solid_boundary.grad_at(position),
         );
     }
@@ -441,7 +441,7 @@ pub fn draw_simulation(
         draw_highres_field_step(
             painter,
             0.125,
-            world.simulation.grid.bounds.as_f64(),
+            world.simulation.grid.inner_bounds.as_f64(),
             |position| simulation.solid_boundary.smoothed_distance_at(position),
         );
     }
@@ -450,7 +450,7 @@ pub fn draw_simulation(
         draw_vector_field(
             painter,
             0.25,
-            world.simulation.grid.bounds.padded(-1).as_f64(),
+            world.simulation.grid.inner_bounds.as_f64(),
             |position| 0.025 * simulation.velocity_boundary_corrected(position),
         )
     }

@@ -92,20 +92,13 @@ impl SolidBoundary {
         Self::new(simulation_bounds, &solid)
     }
 
-    fn out_of_bounds_distance(&self) -> f64 {
-        (self.bounds.width() + self.bounds.height()) as f64
-    }
-
     pub fn distance_at(&self, position: Point<f64>) -> f64 {
         debug_assert_eq!(self.smoothed_signed_distance.bounds().low(), Point::ZERO);
 
         interpolate_bilinear(
             position * self.cell_size as f64 - Self::GRID_OFFSET,
-            |index| match self.signed_distance.get(index) {
-                None => self.out_of_bounds_distance(),
-                Some(distance) => distance / self.cell_size as f64,
-            },
-        )
+            |coord| self.signed_distance[coord],
+        ) / self.cell_size as f64
     }
 
     pub fn smoothed_distance_at(&self, position: Point<f64>) -> f64 {
@@ -113,11 +106,8 @@ impl SolidBoundary {
 
         interpolate_bilinear(
             position * self.cell_size as f64 - Self::GRID_OFFSET,
-            |index| match self.smoothed_signed_distance.get(index) {
-                None => self.out_of_bounds_distance(),
-                Some(distance) => distance / self.cell_size as f64,
-            },
-        )
+            |coord| self.smoothed_signed_distance[coord],
+        ) / self.cell_size as f64
     }
 
     pub fn grad_at(&self, position: Point<f64>) -> Point<f64> {
@@ -125,10 +115,7 @@ impl SolidBoundary {
 
         interpolate_bilinear(
             position * self.cell_size as f64 - Self::GRID_OFFSET,
-            |index| match self.grad.get(index) {
-                None => Point::ZERO,
-                Some(&grad) => grad,
-            },
+            |coord| self.grad[coord],
         )
     }
 
@@ -178,7 +165,7 @@ impl SolidBoundary {
         passable: &mut SideField<f64>,
         cell_type: &mut Field<CellType>,
     ) {
-        for side in passable.indices() {
+        for side in passable.inner_indices() {
             let start_corner = side.start_corner().as_f64();
             let stop_corner = side.stop_corner().as_f64();
 
