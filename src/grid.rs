@@ -24,13 +24,11 @@ pub struct Grid {
     pub bounds: Rect<i64>,
     pub cells_density: Field<f64>,
     pub cells_solid_density: Field<f64>,
-    pub cells_particle_count: Field<usize>,
     pub cells_type: Field<CellType>,
 
     /// Index in the list of cells which are fluid
     pub cells_fluid_index: Field<usize>,
 
-    pub cells_is_boundary: Field<bool>,
     pub cells_pressure: Field<f64>,
     pub sides: Sides,
     pub fluid_cells: Vec<Point<i64>>,
@@ -47,10 +45,8 @@ impl Grid {
             inner_bounds: bounds.padded(-1),
             cells_density: Field::filled(bounds, 0.0),
             cells_solid_density: Field::filled(bounds, 0.0),
-            cells_particle_count: Field::filled(bounds, 0),
             cells_type: Field::filled(bounds, CellType::Air),
             cells_fluid_index: Field::filled(bounds, 0),
-            cells_is_boundary: Field::filled(bounds, false),
             cells_pressure: Field::filled(bounds, 0.0),
             sides: Sides::new(bounds),
             fluid_cells: Vec::new(),
@@ -91,7 +87,6 @@ impl Grid {
             self.cells_type[coord] = CellType::Fluid;
         }
 
-        self.cells_particle_count[coord] += 1;
         Some(particle)
     }
 
@@ -161,7 +156,6 @@ impl Grid {
 
                 if is_border {
                     self.cells_density[coord] = settings.target_density;
-                    self.cells_is_boundary[coord] = true;
                 }
             }
         }
@@ -255,16 +249,12 @@ impl Grid {
             } else {
                 self.sides.velocity_div_free[side] = self.sides.velocity_interpolated[side];
             };
-            self.sides.velocity_correction[side] =
-                self.sides.velocity_div_free[side] - self.sides.velocity_interpolated[side];
         }
     }
 
     pub fn clear(&mut self) {
         self.cells_density.fill(0.0);
-        self.cells_particle_count.fill(0);
         self.cells_fluid_index.fill(0);
-        self.cells_is_boundary.fill(false);
         self.final_velocity.fill(Point::ZERO);
 
         for cell_type in self.cells_type.iter_mut() {
