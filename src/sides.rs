@@ -273,7 +273,6 @@ pub struct Sides {
     pub weight: SideField<f64>,
 
     pub velocity_div_free: SideField<f64>,
-    pub velocity_correction: SideField<f64>,
 
     /// Proportion of the side that is not blocked by solid
     pub passable: SideField<f64>,
@@ -284,7 +283,6 @@ impl Sides {
         Self {
             velocity_interpolated: SideField::filled(bounds, 0.0),
             velocity_div_free: SideField::filled(bounds, 0.0),
-            velocity_correction: SideField::filled(bounds, 0.0),
             weight: SideField::filled(bounds, 0.0),
             passable: SideField::filled(bounds, 1.0),
         }
@@ -293,7 +291,6 @@ impl Sides {
     pub fn clear(&mut self) {
         self.velocity_interpolated.fill(0.0);
         self.velocity_div_free.fill(0.0);
-        self.velocity_correction.fill(0.0);
         self.weight.fill(0.0);
     }
 

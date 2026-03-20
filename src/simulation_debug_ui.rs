@@ -17,7 +17,6 @@ pub struct SimulationDebugDrawSettings {
     velocity_interpolated: bool,
     divergence: bool,
     velocity_div_free: bool,
-    velocity_correction: bool,
     velocity_boundary_corrected: bool,
     passable: bool,
     divergence_corrected: bool,
@@ -43,7 +42,6 @@ impl Default for SimulationDebugDrawSettings {
             velocity_interpolated: false,
             divergence: false,
             velocity_div_free: false,
-            velocity_correction: false,
             velocity_boundary_corrected: false,
             passable: false,
             divergence_corrected: false,
@@ -75,7 +73,6 @@ pub fn simulation_draw_settings_widget(
     ui.checkbox(&mut settings.velocity_interpolated, "Velocity Interpolated");
     ui.checkbox(&mut settings.divergence, "Divergence");
     ui.checkbox(&mut settings.velocity_div_free, "Velocity Div Free");
-    ui.checkbox(&mut settings.velocity_correction, "Velocity Correction");
     ui.checkbox(
         &mut settings.velocity_boundary_corrected,
         "Velocity Boundary Corrected",
@@ -337,10 +334,6 @@ pub fn draw_simulation(
 
     if settings.velocity_div_free {
         draw_side_float_field(painter, font.clone(), &sides.velocity_div_free);
-    }
-
-    if settings.velocity_correction {
-        draw_side_float_field(painter, font.clone(), &sides.velocity_correction);
     }
 
     if settings.pressure {
