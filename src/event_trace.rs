@@ -260,7 +260,7 @@ impl ProfilerWindow {
 
         egui_plot::Plot::new("particles")
             .legend(egui_plot::Legend::default())
-            .default_y_bounds(0.0, 20_000.0)
+            .default_y_bounds(0.0, 40_000.0)
             .show(ui, |plot_ui| {
                 plot_ui.line(particle_count);
             });
