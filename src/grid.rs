@@ -22,14 +22,14 @@ pub struct Grid {
     pub inner_bounds: Rect<i64>,
 
     pub bounds: Rect<i64>,
-    pub cells_density: Field<f64>,
-    pub cells_solid_density: Field<f64>,
-    pub cells_type: Field<CellType>,
+    pub cell_density: Field<f64>,
+    pub cell_solid_density: Field<f64>,
+    pub cell_type: Field<CellType>,
 
     /// Index in the list of cells which are fluid
-    pub cells_fluid_index: Field<usize>,
+    pub cell_fluid_index: Field<usize>,
 
-    pub cells_pressure: Field<f64>,
+    pub cell_pressure: Field<f64>,
     pub sides: Sides,
     pub fluid_cells: Vec<Point<i64>>,
 
@@ -43,11 +43,11 @@ impl Grid {
 
         Self {
             inner_bounds: bounds.padded(-1),
-            cells_density: Field::filled(bounds, 0.0),
-            cells_solid_density: Field::filled(bounds, 0.0),
-            cells_type: Field::filled(bounds, CellType::Air),
-            cells_fluid_index: Field::filled(bounds, 0),
-            cells_pressure: Field::filled(bounds, 0.0),
+            cell_density: Field::filled(bounds, 0.0),
+            cell_solid_density: Field::filled(bounds, 0.0),
+            cell_type: Field::filled(bounds, CellType::Air),
+            cell_fluid_index: Field::filled(bounds, 0),
+            cell_pressure: Field::filled(bounds, 0.0),
             sides: Sides::new(bounds),
             fluid_cells: Vec::new(),
             final_velocity: Field::filled(bounds * 2, Point::ZERO),
@@ -63,7 +63,7 @@ impl Grid {
         debug_assert!(particle.position.x > 0.5 && particle.position.y > 0.5);
 
         let coord = particle.position.as_i64();
-        let cell_type = self.cells_type[coord];
+        let cell_type = self.cell_type[coord];
 
         // Interpolate vertical sides velocities, centers are at (0.0, 0.5) offsets.
         for (coord, weight) in bilinear_weights(particle.position, Point(0.0, 0.5)) {
@@ -80,11 +80,11 @@ impl Grid {
 
         // Interpolate cell densities, centers are at (0.5, 0.5) offsets.
         for (coord, weight) in bilinear_weights(particle.position, Point(0.5, 0.5)) {
-            self.cells_density[coord] += weight;
+            self.cell_density[coord] += weight;
         }
 
         if cell_type == CellType::Air {
-            self.cells_type[coord] = CellType::Fluid;
+            self.cell_type[coord] = CellType::Fluid;
         }
 
         Some(particle)
@@ -107,7 +107,7 @@ impl Grid {
         // Fill air bubbles
         for coord in self.inner_bounds.iter_indices() {
             // if partially solid and has fluid neighbors make fluid
-            if self.cells_type[coord] == CellType::Air {
+            if self.cell_type[coord] == CellType::Air {
                 // All cells of 4-neighborhood are fluid or solid
                 // let is_bubble = coord.neighbors().into_iter().all(|neighbor| {
                 //     let neighbor_cell_type = self.cells_type[neighbor];
@@ -119,7 +119,7 @@ impl Grid {
                     .neighbors8()
                     .into_iter()
                     .filter(|&neighbor| {
-                        let neighbor_cell_type = self.cells_type[neighbor];
+                        let neighbor_cell_type = self.cell_type[neighbor];
                         neighbor_cell_type == CellType::Fluid
                             || neighbor_cell_type == CellType::Solid
                     })
@@ -127,27 +127,27 @@ impl Grid {
                     >= 6;
 
                 if is_bubble {
-                    self.cells_type[coord] = CellType::Fluid;
+                    self.cell_type[coord] = CellType::Fluid;
                 }
             }
         }
 
         // Collect fluid cells
         for c in self.inner_bounds.iter_indices() {
-            let cell_type = self.cells_type[c];
+            let cell_type = self.cell_type[c];
 
             //Cell& cell = cells[c];
             if cell_type == CellType::Fluid {
-                self.cells_fluid_index[c] = self.fluid_cells.len();
+                self.cell_fluid_index[c] = self.fluid_cells.len();
                 self.fluid_cells.push(c);
             }
         }
 
         // Fix cell density next to air or solid cells to settings.target_density.
         for &coord in &self.fluid_cells {
-            if self.cells_type[coord] == CellType::Fluid {
+            if self.cell_type[coord] == CellType::Fluid {
                 let is_border = coord.neighbors().into_iter().any(|neighbor| {
-                    let neighbor_cell_type = self.cells_type[neighbor];
+                    let neighbor_cell_type = self.cell_type[neighbor];
                     // Less particle clumping up around solid boundary, but siphon doesn't work
                     // neighbor_cell_type == CellType::Air || neighbor_cell_type == CellType::Solid
 
@@ -155,7 +155,7 @@ impl Grid {
                 });
 
                 if is_border {
-                    self.cells_density[coord] = settings.target_density;
+                    self.cell_density[coord] = settings.target_density;
                 }
             }
         }
@@ -191,7 +191,7 @@ impl Grid {
         //           └─────────┘
         for i in 0..self.fluid_cells.len() {
             let c = self.fluid_cells[i];
-            let cell_fluid_index = self.cells_fluid_index[c];
+            let cell_fluid_index = self.cell_fluid_index[c];
             let row = &mut solver.rows[cell_fluid_index];
 
             // flow from outside pressure: div (passable * grad p)
@@ -202,9 +202,9 @@ impl Grid {
 
                 // flow from outside pressure in "direction" = -l[side(c, direction)] * p[neighbor(c, direction)]
                 // cells of type AIR have pressure = 0 and sides of type SOLID have l = 0
-                if self.cells_type[to_coord] == CellType::Fluid {
+                if self.cell_type[to_coord] == CellType::Fluid {
                     row.coeffs[direction as usize] = -passable;
-                    row.neighbors[direction as usize] = self.cells_fluid_index[to_coord];
+                    row.neighbors[direction as usize] = self.cell_fluid_index[to_coord];
                 }
 
                 // flow from inside pressure in "direction" = l[side(c, direction)] * p[c]
@@ -214,7 +214,7 @@ impl Grid {
             row.diagonal += 0.00005;
 
             // solver.b = div (passable * u) + density correction
-            let density_correction = settings.target_density - self.cells_density[c];
+            let density_correction = settings.target_density - self.cell_density[c];
             solver.b[cell_fluid_index] =
                 self.sides.divergence(&self.sides.velocity_interpolated, c)
                     + density_correction * settings.density_correction_strength;
@@ -230,17 +230,17 @@ impl Grid {
         let _span = tracy_client::span!("solve_pressure");
         let _duration = MeasureDuration::new(TimingSection::SolvePressure);
 
-        self.cells_pressure.fill(0.0);
+        self.cell_pressure.fill(0.0);
         if !self.fluid_cells.is_empty() {
             let pressure = self.solve(settings);
             for i in 0..pressure.len() {
-                self.cells_pressure[self.fluid_cells[i]] = pressure[i];
+                self.cell_pressure[self.fluid_cells[i]] = pressure[i];
             }
         }
 
         for side in self.sides.inner_indices() {
-            let upper_pressure = self.cells_pressure[side.upper_cell()];
-            let lower_pressure = self.cells_pressure[side.lower_cell()];
+            let upper_pressure = self.cell_pressure[side.upper_cell()];
+            let lower_pressure = self.cell_pressure[side.lower_cell()];
 
             if self.sides.passable[side] > 0.0 {
                 let pressure_velocity = upper_pressure - lower_pressure;
@@ -253,11 +253,11 @@ impl Grid {
     }
 
     pub fn clear(&mut self) {
-        self.cells_density.fill(0.0);
-        self.cells_fluid_index.fill(0);
+        self.cell_density.fill(0.0);
+        self.cell_fluid_index.fill(0);
         self.final_velocity.fill(Point::ZERO);
 
-        for cell_type in self.cells_type.iter_mut() {
+        for cell_type in self.cell_type.iter_mut() {
             if *cell_type != CellType::Solid {
                 *cell_type = CellType::Air;
             }

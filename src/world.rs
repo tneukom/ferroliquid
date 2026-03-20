@@ -191,12 +191,12 @@ impl World {
         self.simulation.solid_boundary = SolidBoundary::new(self.bounds(), &solid);
         self.simulation.solid_boundary.passable_and_solid(
             &mut self.simulation.grid.sides.passable,
-            &mut self.simulation.grid.cells_type,
+            &mut self.simulation.grid.cell_type,
         );
 
         self.simulation
             .solid_boundary
-            .density(&mut self.simulation.grid.cells_solid_density);
+            .density(&mut self.simulation.grid.cell_solid_density);
     }
 }
 
