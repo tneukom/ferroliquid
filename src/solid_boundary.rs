@@ -7,7 +7,6 @@ use crate::{
     sides::{Side, SideField},
 };
 use itertools::Itertools;
-use std::time::Instant;
 
 /// Solid -> distance -> smoothed distance ->
 #[derive(Debug, Clone)]
@@ -45,13 +44,7 @@ impl SolidBoundary {
         let cell_size = solid.width() / simulation_bounds.width();
         assert_eq!(cell_size, solid.height() / simulation_bounds.height());
 
-        let instant = Instant::now();
         let signed_distance = signed_distance_from_obstacle_field(&solid);
-        let elapsed = instant.elapsed();
-        println!(
-            "Time to calculate signed distance: {}",
-            elapsed.as_secs_f64()
-        );
 
         let kernel = gaussian_kernel(6, 3.0);
         let smoothed_signed_distance = convolve_2d(&signed_distance, &kernel);
