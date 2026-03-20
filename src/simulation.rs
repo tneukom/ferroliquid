@@ -299,9 +299,9 @@ impl Simulation {
         // Copy solid density into density
         for (density, &solid_density) in self
             .grid
-            .cells_density
+            .cell_density
             .iter_mut()
-            .zip(self.grid.cells_solid_density.iter())
+            .zip(self.grid.cell_solid_density.iter())
         {
             *density = settings.target_density * solid_density;
         }

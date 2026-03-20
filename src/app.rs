@@ -122,7 +122,7 @@ impl EguiApp {
         let solid_boundary = SolidBoundary::new(bounds, &solid);
         solid_boundary.passable_and_solid(
             &mut world.simulation.grid.sides.passable,
-            &mut world.simulation.grid.cells_type,
+            &mut world.simulation.grid.cell_type,
         );
         world.simulation.solid_boundary = solid_boundary;
 

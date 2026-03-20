@@ -290,7 +290,7 @@ pub fn draw_simulation(
     }
 
     if settings.cell_types {
-        let field = &simulation.grid.cells_type;
+        let field = &simulation.grid.cell_type;
         draw_cell_texts(painter, font.clone(), field.bounds(), |coord| {
             let text = match field[coord] {
                 CellType::Solid => "S",
@@ -337,15 +337,15 @@ pub fn draw_simulation(
     }
 
     if settings.pressure {
-        draw_cell_field(painter, font.clone(), &simulation.grid.cells_pressure);
+        draw_cell_field(painter, font.clone(), &simulation.grid.cell_pressure);
     }
 
     if settings.density {
-        draw_cell_field(painter, font.clone(), &simulation.grid.cells_density)
+        draw_cell_field(painter, font.clone(), &simulation.grid.cell_density)
     }
 
     if settings.solid_density {
-        draw_cell_field(painter, font.clone(), &simulation.grid.cells_solid_density)
+        draw_cell_field(painter, font.clone(), &simulation.grid.cell_solid_density)
     }
 
     if settings.side_weight {
@@ -356,7 +356,7 @@ pub fn draw_simulation(
         draw_cell_texts(
             painter,
             font.clone(),
-            simulation.grid.cells_pressure.bounds().padded(-1),
+            simulation.grid.cell_pressure.bounds().padded(-1),
             |coord| {
                 let div = sides.divergence(&sides.velocity_interpolated, coord);
                 format!("{div:.1}")
@@ -368,7 +368,7 @@ pub fn draw_simulation(
         draw_cell_texts(
             painter,
             font.clone(),
-            simulation.grid.cells_pressure.bounds().padded(-1),
+            simulation.grid.cell_pressure.bounds().padded(-1),
             |coord| {
                 let div = sides.divergence(&sides.velocity_div_free, coord);
                 format!("{div:.1}")
