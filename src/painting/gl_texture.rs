@@ -13,7 +13,6 @@ use crate::{
 };
 use bytemuck::{Pod, cast_slice};
 use glow::{HasContext, PixelUnpackData};
-use log::warn;
 
 pub struct GlTexture {
     pub id: glow::Texture,
@@ -196,7 +195,6 @@ impl GlTexture {
     ) {
         gl.active_texture(glow::TEXTURE0);
         gl.bind_texture(glow::TEXTURE_2D, Some(self.id));
-        warn!("tex_image_2d(format={format:?})");
 
         assert_eq!(T::GL_PRIMITIVE, format.data_type());
 

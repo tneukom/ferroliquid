@@ -1,5 +1,6 @@
 use crate::sides::Direction;
 use itertools::Itertools;
+use log::warn;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Row {
@@ -177,7 +178,7 @@ impl Solver {
             sigma = sigma_next;
         }
 
-        println!("failed to reach stop_epsilon!");
+        warn!("failed to reach stop_epsilon!");
         iterations
     }
 
