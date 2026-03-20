@@ -77,7 +77,7 @@ impl Default for SimulationSettings {
     fn default() -> Self {
         Self {
             density_correction_strength: 2.0,
-            target_density: 8.0,
+            target_density: 6.0,
             tau: 0.4,
             speed: 1.0,
         }
