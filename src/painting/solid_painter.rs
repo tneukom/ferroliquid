@@ -84,7 +84,8 @@ impl SolidPainter {
     }
 
     pub unsafe fn paint<'a>(&self, gl: &glow::Context) {
-        self.blit_painter.draw(gl, &self.solid_texture, true);
+        // Paint actual solid bitmap in background
+        // self.blit_painter.draw(gl, &self.solid_texture, true);
 
         self.distance_field_painter
             .draw(gl, &self.signed_distance_texture);
