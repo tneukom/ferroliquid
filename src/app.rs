@@ -115,20 +115,9 @@ impl EguiApp {
         let gl = cc.gl.clone().unwrap();
 
         let bounds = Rect::low_size(Point::ZERO, Point(120, 100));
-        let mut world = World::new(bounds);
-        world.solid = RgbaField::load_from_memory(include_bytes!("solid.png")).unwrap();
-
-        let solid = world.solid.map(|color| color.a > 128);
-        let solid_boundary = SolidBoundary::new(bounds, &solid);
-        solid_boundary.passable_and_solid(
-            &mut world.simulation.grid.sides.passable,
-            &mut world.simulation.grid.cell_type,
-        );
-        world.simulation.solid_boundary = solid_boundary;
-
+        let world = World::new(bounds);
         let simulation_painter = SimulationPainter::new(&gl, bounds);
-        let mut solid_painter = SolidPainter::new(&gl, world.solid.bounds());
-        solid_painter.update(&gl, &world);
+        let solid_painter = SolidPainter::new(&gl, world.solid.bounds());
 
         let simulation_painter_settings = SimulationPainterSettings {
             particles: ParticlePainterSettings {
@@ -149,13 +138,13 @@ impl EguiApp {
 
         let (channel_sender, channel_receiver) = mpsc::sync_channel(1);
 
-        let app = Self {
+        let mut app = Self {
             world,
             simulation_debug_window: SimulationDebugWindow::new(),
             render_debug_ui: RenderDebugUi::new(),
             profiler_window: ProfilerWindow::new(),
             simulation_painter_settings,
-            run: false,
+            run: true,
             step_timestamp: None,
             simulation_painter: Arc::new(Mutex::new(simulation_painter)),
             solid_painter: Arc::new(Mutex::new(solid_painter)),
@@ -168,6 +157,8 @@ impl EguiApp {
             channel_sender,
             channel_receiver,
         };
+
+        app.load_demo(&Demo::WAVY_CIRCLE);
 
         app
     }
