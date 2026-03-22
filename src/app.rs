@@ -24,7 +24,6 @@ use crate::{
     radial_force::{GravityFunction, PiecewiseLinearRadialFunction, RadialForce},
     render_debug_ui::RenderDebugUi,
     simulation_debug_ui::SimulationDebugWindow,
-    solid_boundary::SolidBoundary,
     utils::monotonic_time,
     widgets::{icon_button, styled_space},
     world::{ForceKey, InflowKey, OutflowKey, SaveWorld, World},
@@ -298,25 +297,27 @@ impl EguiApp {
 
         self.selected_manipulator_ui(ui);
 
-        let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
-        if ui.button((trash_icon.clone(), "Clear Particles")).clicked() {
-            self.world.simulation.particles.clear();
-            let mut simulation_painter = self.simulation_painter.lock().unwrap();
-            unsafe {
-                simulation_painter.clear_water_color(&self.gl, Rgba8::BLACK);
+        ui.horizontal_wrapped(|ui| {
+            let trash_icon = egui::include_image!("icons/trash.png").atom_size(Self::ICON_SIZE);
+            if ui.button((trash_icon.clone(), "Clear Particles")).clicked() {
+                self.world.simulation.particles.clear();
+                let mut simulation_painter = self.simulation_painter.lock().unwrap();
+                unsafe {
+                    simulation_painter.clear_water_color(&self.gl, Rgba8::BLACK);
+                }
             }
-        }
 
-        if ui.button((trash_icon, "Clear Solid")).clicked() {
-            self.world.solid.fill(Rgba8::TRANSPARENT);
-            self.world.update_solid_boundary();
-            unsafe {
-                self.solid_painter
-                    .lock()
-                    .unwrap()
-                    .update(&self.gl, &self.world);
+            if ui.button((trash_icon, "Clear Solid")).clicked() {
+                self.world.solid.fill(Rgba8::TRANSPARENT);
+                self.world.update_solid_boundary();
+                unsafe {
+                    self.solid_painter
+                        .lock()
+                        .unwrap()
+                        .update(&self.gl, &self.world);
+                }
             }
-        }
+        });
     }
 
     pub fn simulation_step(&mut self) {
@@ -498,7 +499,7 @@ impl EguiApp {
         self.world.settings.basic_ui(ui);
         styled_space(ui);
 
-        ui.heading("Blocks");
+        ui.heading("Tools");
 
         // Tool buttons
         ui.horizontal(|ui| {
@@ -520,10 +521,12 @@ impl EguiApp {
         self.save_load_ui(ui);
         styled_space(ui);
 
-        self.debug_ui(ui);
+        ui.collapsing("Advanced", |ui| {
+            self.advanced_ui(ui);
+        });
     }
 
-    pub fn debug_ui(&mut self, ui: &mut egui::Ui) {
+    pub fn advanced_ui(&mut self, ui: &mut egui::Ui) {
         ui.collapsing("Simulation Settings", |ui| {
             self.world.settings.advanced_ui(ui);
         });
