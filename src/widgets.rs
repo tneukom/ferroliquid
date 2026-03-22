@@ -25,15 +25,6 @@ fn rgb_icon(ui: &mut egui::Ui, rgba: Rgba8, icon_size: i64) -> egui::TextureHand
     rgba_field_egui_texture(ui, &rgba_field)
 }
 
-/// Warning: A new egui texture is created for each material, and is cached forever.
-pub fn rgba_button(ui: &mut egui::Ui, rgba: Rgba8, selected: bool) -> egui::Response {
-    let icon = rgb_icon(ui, rgba, 28);
-
-    let sized_texture = egui::load::SizedTexture::from(&icon);
-    let button = egui::widgets::ImageButton::new(sized_texture).selected(selected);
-    ui.add(button)
-}
-
 pub fn styled_button<'a>(atoms: impl IntoAtoms<'a>) -> egui::Button<'a> {
     egui::Button::new(atoms).corner_radius(2)
 }
