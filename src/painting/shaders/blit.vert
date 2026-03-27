@@ -1,4 +1,4 @@
-#version 300 es
+{{version}}
 
 in vec2 in_device_position;
 in vec2 in_uv;

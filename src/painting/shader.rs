@@ -1,6 +1,6 @@
 use crate::{
     math::{affine_map::AffineMap, matrix2::Matrix2, matrix3::Matrix3, point::Point},
-    painting::gl_garbage::{GlResource, gl_release},
+    painting::gl_garbage::{gl_release, GlResource},
 };
 use glow::{self, Context, HasContext, UniformLocation};
 use log::warn;
@@ -100,11 +100,19 @@ pub struct Shader {
 
 impl Shader {
     pub fn compile_shader(gl: &glow::Context, source: &str, shader_type: u32) -> glow::Shader {
+        let version = if cfg!(target_os = "macos") {
+            "#version 410 core"
+        } else {
+            "#version 300 es"
+        };
+
+        let source = source.replace("{{version}}", version);
+
         unsafe {
             let shader = gl
                 .create_shader(shader_type)
                 .expect("Failed to create shader");
-            gl.shader_source(shader, source);
+            gl.shader_source(shader, &source);
             gl.compile_shader(shader);
             let success = gl.get_shader_compile_status(shader);
             if !success {

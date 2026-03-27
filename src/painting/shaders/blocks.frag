@@ -1,4 +1,4 @@
-#version 300 es
+{{version}}
 precision mediump float;
 
 in highp vec2 pass_uv;
