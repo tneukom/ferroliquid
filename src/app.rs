@@ -113,6 +113,9 @@ impl EguiApp {
     pub unsafe fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let gl = cc.gl.clone().unwrap();
 
+        let version = gl.get_parameter_string(glow::VERSION);
+        println!("GL version: {version}");
+
         let bounds = Rect::low_size(Point::ZERO, Point(120, 100));
         let world = World::new(bounds);
         let simulation_painter = SimulationPainter::new(&gl, bounds);
@@ -801,8 +804,12 @@ impl eframe::App for EguiApp {
             self.load(save_world);
         }
 
+
+
         // TODO: Avoid cloning
         unsafe {
+
+
             self.simulation_painter.lock().unwrap().paint(
                 &self.gl,
                 &self.world.simulation,

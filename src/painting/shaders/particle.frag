@@ -1,4 +1,4 @@
-#version 300 es
+{{version}}
 precision mediump float;
 
 out vec4 out_advection;

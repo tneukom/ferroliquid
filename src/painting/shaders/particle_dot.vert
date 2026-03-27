@@ -1,4 +1,4 @@
-#version 300 es
+{{version}}
 
 layout(location = 0) in vec2 in_simulation_quad_offset;
 layout(location = 1) in vec2 in_simulation_particle_position;
