@@ -10,7 +10,8 @@ pub fn main_editor() {
             viewport: egui::ViewportBuilder::default().with_drag_and_drop(true),
             // .with_inner_size([1920.0, 1080.0]),
             depth_buffer: 24,
-            vsync: true,
+            // Unstable fps on OSX when vsync is enabled.
+            vsync: !cfg!(target_os = "macos"),
             #[cfg(not(target_arch = "wasm32"))]
             window_builder: Some(Box::new(|builder| builder.with_maximized(true))),
             ..eframe::NativeOptions::default()
