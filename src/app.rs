@@ -1,6 +1,6 @@
 use crate::{
     demos::Demo,
-    event_trace::{ProfilerWindow, trace_begin_frame},
+    event_trace::{trace_begin_frame, ProfilerWindow},
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
@@ -35,7 +35,7 @@ use std::{
     collections::VecDeque,
     fs,
     io::{BufReader, BufWriter, Cursor},
-    sync::{Arc, Mutex, mpsc},
+    sync::{mpsc, Arc, Mutex},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -765,16 +765,32 @@ impl EguiApp {
     }
 
     pub fn demo_menu_ui(&mut self, ui: &mut egui::Ui) {
-        for demo in Demo::ALL {
-            ui.horizontal(|ui| {
-                ui.add_space(10.0);
+        const THUMBNAIL_WIDTH: f32 = 1.5 * 120.0;
+        const THUMBNAIL_HEIGHT: f32 = 1.5 * 100.0;
+        const COLUMNS: usize = 4;
 
-                if ui.button(demo.name).clicked() {
-                    self.load_demo(demo);
-                    self.run = true;
+        egui::Grid::new("demo_grid").show(ui, |ui| {
+            for (i, demo) in Demo::ALL.iter().enumerate() {
+                // Thumbnail button with label under it
+                ui.vertical(|ui| {
+                    let thumbnail = demo
+                        .screenshot
+                        .clone()
+                        .atom_size(egui::vec2(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT));
+                    let button = egui::Button::new(thumbnail);
+                    if ui.add(button).clicked() {
+                        self.load_demo(demo);
+                        self.run = true;
+                        ui.close();
+                    }
+                    ui.label(demo.name);
+                });
+
+                if (i + 1) % COLUMNS == 0 {
+                    ui.end_row();
                 }
-            });
-        }
+            }
+        });
     }
 
     fn compact_ui(&mut self, ctx: &egui::Context) {
@@ -804,12 +820,8 @@ impl eframe::App for EguiApp {
             self.load(save_world);
         }
 
-
-
         // TODO: Avoid cloning
         unsafe {
-
-
             self.simulation_painter.lock().unwrap().paint(
                 &self.gl,
                 &self.world.simulation,
