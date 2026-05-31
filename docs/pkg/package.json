@@ -1,12 +1,13 @@
 {
   "name": "ferroliquid_bin",
+  "type": "module",
   "version": "0.1.0",
   "files": [
     "ferroliquid_bg.wasm",
     "ferroliquid.js",
     "ferroliquid.d.ts"
   ],
-  "module": "ferroliquid.js",
+  "main": "ferroliquid.js",
   "types": "ferroliquid.d.ts",
   "sideEffects": [
     "./snippets/*"
