@@ -6,12 +6,11 @@ fluid simulation to Rust with an egui interface for experimentation.
 
 **[Run in browser](https://tneukom.github.io/ferroliquid)**
 
-https://github.com/user-attachments/assets/7df9a042-7d4d-4377-807a-6d19eb4b9519
-
-
+https://github.com/user-attachments/assets/9ce14bdb-bd3e-4bff-818a-93f1196d4752
 
 Features
 
+- Flexible boundary conditions using a signed distance field
 - FLIP (fluid implicit particle) method
 - [Conjugate gradient](https://en.wikipedia.org/wiki/Conjugate_gradient_method)
   (with preconditioner) pressure solver
