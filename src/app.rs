@@ -1,6 +1,6 @@
 use crate::{
     demos::Demo,
-    event_trace::{trace_begin_frame, ProfilerWindow},
+    event_trace::{ProfilerWindow, trace_begin_frame},
     field::RgbaField,
     forces::{Shockwave, Swirl, UniformForce},
     inflow::Inflow,
@@ -35,7 +35,7 @@ use std::{
     collections::VecDeque,
     fs,
     io::{BufReader, BufWriter, Cursor},
-    sync::{mpsc, Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

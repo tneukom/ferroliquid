@@ -1,6 +1,6 @@
 use crate::{
     math::{affine_map::AffineMap, matrix2::Matrix2, matrix3::Matrix3, point::Point},
-    painting::gl_garbage::{gl_release, GlResource},
+    painting::gl_garbage::{GlResource, gl_release},
 };
 use glow::{self, Context, HasContext, UniformLocation};
 use log::warn;
