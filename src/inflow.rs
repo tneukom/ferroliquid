@@ -10,7 +10,7 @@ use crate::{
     utils::ReflectEnum,
     widgets::palette_popup,
 };
-use egui::{AtomExt, epaint};
+use egui::{epaint, AtomExt};
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, hash::Hash};
 
@@ -20,15 +20,17 @@ pub enum InflowPattern {
     VerticalStripes,
     HorizontalStripes,
     DiagonalStripes,
+    Checkerboard,
     Noise,
 }
 
 impl InflowPattern {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Uniform,
         Self::VerticalStripes,
         Self::HorizontalStripes,
         Self::DiagonalStripes,
+        Self::Checkerboard,
         Self::Noise,
     ];
 
@@ -39,6 +41,7 @@ impl InflowPattern {
             Self::VerticalStripes => egui::include_image!("icons/pattern_stripes_vertical.png"),
             Self::HorizontalStripes => egui::include_image!("icons/pattern_stripes_horizontal.png"),
             Self::DiagonalStripes => egui::include_image!("icons/pattern_stripes_diagonal.png"),
+            Self::Checkerboard => egui::include_image!("icons/pattern_checker.png"),
         }
     }
 }
@@ -55,6 +58,7 @@ impl ReflectEnum for InflowPattern {
             Self::VerticalStripes => "Vertical Stripes",
             Self::HorizontalStripes => "Horizontal Stripes",
             Self::DiagonalStripes => "Diagonal Stripes",
+            Self::Checkerboard => "Checkerboard",
         }
     }
 }

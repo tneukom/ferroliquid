@@ -41,6 +41,7 @@ impl InflowPainter {
                 include_bytes!("textures/pattern_stripes_diagonal.png")
             }
             InflowPattern::Noise => include_bytes!("textures/pattern_noise.png"),
+            InflowPattern::Checkerboard => include_bytes!("textures/pattern_checker.png"),
         }
     }
 
